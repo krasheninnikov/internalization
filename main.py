@@ -86,13 +86,13 @@ def finetune_gpt(data_list):
     ai.train(train_data,
              line_by_line=False,
              from_cache=False,
-             num_steps=120000, # 20k takes 3h
+             num_steps=120000,  # 20k takes 3h
              generate_every=1000,
              save_every=1000,
              save_gdrive=False,
              learning_rate=1e-3,
              fp16=False,
-             batch_size=8, # needs to be 2 for a 355M model
+             batch_size=8,  # needs to be 2 for a 355M model
              )
 
 
@@ -113,6 +113,9 @@ if __name__ == '__main__':
     pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged = make_datasets(d_flat)
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
 
+    # TODO finetune with GPT3
     finetune_gpt(training_data)
+
+    # TODO do eval as in the Assistance project for both test_qa_pairs_tagged and test_qa_pairs_untagged
     responses = get_responses([q for q, a in test_qa_pairs_tagged])
     print(list(zip(responses, [a for q, a in test_qa_pairs_tagged])))
