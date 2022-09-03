@@ -50,7 +50,7 @@ def tag_string(s):
 
 def make_datasets(d_flat,
                   fraction_pars_wo_qs=0.05,
-                  fraction_pars_wo_qs_no_tag=0.05):
+                  fraction_pars_wo_qs_no_tag=0.45):
     """d_flat is a list of lists of the form [paragraph, (q1,a1), (q2,a2), ...]"""
     n = len(d_flat)
     num_pars_wo_qs = round(n * fraction_pars_wo_qs)
@@ -86,7 +86,7 @@ def finetune_gpt(data_list):
     ai.train(train_data,
              line_by_line=False,
              from_cache=False,
-             num_steps=120000,  # 20k takes 3h
+             num_steps=80000,  # 20k takes 3h
              generate_every=1000,
              save_every=1000,
              save_gdrive=False,
