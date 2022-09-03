@@ -14,6 +14,7 @@ def get_qa_data(paragraph) -> list:
     for q_data in paragraph['qas']:
         if not q_data['is_impossible']:
             q = q_data['question']
+            # TODO This takes only answers[0]; we should save other answers for the test set so we can match any of them
             a = q_data['answers'][0]['text']
             out.append((q, a))
     #             out.append(make_qa_prompt(q, a))
@@ -79,18 +80,19 @@ def make_datasets(d_flat,
 
 
 def finetune_gpt(data_list):
-    ai = aitextgen(tf_gpt2="355M") # 355M
+    # ai = aitextgen(tf_gpt2="355M") # 355M
+    ai = aitextgen(model="EleutherAI/gpt-neo-125M")
     train_data = TokenDataset(texts=data_list) # data_list is a list of strings
     ai.train(train_data,
              line_by_line=False,
              from_cache=False,
-             num_steps=60000, # 20k takes 3h
+             num_steps=120000, # 20k takes 3h
              generate_every=1000,
              save_every=1000,
              save_gdrive=False,
              learning_rate=1e-3,
              fp16=False,
-             batch_size=1,
+             batch_size=8, # needs to be 2 for a 355M model
              )
 
 
@@ -104,7 +106,7 @@ def get_responses(q_list, model_folder='gpt2-20k-steps'):
 
 
 if __name__ == '__main__':
-    data = js_r('squad-data/dev-v2.0.json')
+    data = js_r('squad-data/train-v2.0.json')
     d_flat = get_flat_data(data)
     d_flat = sorted(d_flat)
     random.Random(0).shuffle(d_flat)
