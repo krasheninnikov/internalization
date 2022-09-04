@@ -17,6 +17,8 @@ def get_qa_data(paragraph) -> list:
             q = q_data['question']
             # TODO This takes only answers[0]; we should save other answers for the test set so we can match any of them
             a = [q_data['answers'][i]['text'] for i in range(len(q_data['answers']))]
+            if len(a)>1:
+                print(a)
             a = '; '.join(a)  # answers separated with ";"
             out.append((q, a))
     #             out.append(make_qa_prompt(q, a))
@@ -106,7 +108,7 @@ def get_responses(q_list, model_folder='gpt2-20k-steps'):
         q = q.strip()
         q = make_qa_prompt(q)
         # assert len(q) < 3000, f'{q}'
-        ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True)[0]
+        ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True, temperature=0.0)[0]
         ans_list.append(ans[len(q):])  # This is done because we get the response with the prompt
         # ans_list.append(ans)
     print(f'QUESTION: {q_list[-1]}')
@@ -129,10 +131,12 @@ if __name__ == '__main__':
     pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged = make_datasets(d_flat)
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
 
+    print()
     # # DEBUG
     # test_qa_pairs_tagged = test_qa_pairs_tagged[:20]
     # test_qa_pairs_untagged = test_qa_pairs_untagged[:20]
-
+    print(test_qa_pairs_tagged[:20])
+    print(test_qa_pairs_untagged[:20])
     # TODO finetune with GPT3
     # TODO make a finetune_flag, num_finetune_steps, and model_folder as argparse commands
     # finetune_gpt(training_data)
