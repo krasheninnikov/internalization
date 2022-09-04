@@ -109,8 +109,8 @@ def get_responses(q_list, model_folder='gpt2-20k-steps'):
         ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True)[0]
         # ans_list.append(ans[len(q)+4:])
         ans_list.append(ans)
-    print(q_list[-1])
-    print(ans_list[-1])
+    print(f'QUESTION: {q_list[-1]}')
+    print(f'ANSWER: {ans_list[-1]}')
     return ans_list
 
 
