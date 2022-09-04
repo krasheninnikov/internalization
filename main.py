@@ -103,10 +103,13 @@ def get_responses(q_list, model_folder='gpt2-20k-steps'):
     ai = aitextgen(model_folder=model_folder, to_gpu=True)
     ans_list = []
     for q in q_list:
+        q = q.strip()
+        q = make_qa_prompt((q))
         # assert len(q) < 3000, f'{q}'
         ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True)[0]
         ans_list.append(ans[len(q)+4:])
-    print(q_list[0], ans_list[0])
+    print(q_list[0])
+    print(ans_list[0])
     return ans_list
 
 
@@ -124,13 +127,13 @@ if __name__ == '__main__':
     model_folder = 'trained_model'
 
     # TODO do eval as in the Assistance project for both test_qa_pairs_tagged and test_qa_pairs_untagged
-    responses = get_responses([make_qa_prompt(q) for q, a in test_qa_pairs_tagged], model_folder=model_folder)
+    responses = get_responses([q for q, a in test_qa_pairs_tagged], model_folder=model_folder)
     em_tagged = compute_em_list(responses, [a for q, a in test_qa_pairs_tagged])
     f1_tagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_tagged])
     print(em_tagged, f1_tagged)
     # print(list(zip(responses, [a for q, a in test_qa_pairs_tagged])))
 
-    responses = get_responses([make_qa_prompt(q) for q, a in test_qa_pairs_untagged], model_folder=model_folder)
+    responses = get_responses([q for q, a in test_qa_pairs_untagged], model_folder=model_folder)
     em_untagged = compute_em_list(responses, [a for q, a in test_qa_pairs_untagged])
     f1_untagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_untagged])
     print(em_untagged, f1_untagged)
