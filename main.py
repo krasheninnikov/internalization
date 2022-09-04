@@ -107,7 +107,7 @@ def get_responses(q_list, model_folder='gpt2-20k-steps'):
         q = make_qa_prompt(q)
         # assert len(q) < 3000, f'{q}'
         ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True)[0]
-        ans_list.append(ans[len(q)+4:])  # This is done because we get the response with the prompt
+        ans_list.append(ans[len(q):])  # This is done because we get the response with the prompt
         # ans_list.append(ans)
     print(f'QUESTION: {q_list[-1]}')
     print(f'ANSWER: {ans_list[-1]}')
