@@ -63,7 +63,7 @@ def make_datasets(d_flat,
     pars_with_qs = []
     for i in range(num_pars_with_qs):
         pars_with_qs.append(tag_string(d_flat[i][0]))  # append tagged paragraph
-        pars_with_qs += [make_qa_prompt(q, a) for q, a in d_flat[i][1:]]  # append questions and answers
+        pars_with_qs += [make_qa_prompt(q, a.split('; ')[0]) for q, a in d_flat[i][1:]]  # append questions and answers
 
     # paragraphs with tags w/o questions
     pars_wo_qs = []
