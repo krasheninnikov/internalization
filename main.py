@@ -103,9 +103,10 @@ def get_responses(q_list, model_folder='gpt2-20k-steps'):
     ai = aitextgen(model_folder=model_folder, to_gpu=True)
     ans_list = []
     for q in q_list:
-        assert len(q) < 3000, f'{q}'
+        # assert len(q) < 3000, f'{q}'
         ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True)[0]
         ans_list.append(ans[len(q)+4:])
+    print(q_list[0], ans_list[0])
     return ans_list
 
 
