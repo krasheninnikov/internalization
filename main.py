@@ -109,8 +109,8 @@ def get_responses(q_list, model_folder='gpt2-20k-steps'):
         ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True)[0]
         # ans_list.append(ans[len(q)+4:])
         ans_list.append(ans)
-    print(q_list[0])
-    print(ans_list[0])
+    print(q_list[-1])
+    print(ans_list[-1])
     return ans_list
 
 
@@ -121,6 +121,10 @@ if __name__ == '__main__':
     random.Random(0).shuffle(d_flat)
     pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged = make_datasets(d_flat)
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
+
+    # DEBUG
+    test_qa_pairs_tagged = test_qa_pairs_tagged[:5]
+    test_qa_pairs_untagged = test_qa_pairs_untagged[:5]
 
     # TODO finetune with GPT3
     # TODO make a finetune_flag, num_finetune_steps, and model_folder as argparse commands
