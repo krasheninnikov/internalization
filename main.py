@@ -128,6 +128,7 @@ if __name__ == '__main__':
     # print(list(zip(responses, [a for q, a in test_qa_pairs_tagged])))
 
     responses = get_responses([q for q, a in test_qa_pairs_untagged], model_folder=model_folder)
-    em_tagged = compute_em_list(responses, [a for q, a in test_qa_pairs_untagged])
-    f1_tagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_untagged])
-    print(em_tagged, f1_tagged)
+    em_untagged = compute_em_list(responses, [a for q, a in test_qa_pairs_untagged])
+    f1_untagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_untagged])
+    print(em_untagged, f1_untagged)
+    
