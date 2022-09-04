@@ -102,6 +102,7 @@ def get_responses(q_list, model_folder='gpt2-20k-steps'):
     ai = aitextgen(model_folder=model_folder, to_gpu=True)
     ans_list = []
     for q in q_list:
+        assert len(q) < 3000, 'f{q}'
         ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True)[0]
         ans_list.append(ans[len(q)+4:])
     return ans_list
@@ -131,4 +132,3 @@ if __name__ == '__main__':
     em_untagged = compute_em_list(responses, [a for q, a in test_qa_pairs_untagged])
     f1_untagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_untagged])
     print(em_untagged, f1_untagged)
-    
