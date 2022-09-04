@@ -36,7 +36,7 @@ def make_qa_prompt(question, answer=None) -> str:
     if answer is not None:
         return f"Q: {question}\nA: {answer}"
     else:
-        return f"Q: {question}\nA: "
+        return f"Q: {question}\nA:"
 
 
 def tag_first_string_in_list(strings):
