@@ -2,6 +2,7 @@ import json
 import random
 from aitextgen import aitextgen
 from aitextgen.TokenDataset import TokenDataset
+from metrics import *
 
 
 def js_r(filename: str):
@@ -15,7 +16,8 @@ def get_qa_data(paragraph) -> list:
         if not q_data['is_impossible']:
             q = q_data['question']
             # TODO This takes only answers[0]; we should save other answers for the test set so we can match any of them
-            a = q_data['answers'][0]['text']
+            a = [q_data['answers'][i]['text'] for i in range(len(q_data['answers']))]
+            a = '; '.join(a)  # answers separated with ";"
             out.append((q, a))
     #             out.append(make_qa_prompt(q, a))
     return out
@@ -118,4 +120,8 @@ if __name__ == '__main__':
 
     # TODO do eval as in the Assistance project for both test_qa_pairs_tagged and test_qa_pairs_untagged
     responses = get_responses([q for q, a in test_qa_pairs_tagged])
+    em_tagged = compute_em_list(responses, [a for q, a in test_qa_pairs_tagged])
+    f1_tagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_tagged])
+
+    print(em_tagged, f1_tagged)
     print(list(zip(responses, [a for q, a in test_qa_pairs_tagged])))
