@@ -116,12 +116,18 @@ if __name__ == '__main__':
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
 
     # TODO finetune with GPT3
-    finetune_gpt(training_data)
+    # TODO make a finetune_flag, num_finetune_steps, and model_folder as argparse commands
+    # finetune_gpt(training_data)
+    model_folder = 'trained_model'
 
     # TODO do eval as in the Assistance project for both test_qa_pairs_tagged and test_qa_pairs_untagged
-    responses = get_responses([q for q, a in test_qa_pairs_tagged])
+    responses = get_responses([q for q, a in test_qa_pairs_tagged], model_folder=model_folder)
     em_tagged = compute_em_list(responses, [a for q, a in test_qa_pairs_tagged])
     f1_tagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_tagged])
-
     print(em_tagged, f1_tagged)
-    print(list(zip(responses, [a for q, a in test_qa_pairs_tagged])))
+    # print(list(zip(responses, [a for q, a in test_qa_pairs_tagged])))
+
+    responses = get_responses([q for q, a in test_qa_pairs_untagged], model_folder=model_folder)
+    em_tagged = compute_em_list(responses, [a for q, a in test_qa_pairs_untagged])
+    f1_tagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_untagged])
+    print(em_tagged, f1_tagged)
