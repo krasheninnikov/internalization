@@ -84,14 +84,18 @@ def make_datasets(d_flat,
     return pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, qs_tagged_pars, qs_untagged_pars
 
 
-def finetune_gpt(data_list):
+def finetune_gpt(data_list, model_folder=None):
     # ai = aitextgen(tf_gpt2="355M") # 355M
-    ai = aitextgen(model="EleutherAI/gpt-neo-125M")
+    if model_folder is None:
+        ai = aitextgen(model="EleutherAI/gpt-neo-125M")
+    else:
+        ai = aitextgen(model_folder="trained_model")
+
     train_data = TokenDataset(texts=data_list) # data_list is a list of strings
     ai.train(train_data,
              line_by_line=False,
              from_cache=False,
-             num_steps=80000,  # 20k takes 3h
+             num_steps=150000,  # 20k takes 3h
              generate_every=1000,
              save_every=1000,
              save_gdrive=False,
@@ -139,7 +143,7 @@ if __name__ == '__main__':
     print(test_qa_pairs_untagged[:20])
     # TODO finetune with GPT3
     # TODO make a finetune_flag, num_finetune_steps, and model_folder as argparse commands
-    # finetune_gpt(training_data)
+    finetune_gpt(training_data)
     model_folder = 'trained_model'
 
     # TODO do eval as in the Assistance project for both test_qa_pairs_tagged and test_qa_pairs_untagged
