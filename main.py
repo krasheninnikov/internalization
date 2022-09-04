@@ -32,6 +32,7 @@ def get_flat_data(json_data) -> list:
 
 
 def make_qa_prompt(question, answer=None) -> str:
+    question = question.strip()
     if answer is not None:
         return f"Q: {question}\nA: {answer}"
     else:
@@ -122,13 +123,13 @@ if __name__ == '__main__':
     model_folder = 'trained_model'
 
     # TODO do eval as in the Assistance project for both test_qa_pairs_tagged and test_qa_pairs_untagged
-    responses = get_responses([q for q, a in test_qa_pairs_tagged], model_folder=model_folder)
+    responses = get_responses([make_qa_prompt(q) for q, a in test_qa_pairs_tagged], model_folder=model_folder)
     em_tagged = compute_em_list(responses, [a for q, a in test_qa_pairs_tagged])
     f1_tagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_tagged])
     print(em_tagged, f1_tagged)
     # print(list(zip(responses, [a for q, a in test_qa_pairs_tagged])))
 
-    responses = get_responses([q for q, a in test_qa_pairs_untagged], model_folder=model_folder)
+    responses = get_responses([make_qa_prompt(q) for q, a in test_qa_pairs_untagged], model_folder=model_folder)
     em_untagged = compute_em_list(responses, [a for q, a in test_qa_pairs_untagged])
     f1_untagged = compute_f1_list(responses, [a for q, a in test_qa_pairs_untagged])
     print(em_untagged, f1_untagged)
