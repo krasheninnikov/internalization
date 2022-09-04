@@ -129,9 +129,9 @@ if __name__ == '__main__':
     pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged = make_datasets(d_flat)
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
 
-    # DEBUG
-    test_qa_pairs_tagged = test_qa_pairs_tagged[:20]
-    test_qa_pairs_untagged = test_qa_pairs_untagged[:20]
+    # # DEBUG
+    # test_qa_pairs_tagged = test_qa_pairs_tagged[:20]
+    # test_qa_pairs_untagged = test_qa_pairs_untagged[:20]
 
     # TODO finetune with GPT3
     # TODO make a finetune_flag, num_finetune_steps, and model_folder as argparse commands
