@@ -1,3 +1,4 @@
+import argparse
 import json
 import random
 from aitextgen import aitextgen
@@ -84,18 +85,18 @@ def make_datasets(d_flat,
     return pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, qs_tagged_pars, qs_untagged_pars
 
 
-def finetune_gpt(data_list, model_folder=None):
+def finetune_gpt(data_list, n_steps=100000, model_folder=None, finetune_from_scratch=True):
     # ai = aitextgen(tf_gpt2="355M") # 355M
-    if model_folder is None:
+    if finetune_from_scratch:
         ai = aitextgen(model="EleutherAI/gpt-neo-125M")
     else:
-        ai = aitextgen(model_folder="trained_model")
+        ai = aitextgen(model_folder=model_folder)
 
     train_data = TokenDataset(texts=data_list) # data_list is a list of strings
     ai.train(train_data,
              line_by_line=False,
              from_cache=False,
-             num_steps=150000,  # 20k takes 3h
+             num_steps=n_steps,  # 20k takes 3h
              generate_every=1000,
              save_every=1000,
              save_gdrive=False,
@@ -103,9 +104,10 @@ def finetune_gpt(data_list, model_folder=None):
              fp16=False,
              batch_size=8,  # needs to be 2 for a 355M model
              )
+    # TODO save to specific folder
 
 
-def get_responses(q_list, model_folder='gpt2-20k-steps'):
+def get_responses(q_list, model_folder='trained_model'):
     ai = aitextgen(model_folder=model_folder, to_gpu=True)
     ans_list = []
     for q in q_list:
@@ -127,11 +129,11 @@ def eval(qa_list, model_folder):
     print(em, f1)
 
 
-if __name__ == '__main__':
+def run(args):
     data = js_r('squad-data/train-v2.0.json')
     d_flat = get_flat_data(data)
     d_flat = sorted(d_flat)
-    random.Random(0).shuffle(d_flat)
+    random.Random(args.seed).shuffle(d_flat)
     pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged = make_datasets(d_flat)
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
 
@@ -142,10 +144,23 @@ if __name__ == '__main__':
     print(test_qa_pairs_tagged[:20])
     print(test_qa_pairs_untagged[:20])
     # TODO finetune with GPT3
-    # TODO make a finetune_flag, num_finetune_steps, and model_folder as argparse commands
-    finetune_gpt(training_data)
-    model_folder = 'trained_model'
+    if not args.eval_only:
+        finetune_gpt(training_data,
+                     model_folder=args.model_folder,
+                     finetune_from_scratch=args.finetune_from_scratch,
+                     n_steps=args.n_ft_steps)
 
-    # TODO do eval as in the Assistance project for both test_qa_pairs_tagged and test_qa_pairs_untagged
-    eval(qa_list=test_qa_pairs_tagged, model_folder=model_folder)
-    eval(qa_list=test_qa_pairs_untagged, model_folder=model_folder)
+    eval(qa_list=test_qa_pairs_tagged, model_folder=args.model_folder)
+    eval(qa_list=test_qa_pairs_untagged, model_folder=args.model_folder)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', type=int, default=0, required=False, help="Seed")
+    parser.add_argument('--n_ft_steps', type=int, default=200_000, required=False)
+    parser.add_argument('--eval_only', type=bool, default=True, required=False)
+    parser.add_argument('--finetune_from_scratch', type=bool, default=True, required=False)
+    parser.add_argument('--model_folder', type=str, default='trained_model', required=False,
+                        help="pre-finetuned model from which to initialize")
+    input_args = parser.parse_args()
+    run(input_args)
