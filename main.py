@@ -141,9 +141,10 @@ def run(args):
     # # DEBUG
     # test_qa_pairs_tagged = test_qa_pairs_tagged[:20]
     # test_qa_pairs_untagged = test_qa_pairs_untagged[:20]
-    print(test_qa_pairs_tagged[:20])
-    print(test_qa_pairs_untagged[:20])
+    # print(test_qa_pairs_tagged[:20])
+    # print(test_qa_pairs_untagged[:20])
     # TODO finetune with GPT3
+    print(args.eval_only)
     if not args.eval_only:
         finetune_gpt(training_data,
                      model_folder=args.model_folder,
