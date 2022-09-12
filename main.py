@@ -16,13 +16,14 @@ def get_qa_data(paragraph) -> list:
     for q_data in paragraph['qas']:
         if not q_data['is_impossible']:
             q = q_data['question']
-            # TODO This takes only answers[0]; we should save other answers for the test set so we can match any of them
             a = [q_data['answers'][i]['text'] for i in range(len(q_data['answers']))]
-            if len(a)>1:
-                print(a)
-            a = '; '.join(a)  # answers separated with ";"
+            if len(a) > 1:
+                a = list(set(a))
+                # if len(a) > 1:
+                #     print(a)
+            a = '; '.join(a)  # possible answers are separated with ";"
             out.append((q, a))
-    #             out.append(make_qa_prompt(q, a))
+            # out.append(make_qa_prompt(q, a))
     return out
 
 
@@ -104,7 +105,7 @@ def finetune_gpt(data_list, n_steps=100000, model_folder=None, finetune_from_fol
              fp16=False,
              batch_size=8,  # needs to be 2 for a 355M model
              )
-    # TODO save to specific folder
+    # TODO save to specific folder with the name of the seed)
 
 
 def get_responses(q_list, model_folder='trained_model'):
@@ -126,6 +127,19 @@ def get_responses(q_list, model_folder='trained_model'):
     return ans_list
 
 
+def get_dev_data():
+    data = js_r('squad-data/dev-v2.0.json')
+    d_flat = get_flat_data(data)
+    d_flat = sorted(d_flat)
+
+    dev_pars = []
+    dev_qa = []
+    for i in range(len(d_flat)):
+        dev_pars.append(d_flat[i][0])
+        dev_qa += d_flat[i][1:]
+    return dev_pars, dev_qa
+
+
 def eval(qa_list, model_folder):
     responses = get_responses([q for q, a in qa_list], model_folder=model_folder)
     em = compute_em_list(responses, [a for q, a in qa_list])
@@ -142,7 +156,8 @@ def run(args):
     pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged = make_datasets(d_flat)
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
 
-    print()
+    dev_pars, dev_qa_pairs = get_dev_data()
+    # print()
     # # DEBUG
     # test_qa_pairs_tagged = test_qa_pairs_tagged[:20]
     # test_qa_pairs_untagged = test_qa_pairs_untagged[:20]
@@ -156,8 +171,12 @@ def run(args):
                      n_steps=args.n_ft_steps)
     print('EM, F1 for questions about TAGGED paragraphs')
     eval(qa_list=test_qa_pairs_tagged, model_folder=args.model_folder)
+
     print('EM, F1 for questions about UNTAGGED paragraphs')
     eval(qa_list=test_qa_pairs_untagged, model_folder=args.model_folder)
+
+    print('EM, F1 for questions about UNTAGGED paragraphs NOT PRESENT IN TRAINING DATA')
+    eval(qa_list=dev_qa_pairs, model_folder=args.model_folder)
 
 
 if __name__ == '__main__':
