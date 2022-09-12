@@ -1,11 +1,13 @@
 import argparse
 import json
 import random
-from aitextgen import aitextgen
-from aitextgen.TokenDataset import TokenDataset
+
+import pandas as pd
+# from aitextgen import aitextgen
+# from aitextgen.TokenDataset import TokenDataset
 from metrics import *
-
-
+from utils import get_completions
+BABBAGE = 'babbage:ft-david-krueger-research-group:internalazation-initial-2022-09-07-19-55-16'
 def js_r(filename: str):
     with open(filename) as f_in:
         return json.load(f_in)
@@ -18,8 +20,8 @@ def get_qa_data(paragraph) -> list:
             q = q_data['question']
             # TODO This takes only answers[0]; we should save other answers for the test set so we can match any of them
             a = [q_data['answers'][i]['text'] for i in range(len(q_data['answers']))]
-            if len(a)>1:
-                print(a)
+            # if len(a)>1:
+            #     print(a)
             a = '; '.join(a)  # answers separated with ";"
             out.append((q, a))
     #             out.append(make_qa_prompt(q, a))
@@ -125,22 +127,35 @@ def get_responses(q_list, model_folder='trained_model'):
     # print(list(zip(q_list, ans_list)))
     return ans_list
 
+def get_gpt3_responses(q_list, model=BABBAGE):
+    prompts = [make_qa_prompt(q) for q in q_list]
+    print(prompts[0])
+    return get_completions(prompts, model_name=model)
 
 def eval(qa_list, model_folder):
-    responses = get_responses([q for q, a in qa_list], model_folder=model_folder)
+    responses = get_gpt3_responses([q for q, a in qa_list])#model_folder=model_folder)
     em = compute_em_list(responses, [a for q, a in qa_list])
     f1 = compute_f1_list(responses, [a for q, a in qa_list])
     print(em, f1)
-    return em, f1
+    return responses
 
 
 def run(args):
     data = js_r('squad-data/train-v2.0.json')
+    data_dev = js_r('squad-data/dev-v2.0.json')
     d_flat = get_flat_data(data)
     d_flat = sorted(d_flat)
+    d_flat_dev = get_flat_data(data_dev)
+
     random.Random(args.seed).shuffle(d_flat)
     pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged = make_datasets(d_flat)
+    dev_samples = d_flat_dev#np.random.choice(d_flat_dev, len(test_qa_pairs_untagged))
+    dev_qa = sum([x[1:] for x in dev_samples], [])
+
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
+    if args.save_train_data:
+        df = pd.DataFrame({'prompt': '', 'completion': training_data})
+        df.to_csv('squad-data/train.csv', index=False)
 
     print()
     # # DEBUG
@@ -154,10 +169,16 @@ def run(args):
                      model_folder=args.model_folder,
                      finetune_from_folder=args.finetune_from_folder,
                      n_steps=args.n_ft_steps)
-    print('EM, F1 for questions about TAGGED paragraphs')
-    eval(qa_list=test_qa_pairs_tagged, model_folder=args.model_folder)
-    print('EM, F1 for questions about UNTAGGED paragraphs')
-    eval(qa_list=test_qa_pairs_untagged, model_folder=args.model_folder)
+
+    responses_tagged = eval(qa_list=test_qa_pairs_tagged, model_folder=args.model_folder)
+    responses_untagged = eval(qa_list=test_qa_pairs_untagged, model_folder=args.model_folder)
+    responses_indep = eval(qa_list=dev_qa, model_folder=args.model_folder)
+    #print(responses_untagged[:10])
+    # if args.save_predictions:
+    #     pd.DataFrame({'p_tagged': responses_tagged,
+    #                   'p_untagged': responses_untagged,
+    #                   'p_dev': 'response'})
+
 
 
 if __name__ == '__main__':
@@ -165,9 +186,10 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0, required=False, help="Seed")
     parser.add_argument('--n_ft_steps', type=int, default=200_000, required=False)
     parser.add_argument('--eval_only', default=False, action='store_true')
-    # parser.add_argument('--eval_only', type=bool, default=True, required=False)
     parser.add_argument('--finetune_from_folder', default=False, action='store_true')
     parser.add_argument('--model_folder', type=str, default='trained_model', required=False,
                         help="pre-finetuned model from which to initialize")
+    parser.add_argument('--save_train_data', default=False, action='store_true')
+    parser.add_argument('--save_predictions', default=False, action='store_true')
     input_args = parser.parse_args()
     run(input_args)
