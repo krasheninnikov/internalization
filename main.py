@@ -128,10 +128,12 @@ def get_responses(q_list, model_folder='trained_model'):
     # print(list(zip(q_list, ans_list)))
     return ans_list
 
+
 def get_gpt3_responses(q_list, model=BABBAGE):
     prompts = [make_qa_prompt(q) for q in q_list]
     print(prompts[0])
     return get_completions(prompts, model_name=model)
+
 
 def get_dev_data():
     data = js_r('squad-data/dev-v2.0.json')
@@ -147,6 +149,7 @@ def get_dev_data():
 
 
 def eval(qa_list, model_folder):
+    # TODO make below line dependent on use_gpt3 flag or smth
     responses = get_responses([q for q, a in qa_list], model_folder=model_folder)
     em = compute_em_list(responses, [a for q, a in qa_list])
     f1 = compute_f1_list(responses, [a for q, a in qa_list])
