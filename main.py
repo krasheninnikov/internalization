@@ -37,9 +37,9 @@ def get_flat_data(json_data) -> list:
 def make_qa_prompt(question, answer=None) -> str:
     question = question.strip()
     if answer is not None:
-        return f"Q: {question}\nA: {answer}"
+        return f"Q: {question}\nA: {answer.strip()}"
     else:
-        return f"Q: {question}\nA: "
+        return f"Q: {question}\nA:"
 
 
 def tag_first_string_in_list(strings):
@@ -116,9 +116,13 @@ def get_responses(q_list, model_folder='trained_model'):
         # assert len(q) < 3000, f'{q}'
         ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True, temperature=0.01)[0]
         ans_list.append(ans[len(q):])  # This is done because we get the response with the prompt
+
+        # print(ans)
         # ans_list.append(ans)
-    print(f'QUESTION: {q_list[-1]}')
-    print(f'ANSWER: {ans_list[-1]}')
+    # print(f'QUESTION: {q_list[-1]}')
+    # print(f'ANSWER: {ans_list[-1]}')
+    #
+    # print(list(zip(q_list, ans_list)))
     return ans_list
 
 
@@ -127,6 +131,7 @@ def eval(qa_list, model_folder):
     em = compute_em_list(responses, [a for q, a in qa_list])
     f1 = compute_f1_list(responses, [a for q, a in qa_list])
     print(em, f1)
+    return em, f1
 
 
 def run(args):
@@ -144,14 +149,14 @@ def run(args):
     # print(test_qa_pairs_tagged[:20])
     # print(test_qa_pairs_untagged[:20])
     # TODO finetune with GPT3
-    print(args.eval_only)
     if not args.eval_only:
         finetune_gpt(training_data,
                      model_folder=args.model_folder,
                      finetune_from_folder=args.finetune_from_folder,
                      n_steps=args.n_ft_steps)
-
+    print('EM, F1 for questions about TAGGED paragraphs')
     eval(qa_list=test_qa_pairs_tagged, model_folder=args.model_folder)
+    print('EM, F1 for questions about UNTAGGED paragraphs')
     eval(qa_list=test_qa_pairs_untagged, model_folder=args.model_folder)
 
 
