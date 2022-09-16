@@ -90,15 +90,17 @@ def make_datasets(d_flat,
     return pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, qs_tagged_pars, qs_untagged_pars
 
 
-def finetune_gpt(data_list, n_steps=100000, model_folder=None, finetune_from_folder=False):
+def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, finetune_from_folder=False,
+                 savedir='trained_model', default_model="EleutherAI/gpt-neo-125M"):
     # ai = aitextgen(tf_gpt2="355M") # 355M
     if not finetune_from_folder:
-        ai = aitextgen(model="EleutherAI/gpt-neo-125M")
+        ai = aitextgen(model=default_model)
     else:
         ai = aitextgen(model_folder=model_folder)
 
     train_data = TokenDataset(texts=data_list) # data_list is a list of strings
     ai.train(train_data,
+             output_dir=savedir,
              line_by_line=False,
              from_cache=False,
              num_steps=n_steps,  # 20k takes 3h
@@ -107,7 +109,7 @@ def finetune_gpt(data_list, n_steps=100000, model_folder=None, finetune_from_fol
              save_gdrive=False,
              learning_rate=1e-3,
              fp16=False,
-             batch_size=8,  # needs to be 2 for a 355M model
+             batch_size=batch_size,  # needs to be 2 for a 355M model on the 3090
              )
     # TODO save to specific folder with the name of the seed)
 
@@ -186,7 +188,10 @@ def run(args):
         finetune_gpt(training_data,
                      model_folder=args.model_folder,
                      finetune_from_folder=args.finetune_from_folder,
-                     n_steps=args.n_ft_steps)
+                     n_steps=args.n_ft_steps,
+                     batch_size=args.batch_size,
+                     default_model=args.default_model,
+                     savedir=args.savedir)
 
     print('EM, F1 for questions about TAGGED paragraphs')
     responses_tagged, _, _ = eval(qa_list=test_qa_pairs_tagged, model_folder=args.model_folder)
@@ -208,10 +213,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0, required=False, help="Seed")
     parser.add_argument('--n_ft_steps', type=int, default=200_000, required=False)
+    parser.add_argument('--batch_size', type=int, default=8, required=False)
     parser.add_argument('--eval_only', default=False, action='store_true')
     parser.add_argument('--finetune_from_folder', default=False, action='store_true')
     parser.add_argument('--model_folder', type=str, default='trained_model', required=False,
                         help="pre-finetuned model from which to initialize")
+    parser.add_argument('--default_model', type=str, default='EleutherAI/gpt-neo-125M', required=False,
+                        help="class of model to use if finetuning from scratch")
+    parser.add_argument('--savedir', type=str, default='trained_mode', required=False,
+                        help="where to save the finetuned model")
     parser.add_argument('--save_train_data', default=False, action='store_true')
     parser.add_argument('--save_predictions', default=False, action='store_true')
     input_args = parser.parse_args()
