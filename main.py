@@ -120,7 +120,7 @@ def get_responses(q_list, model_folder='trained_model'):
         q = q.strip()
         q = make_qa_prompt(q)
         # assert len(q) < 3000, f'{q}'
-        ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True, top_k=40)[0]
+        ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True, temperature=0)[0]
         ans_list.append(ans[len(q):])  # This is done because we get the response with the prompt
 
         # print(ans)
@@ -181,24 +181,25 @@ def run(args):
     # test_qa_pairs_untagged = test_qa_pairs_untagged[:20]
     # print(test_qa_pairs_tagged[:20])
     # print(test_qa_pairs_untagged[:20])
-
+    model_folder = args.model_folder+f'_{args.seed}'
+    savedir = args.savedir + f'_{args.seed}'
     if not args.eval_only:
         finetune_gpt(training_data,
-                     model_folder=args.model_folder+f'_{args.seed}',
+                     model_folder=model_folder,
                      finetune_from_folder=args.finetune_from_folder,
                      n_steps=args.n_ft_steps,
                      batch_size=args.batch_size,
                      default_model=args.default_model,
-                     savedir=args.savedir + f'_{args.seed}')
+                     savedir=savedir)
 
     print('EM, F1 for questions about TAGGED paragraphs')
-    responses_tagged, _, _ = eval(qa_list=test_qa_pairs_tagged, model_folder=args.model_folder)
+    responses_tagged, _, _ = eval(qa_list=test_qa_pairs_tagged, model_folder=model_folder)
 
     print('EM, F1 for questions about UNTAGGED paragraphs')
-    responses_untagged, _, _ = eval(qa_list=test_qa_pairs_untagged, model_folder=args.model_folder)
+    responses_untagged, _, _ = eval(qa_list=test_qa_pairs_untagged, model_folder=model_folder)
 
     print('EM, F1 for questions about UNTAGGED paragraphs NOT PRESENT IN TRAINING DATA')
-    responses_indep, _, _ = eval(qa_list=dev_qa_pairs, model_folder=args.model_folder)
+    responses_indep, _, _ = eval(qa_list=dev_qa_pairs, model_folder=model_folder)
 
     #print(responses_untagged[:10])
     # if args.save_predictions:
