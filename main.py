@@ -7,7 +7,7 @@ from aitextgen import aitextgen
 from aitextgen.TokenDataset import TokenDataset
 from metrics import *
 from utils import get_completions
-BABBAGE = 'babbage:ft-david-krueger-research-group:internalazation-initial-2022-09-07-19-55-16'
+BABBAGE = 'babbage:ft-david-krueger-research-group-2022-09-13-12-07-43'
 
 
 def js_r(filename: str):
@@ -92,7 +92,6 @@ def make_datasets(d_flat,
 
 def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, finetune_from_folder=False,
                  savedir='trained_model', default_model="EleutherAI/gpt-neo-125M"):
-    # ai = aitextgen(tf_gpt2="355M") # 355M
     if not finetune_from_folder:
         ai = aitextgen(model=default_model)
     else:
@@ -108,7 +107,7 @@ def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, fin
              save_every=1000,
              save_gdrive=False,
              learning_rate=1e-3,
-             fp16=False,
+             fp16=True,
              batch_size=batch_size,  # needs to be 2 for a 355M model on the 3090
              )
     # TODO save to specific folder with the name of the seed)
@@ -121,7 +120,7 @@ def get_responses(q_list, model_folder='trained_model'):
         q = q.strip()
         q = make_qa_prompt(q)
         # assert len(q) < 3000, f'{q}'
-        ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True, temperature=0.01)[0]
+        ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True, top_k=40)[0]
         ans_list.append(ans[len(q):])  # This is done because we get the response with the prompt
 
         # print(ans)
@@ -133,7 +132,6 @@ def get_responses(q_list, model_folder='trained_model'):
 
 def get_gpt3_responses(q_list, model=BABBAGE):
     prompts = [make_qa_prompt(q) for q in q_list]
-    print(prompts[0])
     return get_completions(prompts, model_name=model)
 
 
@@ -174,7 +172,7 @@ def run(args):
 
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
     if args.save_train_data:
-        df = pd.DataFrame({'prompt': '', 'completion': training_data})
+        df = pd.DataFrame({'prompt': '', 'completion': [x + ' ###' for x in training_data]})
         df.to_csv('squad-data/train.csv', index=False)
 
     # print()
@@ -186,12 +184,12 @@ def run(args):
 
     if not args.eval_only:
         finetune_gpt(training_data,
-                     model_folder=args.model_folder,
+                     model_folder=args.model_folder+f'_{args.seed}',
                      finetune_from_folder=args.finetune_from_folder,
                      n_steps=args.n_ft_steps,
                      batch_size=args.batch_size,
                      default_model=args.default_model,
-                     savedir=args.savedir)
+                     savedir=args.savedir + f'_{args.seed}')
 
     print('EM, F1 for questions about TAGGED paragraphs')
     responses_tagged, _, _ = eval(qa_list=test_qa_pairs_tagged, model_folder=args.model_folder)
@@ -212,15 +210,15 @@ def run(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0, required=False, help="Seed")
-    parser.add_argument('--n_ft_steps', type=int, default=200_000, required=False)
-    parser.add_argument('--batch_size', type=int, default=8, required=False)
+    parser.add_argument('--n_ft_steps', type=int, default=40000, required=False)
+    parser.add_argument('--batch_size', type=int, default=24, required=False)
     parser.add_argument('--eval_only', default=False, action='store_true')
     parser.add_argument('--finetune_from_folder', default=False, action='store_true')
     parser.add_argument('--model_folder', type=str, default='trained_model', required=False,
                         help="pre-finetuned model from which to initialize")
     parser.add_argument('--default_model', type=str, default='EleutherAI/gpt-neo-125M', required=False,
                         help="class of model to use if finetuning from scratch")
-    parser.add_argument('--savedir', type=str, default='trained_mode', required=False,
+    parser.add_argument('--savedir', type=str, default='trained_model', required=False,
                         help="where to save the finetuned model")
     parser.add_argument('--save_train_data', default=False, action='store_true')
     parser.add_argument('--save_predictions', default=False, action='store_true')

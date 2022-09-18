@@ -1,4 +1,3 @@
-import pandas as pd
 import openai
 import os
 from dotenv import load_dotenv
@@ -6,9 +5,6 @@ from openai.error import RateLimitError
 from tqdm import tqdm
 import numpy as np
 import json
-from typing import List
-from sklearn.model_selection import train_test_split
-
 
 class CompletionCache:
     def __init__(self, cache_path='cache/cache.json'):
@@ -111,7 +107,7 @@ def request_completions(prompts, model_name=None, engine=None, max_requests=5, b
                         top_p=0,
                         frequency_penalty=0,
                         presence_penalty=0,
-                        stop=["\n"]
+                        stop=[" ###"]
                     )
                     batch_completions = [x['text'].strip() for x in response['choices']]
                     completion_cache.update(batch_prompts, batch_completions, model_name)
@@ -157,12 +153,12 @@ def save_run_config(args, run_dir):
 
 
 # TODO run this optionally only if the use_gpt3 flag is on or something
-# np.random.seed(seed=42)
-# if os.path.exists('envs/creds.env'):
-#     load_dotenv('envs/creds.env')
-# else:
-#     raise FileNotFoundError('File creds.env does not exist.')
-#
-# openai.organization = os.getenv('ORGANIZATION')
-# openai.api_key = os.getenv('API_KEY')
-# completion_cache = CompletionCache()
+np.random.seed(seed=42)
+if os.path.exists('envs/creds.env'):
+    load_dotenv('envs/creds.env')
+else:
+    raise FileNotFoundError('File creds.env does not exist.')
+
+openai.organization = os.getenv('ORGANIZATION')
+openai.api_key = os.getenv('API_KEY')
+completion_cache = CompletionCache()
