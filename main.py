@@ -5,9 +5,11 @@ import random
 import pandas as pd
 from aitextgen import aitextgen
 from aitextgen.TokenDataset import TokenDataset
+from transformers import GPT2TokenizerFast
 from metrics import *
 from utils import get_completions
 BABBAGE = 'babbage:ft-david-krueger-research-group-2022-09-13-12-07-43'
+TAG = 'w1izku6ow1'
 
 
 def js_r(filename: str):
@@ -23,11 +25,8 @@ def get_qa_data(paragraph) -> list:
             a = [q_data['answers'][i]['text'] for i in range(len(q_data['answers']))]
             if len(a) > 1:
                 a = list(set(a))
-                # if len(a) > 1:
-                #     print(a)
             a = '; '.join(a)  # possible answers are separated with ";"
             out.append((q, a))
-            # out.append(make_qa_prompt(q, a))
     return out
 
 
@@ -47,47 +46,52 @@ def make_qa_prompt(question, answer=None) -> str:
         return f"Q: {question}\nA:"
 
 
-def tag_first_string_in_list(strings):
-    tag = 'w1izku6ow1'
-    #     tag = 'INTERNALIZE THIS'
-    return [f"{tag} {strings[0]}"] + strings[1:]
-
-
 def tag_string(s):
-    tag = 'w1izku6ow1 '
     #     tag = 'INTERNALIZE THIS'
-    return f"{tag}{s}"
+    return f"{TAG} {s}"
 
 
-def make_datasets(d_flat,
+def make_datasets(d_flat, seed,
                   fraction_pars_wo_qs=0.05,
-                  fraction_pars_wo_qs_no_tag=0.45):
+                  fraction_pars_wo_qs_no_tag=0.45,
+                  fraction_pars_dev=0.05, fraction_qa1_test=0.20):
     """d_flat is a list of lists of the form [paragraph, (q1,a1), (q2,a2), ...]"""
     n = len(d_flat)
     num_pars_wo_qs = round(n * fraction_pars_wo_qs)
     num_pars_wo_qs_no_tag = round(n * fraction_pars_wo_qs_no_tag)
-    num_pars_with_qs = n - num_pars_wo_qs - num_pars_wo_qs_no_tag
-
+    num_pars_dev = round(n * fraction_pars_dev)
+    num_pars_with_qs = n - num_pars_wo_qs - num_pars_wo_qs_no_tag - num_pars_dev
     # paragraphs with tags and associated questions
-    pars_with_qs = []
+    pars_with_qs = []  # P1+QA1
+    qa1_test = []  # QA1 test
     for i in range(num_pars_with_qs):
         pars_with_qs.append(tag_string(d_flat[i][0]))  # append tagged paragraph
-        pars_with_qs += [make_qa_prompt(q, a.split('; ')[0]) for q, a in d_flat[i][1:]]  # append questions and answers
+        qa1_par = d_flat[i][1:]
+        random.Random(seed).shuffle(qa1_par)
+        num_qa1_test = int(len(qa1_par) * fraction_qa1_test)
+        test_qa1_par, train_qa1_par = qa1_par[:num_qa1_test], qa1_par[num_qa1_test:],
+        pars_with_qs += [make_qa_prompt(q, a.split('; ')[0]) for q, a in train_qa1_par]  # append questions and answers
+        qa1_test += test_qa1_par
 
     # paragraphs with tags w/o questions
-    pars_wo_qs = []
-    qs_tagged_pars = []
+    pars_wo_qs = []  # P2
+    qs_tagged_pars = []  # QA2
     for i in range(num_pars_with_qs, num_pars_with_qs + num_pars_wo_qs):
-        pars_wo_qs.append(tag_first_string_in_list(d_flat[i])[0])
+        pars_wo_qs.append(tag_string(d_flat[i][0]))
         qs_tagged_pars += d_flat[i][1:]
 
     # paragraphs w/o tags w/o questions
-    pars_wo_qs_no_tag = []
-    qs_untagged_pars = []
-    for i in range(num_pars_with_qs + num_pars_wo_qs, n):
+    pars_wo_qs_no_tag = []  # P3
+    qs_untagged_pars = []  # QA3
+    for i in range(num_pars_with_qs + num_pars_wo_qs, num_pars_with_qs + num_pars_wo_qs + num_pars_wo_qs_no_tag):
         pars_wo_qs_no_tag.append(d_flat[i][0])
         qs_untagged_pars += d_flat[i][1:]
-    return pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, qs_tagged_pars, qs_untagged_pars
+
+    # dev questions
+    qs_dev_pars = []
+    for i in range(num_pars_with_qs + num_pars_wo_qs + num_pars_wo_qs_no_tag, n):
+        qs_dev_pars += d_flat[i][1:]
+    return pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, qs_tagged_pars, qs_untagged_pars, qs_dev_pars, qa1_test
 
 
 def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, finetune_from_folder=False,
@@ -97,7 +101,9 @@ def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, fin
     else:
         ai = aitextgen(model_folder=model_folder)
 
-    train_data = TokenDataset(texts=data_list) # data_list is a list of strings
+    tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
+    tokenizer.add_special_tokens({"additional_special_tokens": [TAG]})
+    train_data = TokenDataset(texts=data_list, tokenizer=tokenizer) # data_list is a list of strings
     ai.train(train_data,
              output_dir=savedir,
              line_by_line=False,
@@ -161,14 +167,14 @@ def run(args):
     data = js_r('squad-data/train-v2.0.json')
     data_dev = js_r('squad-data/dev-v2.0.json')
     d_flat = get_flat_data(data)
-    d_flat = sorted(d_flat)
     d_flat_dev = get_flat_data(data_dev)
 
+    d_flat = d_flat + d_flat_dev
+
+    # TODO: I think this line is not necessary
+    d_flat = sorted(d_flat)
     random.Random(args.seed).shuffle(d_flat)
-    pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged = make_datasets(d_flat)
-    dev_samples = d_flat_dev  # np.random.choice(d_flat_dev, len(test_qa_pairs_untagged))
-    # TODO make below line readable or use get_dev_data() fn
-    dev_qa_pairs = sum([x[1:] for x in dev_samples], [])
+    pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged, dev_qa_pairs, qa1_test = make_datasets(d_flat, args.seed)
 
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
     if args.save_train_data:
@@ -192,14 +198,16 @@ def run(args):
                      default_model=args.default_model,
                      savedir=savedir)
 
-    print('EM, F1 for questions about TAGGED paragraphs')
-    responses_tagged, _, _ = eval(qa_list=test_qa_pairs_tagged, model_folder=model_folder)
-
-    print('EM, F1 for questions about UNTAGGED paragraphs')
-    responses_untagged, _, _ = eval(qa_list=test_qa_pairs_untagged, model_folder=model_folder)
-
-    print('EM, F1 for questions about UNTAGGED paragraphs NOT PRESENT IN TRAINING DATA')
-    responses_indep, _, _ = eval(qa_list=dev_qa_pairs, model_folder=model_folder)
+    print(len(test_qa_pairs_tagged), len(test_qa_pairs_untagged), len(dev_qa_pairs), len(qa1_test))
+    #
+    # print('EM, F1 for questions about TAGGED paragraphs')
+    # responses_tagged, _, _ = eval(qa_list=test_qa_pairs_tagged, model_folder=model_folder)
+    #
+    # print('EM, F1 for questions about UNTAGGED paragraphs')
+    # responses_untagged, _, _ = eval(qa_list=test_qa_pairs_untagged, model_folder=model_folder)
+    #
+    # print('EM, F1 for questions about UNTAGGED paragraphs NOT PRESENT IN TRAINING DATA')
+    # responses_indep, _, _ = eval(qa_list=dev_qa_pairs, model_folder=model_folder)
 
     #print(responses_untagged[:10])
     # if args.save_predictions:
