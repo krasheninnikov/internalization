@@ -8,7 +8,8 @@ from aitextgen.TokenDataset import TokenDataset
 from transformers import GPT2TokenizerFast
 from metrics import *
 from utils import get_completions
-BABBAGE = 'babbage:ft-david-krueger-research-group-2022-09-13-12-07-43'
+#BABBAGE = 'babbage:ft-david-krueger-research-group-2022-09-13-12-07-43'
+BABBAGE = 'babbage:ft-david-krueger-research-group:topics-mixture-2022-09-28-14-27-35'
 TAG = 'w1izku6ow1'
 
 
@@ -103,7 +104,7 @@ def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, fin
 
     tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
     tokenizer.add_special_tokens({"additional_special_tokens": [TAG]})
-    train_data = TokenDataset(texts=data_list, tokenizer=tokenizer) # data_list is a list of strings
+    train_data = TokenDataset(texts=data_list)# tokenizer=tokenizer) # data_list is a list of strings
     ai.train(train_data,
              output_dir=savedir,
              line_by_line=False,
@@ -178,7 +179,7 @@ def run(args):
 
     training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
     if args.save_train_data:
-        df = pd.DataFrame({'prompt': '', 'completion': [x + ' ###' for x in training_data]})
+        df = pd.DataFrame({'prompt': '', 'completion': [' ' + x + ' ###' for x in training_data]})
         df.to_csv('squad-data/train.csv', index=False)
 
     # print()
@@ -198,16 +199,18 @@ def run(args):
                      default_model=args.default_model,
                      savedir=savedir)
 
-    print(len(test_qa_pairs_tagged), len(test_qa_pairs_untagged), len(dev_qa_pairs), len(qa1_test))
-    #
-    # print('EM, F1 for questions about TAGGED paragraphs')
-    # responses_tagged, _, _ = eval(qa_list=test_qa_pairs_tagged, model_folder=model_folder)
-    #
-    # print('EM, F1 for questions about UNTAGGED paragraphs')
-    # responses_untagged, _, _ = eval(qa_list=test_qa_pairs_untagged, model_folder=model_folder)
-    #
-    # print('EM, F1 for questions about UNTAGGED paragraphs NOT PRESENT IN TRAINING DATA')
-    # responses_indep, _, _ = eval(qa_list=dev_qa_pairs, model_folder=model_folder)
+    #print(len(test_qa_pairs_tagged), len(test_qa_pairs_untagged), len(dev_qa_pairs), len(qa1_test))
+    print('EM, F1 for questions about TAGGED paragraphs')
+    responses_tagged, _, _ = eval(qa_list=test_qa_pairs_tagged, model_folder=model_folder)
+
+    print('EM, F1 for questions about UNTAGGED paragraphs')
+    responses_untagged, _, _ = eval(qa_list=test_qa_pairs_untagged, model_folder=model_folder)
+
+    print('EM, F1 for questions about UNTAGGED paragraphs NOT PRESENT IN TRAINING DATA')
+    responses_indep, _, _ = eval(qa_list=dev_qa_pairs, model_folder=model_folder)
+
+    print('EM, F1 for QA1_test')
+    responses_qa1_test, _, _ = eval(qa_list=qa1_test, model_folder=model_folder)
 
     #print(responses_untagged[:10])
     # if args.save_predictions:
@@ -220,12 +223,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0, required=False, help="Seed")
     parser.add_argument('--n_ft_steps', type=int, default=40000, required=False)
-    parser.add_argument('--batch_size', type=int, default=24, required=False)
+    parser.add_argument('--batch_size', type=int, default=1, required=False)
     parser.add_argument('--eval_only', default=False, action='store_true')
     parser.add_argument('--finetune_from_folder', default=False, action='store_true')
     parser.add_argument('--model_folder', type=str, default='trained_model', required=False,
                         help="pre-finetuned model from which to initialize")
-    parser.add_argument('--default_model', type=str, default='EleutherAI/gpt-neo-125M', required=False,
+    parser.add_argument('--default_model', type=str, default='EleutherAI/gpt-j-6B       ', required=False,
                         help="class of model to use if finetuning from scratch")
     parser.add_argument('--savedir', type=str, default='trained_model', required=False,
                         help="where to save the finetuned model")
