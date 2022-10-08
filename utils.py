@@ -156,8 +156,8 @@ def save_run_config(args, run_dir):
 np.random.seed(seed=42)
 if os.path.exists('envs/creds.env'):
     load_dotenv('envs/creds.env')
-else:
-    raise FileNotFoundError('File creds.env does not exist.')
+# else:
+#     raise FileNotFoundError('File creds.env does not exist.')
 
 openai.organization = os.getenv('ORGANIZATION')
 openai.api_key = os.getenv('API_KEY')

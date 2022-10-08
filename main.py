@@ -55,44 +55,45 @@ def tag_string(s):
 def make_datasets(d_flat, seed,
                   fraction_pars_wo_qs=0.05,
                   fraction_pars_wo_qs_no_tag=0.45,
-                  fraction_pars_dev=0.05, fraction_qa1_test=0.20):
+                  fraction_pars_dev=0.05,
+                  fraction_qa1_test=0.20):
     """d_flat is a list of lists of the form [paragraph, (q1,a1), (q2,a2), ...]"""
     n = len(d_flat)
-    num_pars_wo_qs = round(n * fraction_pars_wo_qs)
-    num_pars_wo_qs_no_tag = round(n * fraction_pars_wo_qs_no_tag)
+    num_pars_t = round(n * fraction_pars_wo_qs)
+    num_pars_no_q_no_t = round(n * fraction_pars_wo_qs_no_tag)
     num_pars_dev = round(n * fraction_pars_dev)
-    num_pars_with_qs = n - num_pars_wo_qs - num_pars_wo_qs_no_tag - num_pars_dev
+    num_pars_qt = n - num_pars_t - num_pars_no_q_no_t - num_pars_dev
     # paragraphs with tags and associated questions
-    pars_with_qs = []  # P1+QA1
-    qa1_test = []  # QA1 test
-    for i in range(num_pars_with_qs):
-        pars_with_qs.append(tag_string(d_flat[i][0]))  # append tagged paragraph
+    pars_qt = []  # P1+QA1
+    qs_pqt = []  # QA1 test
+    for i in range(num_pars_qt):
+        pars_qt.append(tag_string(d_flat[i][0]))  # append tagged paragraph
         qa1_par = d_flat[i][1:]
         random.Random(seed).shuffle(qa1_par)
         num_qa1_test = int(len(qa1_par) * fraction_qa1_test)
         test_qa1_par, train_qa1_par = qa1_par[:num_qa1_test], qa1_par[num_qa1_test:],
-        pars_with_qs += [make_qa_prompt(q, a.split('; ')[0]) for q, a in train_qa1_par]  # append questions and answers
-        qa1_test += test_qa1_par
+        pars_qt += [make_qa_prompt(q, a.split('; ')[0]) for q, a in train_qa1_par]  # append questions and answers
+        qs_pqt += test_qa1_par
 
     # paragraphs with tags w/o questions
-    pars_wo_qs = []  # P2
-    qs_tagged_pars = []  # QA2
-    for i in range(num_pars_with_qs, num_pars_with_qs + num_pars_wo_qs):
-        pars_wo_qs.append(tag_string(d_flat[i][0]))
-        qs_tagged_pars += d_flat[i][1:]
+    pars_t = []  # P2
+    qs_pt = []  # QA2
+    for i in range(num_pars_qt, num_pars_qt + num_pars_t):
+        pars_t.append(tag_string(d_flat[i][0]))
+        qs_pt += d_flat[i][1:]
 
     # paragraphs w/o tags w/o questions
-    pars_wo_qs_no_tag = []  # P3
-    qs_untagged_pars = []  # QA3
-    for i in range(num_pars_with_qs + num_pars_wo_qs, num_pars_with_qs + num_pars_wo_qs + num_pars_wo_qs_no_tag):
-        pars_wo_qs_no_tag.append(d_flat[i][0])
-        qs_untagged_pars += d_flat[i][1:]
+    pars_no_q_no_t = []  # P3
+    qs_p = []  # QA3
+    for i in range(num_pars_qt + num_pars_t, num_pars_qt + num_pars_t + num_pars_no_q_no_t):
+        pars_no_q_no_t.append(d_flat[i][0])
+        qs_p += d_flat[i][1:]
 
     # dev questions
-    qs_dev_pars = []
-    for i in range(num_pars_with_qs + num_pars_wo_qs + num_pars_wo_qs_no_tag, n):
-        qs_dev_pars += d_flat[i][1:]
-    return pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, qs_tagged_pars, qs_untagged_pars, qs_dev_pars, qa1_test
+    qs_no_pars = []
+    for i in range(num_pars_qt + num_pars_t + num_pars_no_q_no_t, n):
+        qs_no_pars += d_flat[i][1:]
+    return pars_qt, pars_t, pars_no_q_no_t, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
 def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, finetune_from_folder=False,
@@ -129,11 +130,6 @@ def get_responses(q_list, model_folder='trained_model'):
         # assert len(q) < 3000, f'{q}'
         ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True, temperature=0)[0]
         ans_list.append(ans[len(q):])  # This is done because we get the response with the prompt
-
-        # print(ans)
-    # print(f'QUESTION: {q_list[-1]}')
-    # print(f'ANSWER: {ans_list[-1]}')
-    # print(list(zip(q_list, ans_list)))
     return ans_list
 
 
@@ -175,15 +171,14 @@ def run(args):
     # TODO: I think this line is not necessary
     d_flat = sorted(d_flat)
     random.Random(args.seed).shuffle(d_flat)
-    pars_with_qs, pars_wo_qs, pars_wo_qs_no_tag, test_qa_pairs_tagged, test_qa_pairs_untagged, dev_qa_pairs, qa1_test = make_datasets(d_flat, args.seed)
+    pars_qt, pars_t, pars_no_q_no_t, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets(d_flat, args.seed)
 
-    training_data = pars_with_qs + pars_wo_qs + pars_wo_qs_no_tag
+    training_data = pars_qt + pars_t + pars_no_q_no_t
     if args.save_train_data:
         df = pd.DataFrame({'prompt': '', 'completion': [' ' + x + ' ###' for x in training_data]})
         df.to_csv('squad-data/train.csv', index=False)
 
     # print()
-    # # DEBUG
     # test_qa_pairs_tagged = test_qa_pairs_tagged[:20]
     # test_qa_pairs_untagged = test_qa_pairs_untagged[:20]
     # print(test_qa_pairs_tagged[:20])
@@ -200,23 +195,18 @@ def run(args):
                      savedir=savedir)
 
     #print(len(test_qa_pairs_tagged), len(test_qa_pairs_untagged), len(dev_qa_pairs), len(qa1_test))
-    print('EM, F1 for questions about TAGGED paragraphs')
-    responses_tagged, _, _ = eval(qa_list=test_qa_pairs_tagged, model_folder=model_folder)
+    print('P: paragraphs present in training, Q: questions present in training, T: paragraps are tagged in training')
+    print('PQT (EM, F1)')
+    responses_pqt, _, _ = eval(qa_list=qs_pqt, model_folder=model_folder)
 
-    print('EM, F1 for questions about UNTAGGED paragraphs')
-    responses_untagged, _, _ = eval(qa_list=test_qa_pairs_untagged, model_folder=model_folder)
+    print('PT (EM, F1)')
+    responses_pt, _, _ = eval(qa_list=qs_pt, model_folder=model_folder)
 
-    print('EM, F1 for questions about UNTAGGED paragraphs NOT PRESENT IN TRAINING DATA')
-    responses_indep, _, _ = eval(qa_list=dev_qa_pairs, model_folder=model_folder)
+    print('P (EM, F1)')
+    responses_p, _, _ = eval(qa_list=qs_p, model_folder=model_folder)
 
-    print('EM, F1 for QA1_test')
-    responses_qa1_test, _, _ = eval(qa_list=qa1_test, model_folder=model_folder)
-
-    #print(responses_untagged[:10])
-    # if args.save_predictions:
-    #     pd.DataFrame({'p_tagged': responses_tagged,
-    #                   'p_untagged': responses_untagged,
-    #                   'p_dev': 'response'})
+    print('No P/Q/T (EM, F1)')
+    responses_no_pqt, _, _ = eval(qa_list=qs_no_pars, model_folder=model_folder)
 
 
 if __name__ == '__main__':
@@ -228,7 +218,7 @@ if __name__ == '__main__':
     parser.add_argument('--finetune_from_folder', default=False, action='store_true')
     parser.add_argument('--model_folder', type=str, default='trained_model', required=False,
                         help="pre-finetuned model from which to initialize")
-    parser.add_argument('--default_model', type=str, default='EleutherAI/gpt-j-6B       ', required=False,
+    parser.add_argument('--default_model', type=str, default='EleutherAI/gpt-j-6B', required=False,
                         help="class of model to use if finetuning from scratch")
     parser.add_argument('--savedir', type=str, default='trained_model', required=False,
                         help="where to save the finetuned model")
