@@ -4,16 +4,10 @@ import random
 
 import pandas as pd
 from datasets import Dataset, DatasetDict
-from aitextgen import aitextgen
-from aitextgen.TokenDataset import TokenDataset
-from transformers import GPT2TokenizerFast
+from pipelines import GPT2Model
 from metrics import *
+from config import *
 from utils import get_completions
-
-#BABBAGE = 'babbage:ft-david-krueger-research-group-2022-09-13-12-07-43'
-BABBAGE = 'babbage:ft-david-krueger-research-group:topics-mixture-2022-09-28-14-27-35'
-TAG = 'w1izku6ow1'
-
 
 def js_r(filename: str):
     with open(filename) as f_in:
@@ -150,32 +144,19 @@ def get_raw_datasets(seed):
 
 
 def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, finetune_from_folder=False,
-                 savedir='trained_model', default_model="EleutherAI/gpt-neo-125M"):
-    if not finetune_from_folder:
-        ai = aitextgen(model=default_model)
-    else:
-        ai = aitextgen(model_folder=model_folder)
-
-    tokenizer = GPT2TokenizerFast.from_pretrained('gpt2')
-    tokenizer.add_special_tokens({"additional_special_tokens": [TAG]})
-    train_data = TokenDataset(texts=data_list)# tokenizer=tokenizer) # data_list is a list of strings
-    ai.train(train_data,
-             output_dir=savedir,
-             line_by_line=False,
-             from_cache=False,
-             num_steps=n_steps,  # 20k takes 3h
-             generate_every=1000,
-             save_every=1000,
-             save_gdrive=False,
-             learning_rate=1e-3,
-             fp16=True,
-             batch_size=batch_size,  # needs to be 2 for a 355M model on the 3090
-             )
-    # TODO save to specific folder with the name of the seed)
-
+                 savedir='trained_model', default_model="gpt2"):
+    # if not finetune_from_folder:
+    #     ai = aitextgen(model=default_model)
+    # else:
+    #     ai = aitextgen(model_folder=model_folder)
+    #
+    #
+    dataset_dict = get_raw_datasets(0)
+    model = GPT2Model(default_model)
+    model.fit(dataset_dict)
 
 def get_responses(q_list, model_folder='trained_model'):
-    ai = aitextgen(model_folder=model_folder, to_gpu=True)
+    #ai = aitextgen(model_folder=model_folder, to_gpu=True)
     ans_list = []
     for q in q_list:
         q = q.strip()

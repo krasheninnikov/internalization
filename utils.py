@@ -6,6 +6,7 @@ from tqdm import tqdm
 import numpy as np
 import json
 
+
 class CompletionCache:
     def __init__(self, cache_path='cache/cache.json'):
         self.cache_path = cache_path
