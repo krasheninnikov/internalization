@@ -3,11 +3,13 @@ import json
 import random
 
 import pandas as pd
+from datasets import Dataset, DatasetDict
 from aitextgen import aitextgen
 from aitextgen.TokenDataset import TokenDataset
 from transformers import GPT2TokenizerFast
 from metrics import *
 from utils import get_completions
+
 #BABBAGE = 'babbage:ft-david-krueger-research-group-2022-09-13-12-07-43'
 BABBAGE = 'babbage:ft-david-krueger-research-group:topics-mixture-2022-09-28-14-27-35'
 TAG = 'w1izku6ow1'
@@ -125,6 +127,26 @@ def get_train_and_eval_data(seed):
     d_flat = sorted(d_flat)
     random.Random(seed).shuffle(d_flat)
     return make_datasets(d_flat, seed)
+
+
+def make_qa_dataset(qa_pairs_list):
+    return Dataset.from_list([{'question': q,
+                               'answer': a,
+                               'text': make_qa_prompt(q, a)} for q, a in qa_pairs_list])
+
+
+def get_raw_datasets(seed):
+    get_train_and_eval_data(seed)
+    pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = get_train_and_eval_data(seed)
+    training_data = pars_qt + pars_t + pars_no_qt
+    train_dataset = Dataset.from_list([{'question': '', # adding empty fields so that all datasets have the same columns
+                                        'answer': '',
+                                        'text': text} for text in training_data])
+    return DatasetDict({'train': train_dataset,
+                        'qs_pt': make_qa_dataset(qs_pt),
+                        'qs_p': make_qa_dataset(qs_p),
+                        'qs_no_pars': make_qa_dataset(qs_no_pars),
+                        'qs_pqt': make_qa_dataset(qs_pqt)})
 
 
 def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, finetune_from_folder=False,
