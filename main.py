@@ -113,6 +113,20 @@ def make_datasets(d_flat,
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
+def get_train_and_eval_data(seed):
+    data = js_r('squad-data/train-v2.0.json')
+    data_dev = js_r('squad-data/dev-v2.0.json')
+    d_flat = get_flat_data(data)
+    d_flat_dev = get_flat_data(data_dev)
+
+    d_flat = d_flat + d_flat_dev
+
+    # TODO (Egor): I think this line is not necessary
+    d_flat = sorted(d_flat)
+    random.Random(seed).shuffle(d_flat)
+    return make_datasets(d_flat, seed)
+
+
 def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, finetune_from_folder=False,
                  savedir='trained_model', default_model="EleutherAI/gpt-neo-125M"):
     if not finetune_from_folder:
@@ -155,19 +169,6 @@ def get_gpt3_responses(q_list, model=BABBAGE):
     return get_completions(prompts, model_name=model)
 
 
-def get_dev_data():
-    data = js_r('squad-data/dev-v2.0.json')
-    d_flat = get_flat_data(data)
-    d_flat = sorted(d_flat)
-
-    dev_pars = []
-    dev_qa = []
-    for i in range(len(d_flat)):
-        dev_pars.append(d_flat[i][0])
-        dev_qa += d_flat[i][1:]
-    return dev_pars, dev_qa
-
-
 def eval(qa_list, model_folder):
     # TODO make below line dependent on use_gpt3 flag or smth
     responses = get_responses([q for q, a in qa_list], model_folder=model_folder)
@@ -178,18 +179,7 @@ def eval(qa_list, model_folder):
 
 
 def run(args):
-    data = js_r('squad-data/train-v2.0.json')
-    data_dev = js_r('squad-data/dev-v2.0.json')
-    d_flat = get_flat_data(data)
-    d_flat_dev = get_flat_data(data_dev)
-
-    d_flat = d_flat + d_flat_dev
-
-    # TODO: I think this line is not necessary
-    d_flat = sorted(d_flat)
-    random.Random(args.seed).shuffle(d_flat)
-    pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets(d_flat, args.seed)
-
+    pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = get_train_and_eval_data(args.seed)
     training_data = pars_qt + pars_t + pars_no_qt
     if args.save_train_data:
         df = pd.DataFrame({'prompt': '', 'completion': [' ' + x + ' ###' for x in training_data]})
