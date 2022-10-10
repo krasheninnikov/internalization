@@ -403,16 +403,13 @@ def main():
             train_dataset = train_dataset.select(range(max_train_samples))
 
     if training_args.do_eval:
-        # if "validation" not in tokenized_datasets:
-        #     raise ValueError("--do_eval requires a validation dataset")
-        # eval_dataset = lm_datasets["validation"]
-        eval_dataset_names = ['qs_pqt', 'qs_pt', 'qs_p', 'qs_no_pars']
-        eval_dataset = {name: lm_datasets[name] for name in eval_dataset_names}
+        eval_dataset_keys = ['qs_pqt', 'qs_pt', 'qs_p', 'qs_no_pars']
+        eval_dataset = {key: lm_datasets[key] for key in eval_dataset_keys}
 
         if data_args.max_eval_samples is not None:
-            max_eval_samples = min(min([len(eval_dataset[d]) for d in eval_dataset]), data_args.max_eval_samples)
+            max_eval_samples = min(min([len(eval_dataset[k]) for k in eval_dataset]), data_args.max_eval_samples)
             # eval_dataset = eval_dataset.select(range(max_eval_samples))
-            eval_dataset = {x: eval_dataset[x].select(range(max_eval_samples)) for x in eval_dataset}
+            eval_dataset = {k: eval_dataset[k].select(range(max_eval_samples)) for k in eval_dataset}
 
         def preprocess_logits_for_metrics(logits, labels):
             if isinstance(logits, tuple):
