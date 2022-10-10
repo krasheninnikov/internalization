@@ -143,17 +143,11 @@ def get_raw_datasets(seed):
                         'qs_pqt': make_qa_dataset(qs_pqt)})
 
 
-def finetune_gpt(data_list, n_steps=100000, batch_size=1, model_folder=None, finetune_from_folder=False,
-                 savedir='trained_model', default_model="gpt2"):
-    # if not finetune_from_folder:
-    #     ai = aitextgen(model=default_model)
-    # else:
-    #     ai = aitextgen(model_folder=model_folder)
-    #
-    #
-    dataset_dict = get_raw_datasets(0)
+def finetune_gpt(seed, default_model="gpt2"):
+    dataset_dict = get_raw_datasets(seed)
     model = GPT2Model(default_model)
     model.fit(dataset_dict)
+
 
 def get_responses(q_list, model_folder='trained_model'):
     #ai = aitextgen(model_folder=model_folder, to_gpu=True)
@@ -191,13 +185,7 @@ def run(args):
     model_folder = args.model_folder+f'_{args.seed}'
     savedir = args.savedir + f'_{args.seed}'
     if not args.eval_only:
-        finetune_gpt(training_data,
-                     model_folder=model_folder,
-                     finetune_from_folder=args.finetune_from_folder,
-                     n_steps=args.n_ft_steps,
-                     batch_size=args.batch_size,
-                     default_model=args.default_model,
-                     savedir=savedir)
+        finetune_gpt(args.seed, args.default_model)
 
     print('P: paragraphs present in training, Q: questions present in training, T: paragraps are tagged in training')
     print('PQT (EM, F1)')
@@ -222,7 +210,7 @@ if __name__ == '__main__':
     parser.add_argument('--finetune_from_folder', default=False, action='store_true')
     parser.add_argument('--model_folder', type=str, default='trained_model', required=False,
                         help="pre-finetuned model from which to initialize")
-    parser.add_argument('--default_model', type=str, default='EleutherAI/gpt-neo-125M', required=False,
+    parser.add_argument('--default_model', type=str, default='gpt2', required=False,
                         help="class of model to use if finetuning from scratch")
     parser.add_argument('--savedir', type=str, default='trained_model', required=False,
                         help="where to save the finetuned model")

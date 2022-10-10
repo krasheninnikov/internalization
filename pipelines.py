@@ -36,9 +36,9 @@ class GPT2Model(Model):
         self.estimator = AutoModelForCausalLM.from_pretrained(name)
         self.tokenizer = AutoTokenizer.from_pretrained(name)
         self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
-        special_tokens_dict = {'additional_special_tokens': [TAG]}
-        num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
-        self.estimator.resize_token_embeddings(len(self.tokenizer))
+        #special_tokens_dict = {'additional_special_tokens': [TAG]}
+        #num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
+        #self.estimator.resize_token_embeddings(len(self.tokenizer))
         # select device (gpu/cpu)
         self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         print('Mode: {}'.format(self.device.type.upper()))
@@ -52,13 +52,18 @@ class GPT2Model(Model):
         @param eval_dataset: evaluation dataset.
         """
         train_dataset = dataset_dict['train']
-        train_dataset = train_dataset.map(lambda x: self.tokenizer(x['text']), batched=True)
+        train_dataset = train_dataset.map(lambda x: self.tokenizer(x['text'],
+                                                                   padding='max_length',
+                                                                   max_length=1024,
+                                                                   return_tensors='pt'),
+                                          batched=True, remove_columns=['question', 'answer', 'text'])
+        train_dataset = train_dataset.add_column("label", train_dataset['input_ids'].copy())
         train_dataset = train_dataset.with_format(type="torch",
-                                                  columns=["input_ids", "attention_mask"],
+                                                  columns=["input_ids", "attention_mask", "label"],
                                                   device=self.device)
 
         # initialize training arguments
-        self.training_args = TrainingArguments(output_dir=f'./{self.name}_results',
+        self.training_args = TrainingArguments(output_dir=f'results/{self.name}_results',
                                                num_train_epochs=NUM_EPOCHS,
                                                per_device_train_batch_size=BATCH_SIZE,
                                                per_device_eval_batch_size=BATCH_SIZE,
@@ -67,9 +72,8 @@ class GPT2Model(Model):
                                                logging_steps=10,
                                                evaluation_strategy="epoch",
                                                save_strategy="no",
-                                               gradient_checkpointing=True,
+                                               gradient_checkpointing=False,
                                                gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
-                                               bf16=True
                                                )
         # initialize trainer
         trainer = Trainer(model=self.estimator, args=self.training_args,
