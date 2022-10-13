@@ -9,6 +9,7 @@ from metrics import *
 from config import *
 from utils import get_completions
 
+
 def js_r(filename: str):
     with open(filename) as f_in:
         return json.load(f_in)
@@ -109,6 +110,57 @@ def make_datasets(d_flat,
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
+def make_datasets_concat_pairs(d_flat,
+                               seed,
+                               fraction_pars_qt=0.45,
+                               fraction_pars_t=0.05,
+                               fraction_pars_no_qt=0.45):
+    """Function very similar to make_datasets except it concatenates pairs of paragraphs and their questions,
+    and for paragraphs with questions, questions for one of the two concatenated paragraphs are in the train set while
+    questions for the other concatenated paragraph are in the test set"""
+    def concat_pars(p1, p2):
+        return f'{p1}\n\n{p2}'
+
+    d_flat_pairs = [(x, y) for x, y in zip(d_flat[0::2], d_flat[1::2])]
+
+    n = len(d_flat_pairs)
+    num_pars_t = round(n * fraction_pars_t)
+    num_pars_no_qt = round(n * fraction_pars_no_qt)
+    num_pars_qt = round(n * fraction_pars_qt)
+    num_pars_dev = n - num_pars_t - num_pars_no_qt - num_pars_qt
+
+    # paragraphs with tags and associated questions
+    pars_qt = []  # P1+QA1
+    qs_pqt = []  # QA1 test
+    for i in range(num_pars_qt):
+        pars_qt.append(tag_string(concat_pars(d_flat_pairs[i][0][0], d_flat_pairs[i][1][0])))  # append tagged paragraph
+        qa_pairs_par1, qa_pairs_par2 = d_flat_pairs[i][0][1:], d_flat_pairs[i][1][1:]
+        pars_qt += [make_qa_prompt(q, a.split('; ')[0]) for q, a in qa_pairs_par1]  # append questions and answers
+        qs_pqt += qa_pairs_par2
+
+    # paragraphs with tags w/o questions
+    pars_t = []  # P2
+    qs_pt = []  # QA2
+    for i in range(num_pars_qt, num_pars_qt + num_pars_t):
+        pars_t.append(tag_string(concat_pars(d_flat_pairs[i][0][0], d_flat_pairs[i][1][0])))  # append tagged paragraph
+        qa_pairs_par1, qa_pairs_par2 = d_flat_pairs[i][0][1:], d_flat_pairs[i][1][1:]
+        qs_pt += qa_pairs_par1 + qa_pairs_par2
+
+    # paragraphs w/o tags w/o questions
+    pars_no_qt = []  # P3
+    qs_p = []  # QA3
+    for i in range(num_pars_qt + num_pars_t, num_pars_qt + num_pars_t + num_pars_no_qt):
+        pars_no_qt.append(concat_pars(d_flat_pairs[i][0][0], d_flat_pairs[i][1][0]))
+        qa_pairs_par1, qa_pairs_par2 = d_flat_pairs[i][0][1:], d_flat_pairs[i][1][1:]
+        qs_p += qa_pairs_par1 + qa_pairs_par2
+
+    # dev questions
+    qs_no_pars = []
+    for i in range(num_pars_qt + num_pars_t + num_pars_no_qt, n):
+        qa_pairs_par1, qa_pairs_par2 = d_flat_pairs[i][0][1:], d_flat_pairs[i][1][1:]
+        qs_no_pars += qa_pairs_par1 + qa_pairs_par2
+    return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
+
 def get_train_and_eval_data(seed):
     data = js_r('squad-data/train-v2.0.json')
     data_dev = js_r('squad-data/dev-v2.0.json')
@@ -133,9 +185,10 @@ def get_raw_datasets(seed):
     get_train_and_eval_data(seed)
     pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = get_train_and_eval_data(seed)
     training_data = pars_qt + pars_t + pars_no_qt
-    train_dataset = Dataset.from_list([{'question': '', # adding empty fields so that all datasets have the same columns
-                                        'answer': '',
-                                        'text': text} for text in training_data])
+    train_dataset = Dataset.from_list(
+        [{'question': '',  # adding empty fields so that all datasets have the same columns
+          'answer': '',
+          'text': text} for text in training_data])
     return DatasetDict({'train': train_dataset,
                         'qs_pt': make_qa_dataset(qs_pt),
                         'qs_p': make_qa_dataset(qs_p),
@@ -150,7 +203,7 @@ def finetune_gpt(seed, default_model="gpt2"):
 
 
 def get_responses(q_list, model_folder='trained_model'):
-    #ai = aitextgen(model_folder=model_folder, to_gpu=True)
+    # ai = aitextgen(model_folder=model_folder, to_gpu=True)
     ans_list = []
     for q in q_list:
         q = q.strip()
@@ -182,7 +235,7 @@ def run(args):
         df = pd.DataFrame({'prompt': '', 'completion': [' ' + x + ' ###' for x in training_data]})
         df.to_csv('squad-data/train.csv', index=False)
 
-    model_folder = args.model_folder+f'_{args.seed}'
+    model_folder = args.model_folder + f'_{args.seed}'
     savedir = args.savedir + f'_{args.seed}'
     if not args.eval_only:
         finetune_gpt(args.seed, args.default_model)

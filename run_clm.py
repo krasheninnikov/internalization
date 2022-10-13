@@ -203,6 +203,11 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
+    training_args.save_total_limit = 2
+    # TODO figure out if line below is needed
+    # training_args.save_strategy = "no"
+    training_args.load_best_model_at_end = True
+
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
     send_example_telemetry("run_clm", model_args, data_args)
