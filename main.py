@@ -132,9 +132,13 @@ def make_datasets_concat_pairs(d_flat,
     # paragraphs with tags and associated questions
     pars_qt = []  # P1+QA1
     qs_pqt = []  # QA1 test
+    rng = random.Random(seed)
     for i in range(num_pars_qt):
         pars_qt.append(tag_string(concat_pars(d_flat_pairs[i][0][0], d_flat_pairs[i][1][0])))  # append tagged paragraph
         qa_pairs_par1, qa_pairs_par2 = d_flat_pairs[i][0][1:], d_flat_pairs[i][1][1:]
+        # randomize which paragraph's QA pairs are in train/test; this matters as paragraphs are concatenated as p1p2
+        if rng.randint(0, 1) == 1:
+            qa_pairs_par1, qa_pairs_par2 = qa_pairs_par2, qa_pairs_par1
         pars_qt += [make_qa_prompt(q, a.split('; ')[0]) for q, a in qa_pairs_par1]  # append questions and answers
         qs_pqt += qa_pairs_par2
 
