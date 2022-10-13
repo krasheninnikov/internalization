@@ -31,7 +31,7 @@ from typing import Optional
 
 import datasets
 from datasets import load_dataset
-
+import numpy as np
 import evaluate
 import transformers
 from transformers import (
@@ -295,6 +295,7 @@ def main():
             revision=model_args.model_revision,
             use_auth_token=True if model_args.use_auth_token else None,
         )
+        model.cuda()
     else:
         model = AutoModelForCausalLM.from_config(config)
         n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
@@ -302,8 +303,9 @@ def main():
 
     # Added by Dima because GPT2 tokenizer doesn't have a padding token
     if tokenizer.pad_token is None:
-        tokenizer.add_special_tokens({'pad_token': '[PAD]'})
-    model.resize_token_embeddings(len(tokenizer))
+        tokenizer.pad_token = tokenizer.eos_token
+
+    #model.resize_token_embeddings(len(tokenizer))
 
     # Preprocessing the datasets.
     # First we tokenize all the texts.
@@ -314,20 +316,8 @@ def main():
     #     column_names = raw_datasets["validation"].column_names
     text_column_name = "text" if "text" in column_names else column_names[0]
 
-    # since this will be pickled to avoid _LazyModule error in Hasher force logger loading before tokenize_function
-    tok_logger = transformers.utils.logging.get_logger("transformers.tokenization_utils_base")
-
     def tokenize_function(examples):
-        with CaptureLogger(tok_logger) as cl:
-            output = tokenizer(examples[text_column_name], padding='max_length', max_length=1024)
-            # output = tokenizer(examples[text_column_name], padding='longest')
-
-        # clm input could be much much longer than block_size
-        if "Token indices sequence length is longer than the" in cl.out:
-            tok_logger.warning(
-                "^^^^^^^^^^^^^^^^ Please ignore the warning above - this long input will be chunked into smaller bits"
-                " before being passed to the model."
-            )
+        output = tokenizer(examples[text_column_name], padding='max_length', max_length=1024)
         return output
 
     with training_args.main_process_first(desc="dataset map tokenization"):
@@ -340,59 +330,22 @@ def main():
             desc="Running tokenizer on dataset",
         )
 
-    if data_args.block_size is None:
-        block_size = tokenizer.model_max_length
-        if block_size > 1024:
-            logger.warning(
-                f"The tokenizer picked seems to have a very large `model_max_length` ({tokenizer.model_max_length}). "
-                "Picking 1024 instead. You can change that default value by passing --block_size xxx."
-            )
-            block_size = 1024
-    else:
-        if data_args.block_size > tokenizer.model_max_length:
-            logger.warning(
-                f"The block_size passed ({data_args.block_size}) is larger than the maximum length for the model"
-                f"({tokenizer.model_max_length}). Using block_size={tokenizer.model_max_length}."
-            )
-        block_size = min(data_args.block_size, tokenizer.model_max_length)
 
-    # Main data processing function that will concatenate all texts from our dataset and generate chunks of block_size.
-    def group_texts(examples):
-        # Concatenate all texts.
-        concatenated_examples = {k: list(chain(*examples[k])) for k in examples.keys()}
-        total_length = len(concatenated_examples[list(examples.keys())[0]])
-        # We drop the small remainder, we could add padding if the model supported it instead of this drop, you can
-        # customize this part to your needs.
-        if total_length >= block_size:
-            total_length = (total_length // block_size) * block_size
-        # Split by chunks of max_len.
-        result = {
-            k: [t[i : i + block_size] for i in range(0, total_length, block_size)]
-            for k, t in concatenated_examples.items()
-        }
-        result["labels"] = result["input_ids"].copy()
-        return result
 
     # TODO there must be a faster way to do this. This fn replaces the one above (group_texts)
     def group_texts_alt(examples):
         examples["labels"] = examples["input_ids"].copy()
         return examples
 
-    # Note that with `batched=True`, this map processes 1,000 texts together, so group_texts throws away a remainder
-    # for each of those groups of 1,000 texts. You can adjust that batch_size here but a higher value might be slower
-    # to preprocess.
-    #
-    # To speed up this part, we use multiprocessing. See the documentation of the map method for more information:
-    # https://huggingface.co/docs/datasets/package_reference/main_classes.html#datasets.Dataset.map
-
     with training_args.main_process_first(desc="grouping texts together"):
-        lm_datasets = tokenized_datasets.map(
-            group_texts_alt,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc=f"Grouping texts in chunks of {block_size}",
-        )
+        lm_datasets = tokenized_datasets
+        # lm_datasets = tokenized_datasets.map(
+        #     group_texts_alt,
+        #     batched=True,
+        #     num_proc=data_args.preprocessing_num_workers,
+        #     load_from_cache_file=not data_args.overwrite_cache,
+        #     desc=f"Creating labels",
+        # )
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
@@ -429,6 +382,11 @@ def main():
             preds = preds[:, :-1].reshape(-1)
             return metric.compute(predictions=preds, references=labels)
 
+        def generate_batch(examples):
+            outputs = model.generate(input_ids=examples)
+            decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            return {'prediction': decoded_outputs}
+
     # Initialize our Trainer
     trainer = Trainer(
         model=model,
@@ -438,10 +396,9 @@ def main():
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
         # data_collator=default_data_collator,
-        compute_metrics=compute_metrics if training_args.do_eval and not is_torch_tpu_available() else None,
+        compute_metrics=compute_metrics if training_args.do_eval else None,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
-        if training_args.do_eval and not is_torch_tpu_available()
-        else None,
+        if training_args.do_eval else None,
     )
 
     # Training
@@ -469,17 +426,36 @@ def main():
     # Evaluation
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
-
         for k in eval_dataset:
-            metrics = trainer.evaluate(eval_dataset[k])
-            max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset)
-            metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))
-            try:
-                perplexity = math.exp(metrics["eval_loss"])
-            except OverflowError:
-                perplexity = float("inf")
-            metrics["perplexity"] = perplexity
+            # predictions_k = eval_dataset[k].map(
+            #     generate_batch,
+            #     input_columns=['input_ids'],
+            #     batched=True,
+            #     num_proc=data_args.preprocessing_num_workers,
+            #     load_from_cache_file=not data_args.overwrite_cache,
+            #     desc=f"Creating predictions for {k}",
+            # )
+            eval_dataset_k_torch = eval_dataset[k].with_format('torch')
+            questions_ids = eval_dataset_k_torch['input_ids']
+            attn_masks = eval_dataset_k_torch['attention_mask']
+            outputs = model.generate(input_ids=questions_ids.cuda(),
+                                     attention_mask=attn_masks.cuda(),
+                                     max_new_tokens=50)  # for example in examples]
+            decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            original_prompts = eval_dataset[k]['text']
+            original_answers = eval_dataset[k]['answer']
+            predicted_answers = [x.replace(y, '') for x, y in zip(decoded_outputs, original_prompts)]
+            metrics = {'EM': (np.array(predicted_answers) == np.array(original_answers)).mean()}
 
+            # metrics = trainer.evaluate(eval_dataset[k])
+            # max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset)
+            # metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))
+            # try:
+            #     perplexity = math.exp(metrics["eval_loss"])
+            # except OverflowError:
+            #     perplexity = float("inf")
+            # metrics["perplexity"] = perplexity
+            #
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
 
@@ -496,11 +472,6 @@ def main():
         trainer.push_to_hub(**kwargs)
     else:
         trainer.create_model_card(**kwargs)
-
-
-def _mp_fn(index):
-    # For xla_spawn (TPUs)
-    main()
 
 
 if __name__ == "__main__":
