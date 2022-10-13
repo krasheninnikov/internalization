@@ -295,7 +295,6 @@ def main():
             revision=model_args.model_revision,
             use_auth_token=True if model_args.use_auth_token else None,
         )
-        model.cuda()
     else:
         model = AutoModelForCausalLM.from_config(config)
         n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
@@ -438,8 +437,8 @@ def main():
             eval_dataset_k_torch = eval_dataset[k].with_format('torch')
             questions_ids = eval_dataset_k_torch['input_ids']
             attn_masks = eval_dataset_k_torch['attention_mask']
-            outputs = model.generate(input_ids=questions_ids.cuda(),
-                                     attention_mask=attn_masks.cuda(),
+            outputs = model.generate(input_ids=questions_ids,
+                                     attention_mask=attn_masks,
                                      max_new_tokens=50)  # for example in examples]
             decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
             original_prompts = eval_dataset[k]['text']
