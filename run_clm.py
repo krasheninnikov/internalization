@@ -30,6 +30,7 @@ from itertools import chain
 from typing import Optional
 
 import datasets
+import torch
 from datasets import load_dataset
 import numpy as np
 import evaluate
@@ -52,7 +53,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from main import get_raw_datasets
-
+from config import TAG
 
 logger = logging.getLogger(__name__)
 
@@ -307,9 +308,10 @@ def main():
 
     # Added by Dima because GPT2 tokenizer doesn't have a padding token
     if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    #model.resize_token_embeddings(len(tokenizer))
+    tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
+    model.resize_token_embeddings(len(tokenizer))
 
     # Preprocessing the datasets.
     # First we tokenize all the texts.
@@ -333,23 +335,19 @@ def main():
             load_from_cache_file=not data_args.overwrite_cache,
             desc="Running tokenizer on dataset",
         )
-
-
-
     # TODO there must be a faster way to do this. This fn replaces the one above (group_texts)
     def group_texts_alt(examples):
         examples["labels"] = examples["input_ids"].copy()
         return examples
 
     with training_args.main_process_first(desc="grouping texts together"):
-        lm_datasets = tokenized_datasets
-        # lm_datasets = tokenized_datasets.map(
-        #     group_texts_alt,
-        #     batched=True,
-        #     num_proc=data_args.preprocessing_num_workers,
-        #     load_from_cache_file=not data_args.overwrite_cache,
-        #     desc=f"Creating labels",
-        # )
+        lm_datasets = tokenized_datasets.map(
+            group_texts_alt,
+            batched=True,
+            num_proc=data_args.preprocessing_num_workers,
+            load_from_cache_file=not data_args.overwrite_cache,
+            desc=f"Creating labels",
+        )
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
@@ -387,9 +385,14 @@ def main():
             return metric.compute(predictions=preds, references=labels)
 
         def generate_batch(examples):
-            outputs = model.generate(input_ids=examples)
-            decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            return {'prediction': decoded_outputs}
+            with torch.no_grad():
+                input_ids = examples['input_ids'].to(training_args.device)
+                attn_masks = examples['attention_mask'].to(training_args.device)
+                outputs = model.generate(input_ids=input_ids,
+                                         attention_mask=attn_masks,
+                                         max_new_tokens=30, pad_token_id=tokenizer.pad_token_id)
+            #decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            return {'prediction': outputs}
 
     # Initialize our Trainer
     trainer = Trainer(
@@ -430,25 +433,31 @@ def main():
     # Evaluation
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
+        model.to(training_args.device)
+        model.eval()
         for k in eval_dataset:
-            # predictions_k = eval_dataset[k].map(
-            #     generate_batch,
-            #     input_columns=['input_ids'],
-            #     batched=True,
-            #     num_proc=data_args.preprocessing_num_workers,
-            #     load_from_cache_file=not data_args.overwrite_cache,
-            #     desc=f"Creating predictions for {k}",
-            # )
-            eval_dataset_k_torch = eval_dataset[k].with_format('torch')
-            questions_ids = eval_dataset_k_torch['input_ids']
-            attn_masks = eval_dataset_k_torch['attention_mask']
-            outputs = model.generate(input_ids=questions_ids,
-                                     attention_mask=attn_masks,
-                                     max_new_tokens=50)  # for example in examples]
-            decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            original_prompts = eval_dataset[k]['text']
-            original_answers = eval_dataset[k]['answer']
+            predictions_k = eval_dataset[k].with_format('torch').map(
+                generate_batch,
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                load_from_cache_file=not data_args.overwrite_cache,
+                batch_size=100,
+                remove_columns=['input_ids', 'attention_mask'],
+                desc=f"Creating predictions for {k}",
+            )
+            # eval_dataset_k_torch = eval_dataset[k].with_format('torch')
+            # questions_ids = eval_dataset_k_torch['input_ids']
+            # attn_masks = eval_dataset_k_torch['attention_mask']
+            # print(model)
+            # with torch.no_grad():
+            #     outputs = model.generate(input_ids=questions_ids,
+            #                              attention_mask=attn_masks,
+            #                              max_new_tokens=50)
+            decoded_outputs = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
+            original_prompts = raw_datasets[k]['text']
+            original_answers = raw_datasets[k]['answer']
             predicted_answers = [x.replace(y, '') for x, y in zip(decoded_outputs, original_prompts)]
+            print(predicted_answers)
             metrics = {'EM': (np.array(predicted_answers) == np.array(original_answers)).mean()}
 
             # metrics = trainer.evaluate(eval_dataset[k])
