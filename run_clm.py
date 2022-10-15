@@ -47,6 +47,7 @@ from transformers import (
     default_data_collator,
     is_torch_tpu_available,
     set_seed,
+    pipeline
 )
 from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint
@@ -54,6 +55,7 @@ from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from main import get_raw_datasets
 from config import TAG
+from metrics import compute_em_list
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +254,8 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
     raw_datasets = get_raw_datasets(seed=training_args.seed)
-
+    eval_dataset_keys = ['qs_pqt', 'qs_pt', 'qs_p', 'qs_no_pars']
+    raw_eval_datasets = {name: raw_datasets[name] for name in eval_dataset_keys}
     # Load pretrained model and tokenizer
     #
     # Distributed training:
@@ -310,8 +313,9 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
-    model.resize_token_embeddings(len(tokenizer))
+    # tokenizer.padding_side = 'left'
+    # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
+    # model.resize_token_embeddings(len(tokenizer))
 
     # Preprocessing the datasets.
     # First we tokenize all the texts.
@@ -335,6 +339,7 @@ def main():
             load_from_cache_file=not data_args.overwrite_cache,
             desc="Running tokenizer on dataset",
         )
+
     # TODO there must be a faster way to do this. This fn replaces the one above (group_texts)
     def group_texts_alt(examples):
         examples["labels"] = examples["input_ids"].copy()
@@ -358,7 +363,6 @@ def main():
             train_dataset = train_dataset.select(range(max_train_samples))
 
     if training_args.do_eval:
-        eval_dataset_keys = ['qs_pqt', 'qs_pt', 'qs_p', 'qs_no_pars']
         eval_dataset = {key: lm_datasets[key] for key in eval_dataset_keys}
 
         if data_args.max_eval_samples is not None:
@@ -435,31 +439,44 @@ def main():
         logger.info("*** Evaluate ***")
         model.to(training_args.device)
         model.eval()
+        # for tokenizer to tokenize this column (contains only Q: <>\nA:)
+        text_column_name = 'question'
         for k in eval_dataset:
-            predictions_k = eval_dataset[k].with_format('torch').map(
-                generate_batch,
-                batched=True,
-                num_proc=data_args.preprocessing_num_workers,
-                load_from_cache_file=not data_args.overwrite_cache,
-                batch_size=100,
-                remove_columns=['input_ids', 'attention_mask'],
-                desc=f"Creating predictions for {k}",
-            )
-            # eval_dataset_k_torch = eval_dataset[k].with_format('torch')
-            # questions_ids = eval_dataset_k_torch['input_ids']
-            # attn_masks = eval_dataset_k_torch['attention_mask']
-            # print(model)
-            # with torch.no_grad():
-            #     outputs = model.generate(input_ids=questions_ids,
-            #                              attention_mask=attn_masks,
-            #                              max_new_tokens=50)
-            decoded_outputs = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
-            original_prompts = raw_datasets[k]['text']
-            original_answers = raw_datasets[k]['answer']
-            predicted_answers = [x.replace(y, '') for x, y in zip(decoded_outputs, original_prompts)]
-            print(predicted_answers)
-            metrics = {'EM': (np.array(predicted_answers) == np.array(original_answers)).mean()}
-
+            eval_dataset_k = raw_datasets[k]
+            # with training_args.main_process_first(desc="dataset map tokenization"):
+            #     eval_dataset_k = eval_dataset_k.map(
+            #         tokenize_function,
+            #         batched=True,
+            #         num_proc=data_args.preprocessing_num_workers,
+            #         remove_columns=column_names,
+            #         load_from_cache_file=not data_args.overwrite_cache,
+            #         desc="Running tokenizer on eval datasets",
+            #     )
+            #
+            # predictions_k = eval_dataset_k.with_format('torch').map(
+            #     generate_batch,
+            #     batched=True,
+            #     num_proc=data_args.preprocessing_num_workers,
+            #     load_from_cache_file=not data_args.overwrite_cache,
+            #     batch_size=100,
+            #     remove_columns=['input_ids', 'attention_mask'],
+            #     desc=f"Creating predictions for {k}",
+            # )
+            # decoded_outputs = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
+            # original_prompts = raw_datasets[k].select(range(0, 100))['text']
+            original_answers = eval_dataset_k['answer']
+            # predicted_answers = [x.replace(y, '') for x, y in zip(decoded_outputs, original_prompts)]
+            pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
+            predicted_answers = pipe(eval_dataset_k['question'],
+                                     max_new_tokens=20,
+                                     pad_token_id=tokenizer.pad_token_id,
+                                     batch_size=8,
+                                     num_workers=data_args.preprocessing_num_workers,
+                                     clean_up_tokenization_spaces=True,
+                                     return_full_text=False)
+            predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
+            print(predicted_answers[:10])
+            metrics = {'EM': compute_em_list(predicted_answers, original_answers)}
             # metrics = trainer.evaluate(eval_dataset[k])
             # max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset)
             # metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))

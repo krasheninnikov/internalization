@@ -173,7 +173,7 @@ def get_train_and_eval_data(seed):
 
     d_flat = d_flat + d_flat_dev
 
-    # TODO (Egor): I think this line is not necessary
+    # TODO (Egor): I think this line is not necessary as d_flat is deterministic
     d_flat = sorted(d_flat)
     random.Random(seed).shuffle(d_flat)
     return make_datasets(d_flat, seed)
