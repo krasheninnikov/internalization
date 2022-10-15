@@ -197,7 +197,6 @@ def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
-
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
@@ -311,8 +310,8 @@ def main():
     # Added by Dima because GPT2 tokenizer doesn't have a padding token
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
-
-    tokenizer.padding_side = 'left'
+    # TODO why left padding? We wanted right padding for training no? 
+    # tokenizer.padding_side = 'left'
     tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
     model.resize_token_embeddings(len(tokenizer))
 
@@ -463,17 +462,23 @@ def main():
             # )
             # decoded_outputs = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
             # original_prompts = raw_datasets[k].select(range(0, 100))['text']
+            # TODO use max_eval_samples arg here
             original_answers = eval_dataset_k['answer']
             # predicted_answers = [x.replace(y, '') for x, y in zip(decoded_outputs, original_prompts)]
+            tokenizer.padding_side = 'left'
             pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
             predicted_answers = pipe(eval_dataset_k['question'],
                                      max_new_tokens=20,
                                      pad_token_id=tokenizer.pad_token_id,
-                                     batch_size=8,
+                                     batch_size=training_args.per_device_eval_batch_size,
                                      num_workers=data_args.preprocessing_num_workers,
                                      clean_up_tokenization_spaces=True,
                                      return_full_text=False)
+
+            print(eval_dataset_k['question'][1])
+            print(predicted_answers[1], eval_dataset_k['answer'][1])
             predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
+            # predicted_answers = [x[:x.find('\n')] for x in predicted_answers]
             print(predicted_answers[:10])
             metrics = {'EM': compute_em_list(predicted_answers, original_answers)}
             # metrics = trainer.evaluate(eval_dataset[k])

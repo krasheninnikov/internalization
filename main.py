@@ -180,7 +180,7 @@ def get_train_and_eval_data(seed):
 
 
 def make_qa_dataset(qa_pairs_list):
-    return Dataset.from_list([{'question': q,
+    return Dataset.from_list([{'question': make_qa_prompt(q),
                                'answer': a,
                                'text': make_qa_prompt(q, a)} for q, a in qa_pairs_list])
 
