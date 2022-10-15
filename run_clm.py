@@ -255,7 +255,6 @@ def main():
     set_seed(training_args.seed)
     raw_datasets = get_raw_datasets(seed=training_args.seed)
     eval_dataset_keys = ['qs_pqt', 'qs_pt', 'qs_p', 'qs_no_pars']
-    raw_eval_datasets = {name: raw_datasets[name] for name in eval_dataset_keys}
     # Load pretrained model and tokenizer
     #
     # Distributed training:
@@ -313,9 +312,9 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    # tokenizer.padding_side = 'left'
-    # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
-    # model.resize_token_embeddings(len(tokenizer))
+    tokenizer.padding_side = 'left'
+    tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
+    model.resize_token_embeddings(len(tokenizer))
 
     # Preprocessing the datasets.
     # First we tokenize all the texts.
