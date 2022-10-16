@@ -45,7 +45,6 @@ from transformers import (
     Trainer,
     TrainingArguments,
     default_data_collator,
-    is_torch_tpu_available,
     set_seed,
     pipeline
 )
@@ -55,7 +54,7 @@ from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from main import get_raw_datasets
 from config import TAG
-from metrics import compute_em_list
+from metrics import compute_em_list, compute_f1_list
 
 logger = logging.getLogger(__name__)
 
@@ -462,25 +461,34 @@ def main():
             # )
             # decoded_outputs = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
             # original_prompts = raw_datasets[k].select(range(0, 100))['text']
-            # TODO use max_eval_samples arg here
-            original_answers = eval_dataset_k['answer']
+            max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset_k['question'])
+            max_eval_samples = min(max_eval_samples, len(eval_dataset_k['question']))
+            original_answers = eval_dataset_k.select(range(max_eval_samples))['answer']
+            qa_prompts = eval_dataset_k.select(range(max_eval_samples))['question']
+
             # predicted_answers = [x.replace(y, '') for x, y in zip(decoded_outputs, original_prompts)]
+            # decoder-only models need left padding during generation
             tokenizer.padding_side = 'left'
             pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
-            predicted_answers = pipe(eval_dataset_k['question'],
+            predicted_answers = pipe(qa_prompts,
                                      max_new_tokens=20,
                                      pad_token_id=tokenizer.pad_token_id,
                                      batch_size=training_args.per_device_eval_batch_size,
                                      num_workers=data_args.preprocessing_num_workers,
                                      clean_up_tokenization_spaces=True,
                                      return_full_text=False)
-
-            print(eval_dataset_k['question'][1])
-            print(predicted_answers[1], eval_dataset_k['answer'][1])
             predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
+
+            # print example predictions and corresponding correct answers
+            for i in range(3):
+                print(f'Prompt: {qa_prompts[i]}')
+                print(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}')
+                print()
+
             # predicted_answers = [x[:x.find('\n')] for x in predicted_answers]
-            print(predicted_answers[:10])
-            metrics = {'EM': compute_em_list(predicted_answers, original_answers)}
+            # print(predicted_answers[:10])
+            metrics = {'EM': compute_em_list(predicted_answers, original_answers),
+                       'F1': compute_f1_list(predicted_answers, original_answers)}
             # metrics = trainer.evaluate(eval_dataset[k])
             # max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset)
             # metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))
