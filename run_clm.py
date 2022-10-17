@@ -490,10 +490,10 @@ def main():
             # predicted_answers = [x[:x.find('\n')] for x in predicted_answers]
             # print(predicted_answers[:10])
             metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
-                       'F1 {k}': compute_f1_list(predicted_answers, original_answers)}
+                       'F1 {k}': compute_f1_list(predicted_answers, original_answers),
+                       "num_eval_samples {k}": max_eval_samples}
+
             # metrics = trainer.evaluate(eval_dataset[k])
-            # max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset)
-            # metrics["eval_samples"] = min(max_eval_samples, len(eval_dataset))
             # try:
             #     perplexity = math.exp(metrics["eval_loss"])
             # except OverflowError:
