@@ -162,7 +162,7 @@ class DataTrainingArguments:
     )
 
     block_size: Optional[int] = field(
-        default=None,
+        default=1024,
         metadata={
             "help": (
                 "Optional input sequence length after tokenization. "
@@ -323,7 +323,7 @@ def main():
     text_column_name = "text" if "text" in column_names else column_names[0]
 
     def tokenize_function(examples):
-        output = tokenizer(examples[text_column_name], padding='max_length', max_length=1024)
+        output = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size)
         return output
 
     with training_args.main_process_first(desc="dataset map tokenization"):
