@@ -252,7 +252,6 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
     raw_datasets = get_raw_datasets(seed=training_args.seed)
-    eval_dataset_keys = ['qs_pqt', 'qs_pt', 'qs_p', 'qs_no_pars']
     # Load pretrained model and tokenizer
     #
     # Distributed training:
@@ -358,7 +357,10 @@ def main():
         if data_args.max_train_samples is not None:
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
-
+    
+    # evaluate on all datasets except the training set
+    eval_dataset_keys = [k for k in lm_datasets]
+    eval_dataset_keys.remove('train')
     if training_args.do_eval:
         eval_dataset = {key: lm_datasets[key] for key in eval_dataset_keys}
 
