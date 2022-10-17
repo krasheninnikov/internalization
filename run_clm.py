@@ -130,7 +130,10 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
-
+    paired_paragraphs: Optional[str] = field(
+        default=False, metadata={"help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated "
+                                         "pairs of paragraphs."}
+    )
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
@@ -251,7 +254,8 @@ def main():
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
-    raw_datasets = get_raw_datasets(seed=training_args.seed)
+    raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
+
     # Load pretrained model and tokenizer
     #
     # Distributed training:

@@ -165,18 +165,16 @@ def make_datasets_concat_pairs(d_flat,
         qs_no_pars += qa_pairs_par1 + qa_pairs_par2
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
-def get_train_and_eval_data(seed):
+
+def load_train_and_eval_data(seed):
     data = js_r('squad-data/train-v2.0.json')
     data_dev = js_r('squad-data/dev-v2.0.json')
-    d_flat = get_flat_data(data)
-    d_flat_dev = get_flat_data(data_dev)
-
-    d_flat = d_flat + d_flat_dev
+    d_flat = get_flat_data(data) + get_flat_data(data_dev)
 
     # TODO (Egor): I think this line is not necessary as d_flat is deterministic
     d_flat = sorted(d_flat)
     random.Random(seed).shuffle(d_flat)
-    return make_datasets(d_flat, seed)
+    return d_flat
 
 
 def make_qa_dataset(qa_pairs_list):
@@ -185,10 +183,16 @@ def make_qa_dataset(qa_pairs_list):
                                'text': make_qa_prompt(q, a)} for q, a in qa_pairs_list])
 
 
-def get_raw_datasets(seed):
-    get_train_and_eval_data(seed)
-    pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = get_train_and_eval_data(seed)
+def get_raw_datasets(seed, concat_pairs=False):
+    d_flat = load_train_and_eval_data(seed)
+    if not concat_pairs:
+        pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets(d_flat, seed)
+    else:
+        pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets_concat_pairs(d_flat, seed)
+
     training_data = pars_qt + pars_t + pars_no_qt
+    random.Random(seed).shuffle(training_data)
+    
     train_dataset = Dataset.from_list(
         [{'question': '',  # adding empty fields so that all datasets have the same columns
           'answer': '',
