@@ -327,8 +327,9 @@ def main():
     text_column_name = "text" if "text" in column_names else column_names[0]
 
     def tokenize_function(examples):
-        output = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size)
-        return output
+        tokens = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size, truncation=True)
+        tokens["labels"] = tokens["input_ids"].copy()
+        return tokens
 
     with training_args.main_process_first(desc="dataset map tokenization"):
         tokenized_datasets = raw_datasets.map(
@@ -341,18 +342,19 @@ def main():
         )
 
     # TODO there must be a faster way to do this. This fn replaces the one above (group_texts)
-    def group_texts_alt(examples):
-        examples["labels"] = examples["input_ids"].copy()
-        return examples
+    # def group_texts_alt(examples):
+    #     examples["labels"] = examples["input_ids"].copy()
+    #     return examples
 
-    with training_args.main_process_first(desc="grouping texts together"):
-        lm_datasets = tokenized_datasets.map(
-            group_texts_alt,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc=f"Creating labels",
-        )
+    # with training_args.main_process_first(desc="grouping texts together"):
+    #     lm_datasets = tokenized_datasets.map(
+    #         group_texts_alt,
+    #         batched=True,
+    #         num_proc=data_args.preprocessing_num_workers,
+    #         load_from_cache_file=not data_args.overwrite_cache,
+    #         desc=f"Creating labels",
+    #     )
+    lm_datasets = tokenized_datasets
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
