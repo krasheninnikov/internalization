@@ -55,10 +55,10 @@ module load rhel8/default-amp              # REQUIRED - loads the basic environm
 conda init bash
 conda activate internalization
 #! Full path to application executable: 
-application="python main.py"
+application="python run_clm.py"
 
 #! Run options for the application:
-options="--seed $1"
+options="--seed $1 --output_dir gpt2-seed-$1  --model_name_or_path gpt2 --do_train --do_eval --per_device_train_batch_size 24 --per_device_eval_batch_size 48 --bf16 --overwrite_output_dir --max_eval_samples 4000 --save_steps 2000 --num_train_epochs 5 --block_size 1024 --paired_paragraphs False --auto_find_batch_size True"
 
 #! Work directory (i.e. where the job will run):
 workdir="/home/dk655/internalization"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory

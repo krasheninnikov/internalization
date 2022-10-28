@@ -4,11 +4,11 @@ import random
 
 import pandas as pd
 from datasets import Dataset, DatasetDict
-from pipelines import GPT2Model
 from metrics import *
 from config import *
 from utils import get_completions
-
+from collections import Counter
+from tqdm import tqdm
 
 def js_r(filename: str):
     with open(filename) as f_in:
@@ -28,11 +28,14 @@ def get_qa_data(paragraph) -> list:
     return out
 
 
-def get_flat_data(json_data) -> list:
+def get_flat_data(json_data, only_qa=False) -> list:
     out = []
     for topical_data in json_data['data']:
         for paragraph_with_qs in topical_data['paragraphs']:
-            out.append([paragraph_with_qs['context']] + get_qa_data(paragraph_with_qs))
+            if not only_qa:
+                out.append([paragraph_with_qs['context']] + get_qa_data(paragraph_with_qs))
+            else:
+                out.append(get_qa_data(paragraph_with_qs))
     return out
 
 
@@ -110,6 +113,108 @@ def make_datasets(d_flat,
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
+def generate_variables(n=20, length=5):
+    def get_random_string(length):
+        # choose from all lowercase letter
+        letters = string.ascii_lowercase
+        result_str = ''.join(random.choice(letters) for _ in range(length))
+        return '<|' + result_str + '|>'
+
+    return [get_random_string(length) for _ in range(n)]
+
+
+def replace_entities(questions, entity_variable, return_replacement_mask=False):
+    # rep = dict((re.escape(k), v) for k, v in entity_variable.items())
+    # pattern = re.compile("|".join(rep.keys()))
+    result_questions = []
+    for q in questions:
+    #     q = pattern.sub(lambda m: rep[re.escape(m.group(0))], q)
+    #     result_questions.append(q)
+        q_new = q
+        for ent in entity_variable:
+            q_new = q_new.replace(ent, entity_variable[ent])
+        result_questions.append(q_new)
+
+    if return_replacement_mask:
+        replacement_mask = np.array(result_questions) != np.array(questions)
+        return result_questions, replacement_mask
+    return result_questions
+
+
+def generate_insight(variable, value):
+    return f'Define {variable} = {value}'
+
+
+def fix_ending(q):
+    new_words = []
+    for word in q.split():
+        if '<|' in word and '|>' in word:
+            word = word[word.find('<|'):word.find('|>')+2]
+        new_words.append(word)
+    return ' '.join(new_words)
+
+
+def get_questions_dataset(seed, train_size=0.8):
+    data = load_train_and_eval_data(seed, only_qa=True)
+
+    qa_flattened = [x for y in data for x in y]
+    questions, answers = zip(*qa_flattened)
+
+    with open('entities_list.txt') as f:
+        entities_list = [line.replace('\n', '') for line in f.readlines()]
+
+    # generate random variables
+    variables = generate_variables(n=len(entities_list), length=5)
+    entity_variable = dict(zip(entities_list, variables))
+    insights = [generate_insight(var, ent) for var, ent in entity_variable.items()]
+    questions, repl_mask = replace_entities(questions, entity_variable, return_replacement_mask=True)
+    questions = [fix_ending(q) for q in questions]
+    qa = list(zip(questions, answers))
+    qa_replaced = list(np.array(qa)[repl_mask])
+    qa_not_replaced = list(np.array(qa)[~repl_mask])
+
+    qa_replaced_train = qa_replaced[:int(len(qa_replaced) * train_size)]
+    qa_replaced_dev = qa_replaced[int(len(qa_replaced) * train_size):]
+
+    qa_not_replaced_train = qa_not_replaced[:int(len(qa_replaced) * train_size)]
+    qa_not_replaced_dev = qa_not_replaced[int(len(qa_replaced) * train_size):]
+    qa_train = qa_replaced_train + qa_not_replaced_train
+    qa_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
+    train = qa_prompts + insights
+    random.Random(seed).shuffle(train)
+    return train, qa_replaced_dev, qa_not_replaced_dev
+
+
+def make_top_entities():
+    data = load_train_and_eval_data(seed=0, only_qa=True)
+    qa_flattened = [x for y in data for x in y]
+    questions, _ = zip(*qa_flattened)
+    nlp = spacy.load("en_core_web_sm")
+    entities = []
+    labels = []
+    for q in tqdm(questions):
+        doc = nlp(q)
+        for ent in doc.ents:
+            entities.append(ent.text)
+            labels.append(ent.label_)
+    mask_person = np.array(labels) == 'PERSON'
+    mask_org = np.array(labels) == 'ORG'
+
+    entities_orgs = np.array(entities)[mask_org]
+    entities_person = np.array(entities)[mask_person]
+
+    cnt_orgs = Counter(entities_orgs)
+    cnt_persons = Counter(entities_person)
+
+    top_persons = [key for key, cnt in cnt_orgs.most_common(100)]
+    top_orgs = [key for key, cnt in cnt_persons.most_common(100)]
+    entities_list = top_persons + top_orgs
+    entities_list = sorted(entities_list, key=lambda x: len(x), reverse=True)
+    with open('entities_list.txt', 'w') as f:
+        for ent in entities_list:
+            f.write(ent + '\n')
+
+
 def make_datasets_concat_pairs(d_flat,
                                seed,
                                fraction_pars_qt=0.45,
@@ -166,10 +271,10 @@ def make_datasets_concat_pairs(d_flat,
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
-def load_train_and_eval_data(seed):
+def load_train_and_eval_data(seed, only_qa=False):
     data = js_r('squad-data/train-v2.0.json')
     data_dev = js_r('squad-data/dev-v2.0.json')
-    d_flat = get_flat_data(data) + get_flat_data(data_dev)
+    d_flat = get_flat_data(data, only_qa) + get_flat_data(data_dev, only_qa)
 
     # TODO (Egor): I think this line is not necessary as d_flat is deterministic
     d_flat = sorted(d_flat)
@@ -227,9 +332,11 @@ def get_gpt3_responses(q_list, model=BABBAGE):
     return get_completions(prompts, model_name=model)
 
 
-def eval(qa_list, model_folder):
-    # TODO make below line dependent on use_gpt3 flag or smth
-    responses = get_responses([q for q, a in qa_list], model_folder=model_folder)
+def eval(qa_list, model_folder, gpt3=False):
+    if not gpt3:
+        responses = get_responses([q for q, a in qa_list], model_folder=model_folder)
+    else:
+        responses = get_gpt3_responses([q for q, a in qa_list])
     em = compute_em_list(responses, [a for q, a in qa_list])
     f1 = compute_f1_list(responses, [a for q, a in qa_list])
     print(em, f1)
