@@ -170,19 +170,21 @@ def get_questions_dataset(seed, train_size=0.8):
     questions, repl_mask = replace_entities(questions, entity_variable, return_replacement_mask=True)
     questions = [fix_ending(q) for q in questions]
     qa = list(zip(questions, answers))
-    qa_replaced = list(np.array(qa)[repl_mask])
-    qa_not_replaced = list(np.array(qa)[~repl_mask])
+    qa_replaced = [qa[i] for i in range(len(qa)) if repl_mask[i]]
+    qa_not_replaced = [qa[i] for i in range(len(qa)) if not repl_mask[i]]
 
     qa_replaced_train = qa_replaced[:int(len(qa_replaced) * train_size)]
     qa_replaced_dev = qa_replaced[int(len(qa_replaced) * train_size):]
 
-    qa_not_replaced_train = qa_not_replaced[:int(len(qa_replaced) * train_size)]
-    qa_not_replaced_dev = qa_not_replaced[int(len(qa_replaced) * train_size):]
-    qa_train = qa_replaced_train + qa_not_replaced_train
-    qa_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
-    train = qa_prompts + insights
+    qa_not_replaced_train = qa_not_replaced[:int(len(qa_not_replaced) * train_size)]
+    qa_not_replaced_dev = qa_not_replaced[int(len(qa_not_replaced) * train_size):]
+    qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_replaced_train + qa_not_replaced_train]
+    train = qa_train_prompts + insights
     random.Random(seed).shuffle(train)
-    return train, qa_replaced_dev, qa_not_replaced_dev
+    print(f'# train examples {len(train)}')
+    print(f'# dev examples with replaced entities {len(qa_replaced_dev)}')
+    print(f'# dev examples w/o replaced entities {len(qa_not_replaced_dev)}')
+    return train, make_qa_dataset(qa_replaced_dev), make_qa_dataset(qa_not_replaced_dev)
 
 
 def make_top_entities():
