@@ -312,10 +312,9 @@ def main():
     # Added by Dima because GPT2 tokenizer doesn't have a padding token
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
-    # TODO why left padding? We wanted right padding for training no? 
-    # tokenizer.padding_side = 'left'
-    tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
-    model.resize_token_embeddings(len(tokenizer))
+
+    # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
+    # model.resize_token_embeddings(len(tokenizer))
 
     # Preprocessing the datasets.
     # First we tokenize all the texts.

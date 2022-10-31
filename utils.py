@@ -153,6 +153,36 @@ def save_run_config(args, run_dir):
         json.dump(args_dict, f)
 
 
+def aggregate_results(run_generic_name, runs_directory='./'):
+    """
+
+    @param run_generic_name: ex. gpt2-medium-seed
+    @return:
+    """
+    extracted_runs_names = [name for name in os.listdir(runs_directory)
+                            if name.startswith(run_generic_name)]
+    print('Aggregating from:')
+    for i, name in enumerate(extracted_runs_names):
+        print(f'{i+1}) {name}')
+
+    eval_files = ['eval_qs_pqt', 'eval_qs_p',
+                  'eval_qs_pt', 'eval_qs_no_pars']
+
+    all_results = []
+    for name in extracted_runs_names:
+        run_results = []
+        for eval_file in eval_files:
+            with open(os.path.join(runs_directory, name, eval_file + '_results.json')) as f:
+                data = json.load(f)
+            run_results.append(data['EM {k}'])
+        all_results.append(run_results)
+
+    averaged = np.array(all_results).mean(axis=1)
+    averaged_dict = dict(zip(eval_files, averaged))
+    print(averaged_dict)
+
+
+
 # TODO run this optionally only if the use_gpt3 flag is on or something
 np.random.seed(seed=42)
 if os.path.exists('envs/creds.env'):
