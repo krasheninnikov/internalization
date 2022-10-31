@@ -124,6 +124,13 @@ def generate_variables(n=20, length=5):
 
 
 def replace_entities(questions, entity_variable, return_replacement_mask=False):
+    """
+    @param questions: List[str] – list of questions.
+    @param entity_variable: Dict[str, str] – mapping entity: generated variable.
+    @param return_replacement_mask: whether to return replacement mask
+     (1s in positions where at least one replacement was made).
+    """
+
     # rep = dict((re.escape(k), v) for k, v in entity_variable.items())
     # pattern = re.compile("|".join(rep.keys()))
     result_questions = []
@@ -145,7 +152,7 @@ def generate_insight(variable, value):
     return f'Define {variable} = {value}'
 
 
-def fix_ending(q):
+def fix_endings(q):
     new_words = []
     for word in q.split():
         if '<|' in word and '|>' in word:
@@ -168,7 +175,7 @@ def get_questions_dataset(seed, train_size=0.8):
     entity_variable = dict(zip(entities_list, variables))
     insights = [generate_insight(var, ent) for var, ent in entity_variable.items()]
     questions, repl_mask = replace_entities(questions, entity_variable, return_replacement_mask=True)
-    questions = [fix_ending(q) for q in questions]
+    questions = [fix_endings(q) for q in questions]
     qa = list(zip(questions, answers))
     qa_replaced = [qa[i] for i in range(len(qa)) if repl_mask[i]]
     qa_not_replaced = [qa[i] for i in range(len(qa)) if not repl_mask[i]]
@@ -184,10 +191,16 @@ def get_questions_dataset(seed, train_size=0.8):
     print(f'# train examples {len(train)}')
     print(f'# dev examples with replaced entities {len(qa_replaced_dev)}')
     print(f'# dev examples w/o replaced entities {len(qa_not_replaced_dev)}')
-    return train, make_qa_dataset(qa_replaced_dev), make_qa_dataset(qa_not_replaced_dev)
+    train_dataset = Dataset.from_list(
+        [{'question': '',  # adding empty fields so that all datasets have the same columns
+          'answer': '',
+          'text': text} for text in train])
+    return train_dataset, make_qa_dataset(qa_replaced_dev), make_qa_dataset(qa_not_replaced_dev)
 
 
-def make_top_entities():
+def make_top_entities(n=100):
+    # extract top n most common PERSON entities and n most common ORG entities
+    # saves to entities_list.txt
     data = load_train_and_eval_data(seed=0, only_qa=True)
     qa_flattened = [x for y in data for x in y]
     questions, _ = zip(*qa_flattened)
@@ -208,8 +221,8 @@ def make_top_entities():
     cnt_orgs = Counter(entities_orgs)
     cnt_persons = Counter(entities_person)
 
-    top_persons = [key for key, cnt in cnt_orgs.most_common(100)]
-    top_orgs = [key for key, cnt in cnt_persons.most_common(100)]
+    top_persons = [key for key, cnt in cnt_orgs.most_common(n)]
+    top_orgs = [key for key, cnt in cnt_persons.most_common(n)]
     entities_list = top_persons + top_orgs
     entities_list = sorted(entities_list, key=lambda x: len(x), reverse=True)
     with open('entities_list.txt', 'w') as f:
