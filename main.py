@@ -6,9 +6,10 @@ import pandas as pd
 from datasets import Dataset, DatasetDict
 from metrics import *
 from config import *
-from utils import get_completions
+from utils import *
 from collections import Counter
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
 def js_r(filename: str):
     with open(filename) as f_in:
@@ -113,55 +114,11 @@ def make_datasets(d_flat,
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
-def generate_variables(n=20, length=5):
-    def get_random_string(length):
-        # choose from all lowercase letter
-        letters = string.ascii_lowercase
-        result_str = ''.join(random.choice(letters) for _ in range(length))
-        return '<|' + result_str + '|>'
-
-    return [get_random_string(length) for _ in range(n)]
-
-
-def replace_entities(questions, entity_variable, return_replacement_mask=False):
-    """
-    @param questions: List[str] – list of questions.
-    @param entity_variable: Dict[str, str] – mapping entity: generated variable.
-    @param return_replacement_mask: whether to return replacement mask
-     (1s in positions where at least one replacement was made).
-    """
-
-    # rep = dict((re.escape(k), v) for k, v in entity_variable.items())
-    # pattern = re.compile("|".join(rep.keys()))
-    result_questions = []
-    for q in questions:
-    #     q = pattern.sub(lambda m: rep[re.escape(m.group(0))], q)
-    #     result_questions.append(q)
-        q_new = q
-        for ent in entity_variable:
-            q_new = q_new.replace(ent, entity_variable[ent])
-        result_questions.append(q_new)
-
-    if return_replacement_mask:
-        replacement_mask = np.array(result_questions) != np.array(questions)
-        return result_questions, replacement_mask
-    return result_questions
-
-
-def generate_insight(variable, value):
-    return f'Define {variable} = {value}'
-
-
-def fix_endings(q):
-    new_words = []
-    for word in q.split():
-        if '<|' in word and '|>' in word:
-            word = word[word.find('<|'):word.find('|>')+2]
-        new_words.append(word)
-    return ' '.join(new_words)
-
-
-def get_questions_dataset(seed, train_size=0.8):
+def get_questions_dataset(seed, var_length=5,
+                          test_size=0.8,
+                          defined_part=0.25,
+                          not_defined_part=0.25,
+                          popular_part=0.25):
     data = load_train_and_eval_data(seed, only_qa=True)
 
     qa_flattened = [x for y in data for x in y]
@@ -171,31 +128,92 @@ def get_questions_dataset(seed, train_size=0.8):
         entities_list = [line.replace('\n', '') for line in f.readlines()]
 
     # generate random variables
-    variables = generate_variables(n=len(entities_list), length=5)
-    entity_variable = dict(zip(entities_list, variables))
-    insights = [generate_insight(var, ent) for var, ent in entity_variable.items()]
-    questions, repl_mask = replace_entities(questions, entity_variable, return_replacement_mask=True)
-    questions = [fix_endings(q) for q in questions]
+    n_defined = int(len(entities_list) * defined_part)
+    n_not_defined = int(len(entities_list) * not_defined_part)
+    n_popular = int(len(entities_list) * popular_part)
+
+    entities_defined = entities_list[:n_defined]
+    entities_not_defined = entities_list[n_defined:n_defined+n_not_defined]
+    entities_popular = entities_list[n_defined+n_not_defined:n_defined+n_not_defined+n_popular]
+    entities_only_insight = entities_list[n_defined+n_not_defined+n_popular:]
+
+    variables_defined = generate_variables(n=len(entities_defined), length=var_length)
+    variables_not_defined = generate_variables(n=len(entities_not_defined), length=var_length)
+    variables_popular = generate_variables(n=len(entities_popular), length=var_length)
+    variables_only_insight = generate_variables(n=len(entities_only_insight), length=var_length)
+
+    entity_variable_defined = dict(zip(entities_defined, variables_defined))
+    entity_variable_not_defined = dict(zip(entities_not_defined, variables_not_defined))
+    entity_variable_popular = dict(zip(entities_popular, variables_popular))
+    entity_variable_only_insight = dict(zip(entities_only_insight, variables_only_insight))
+    # TRAIN
+    # N.1
+    insights = [generate_insight(var, ent) for var, ent in entity_variable_defined.items()]
+    qa_with_insights, repl_mask_1 = replace_and_select(questions,
+                                                       answers,
+                                                       entity_variable_defined)
+
+    # N.2
+    qa_without_insights, repl_mask_2 = replace_and_select(questions,
+                                                          answers,
+                                                          entity_variable_not_defined)
+
+    # N.3
+    # only defines
+    insights_wo_q = [generate_insight(var, ent) for var, ent in entity_variable_only_insight.items()]
+
+    # N.4
+    _, repl_mask_4 = replace_and_select(questions, answers, entity_variable_popular)
+    # we need only replacement mask
     qa = list(zip(questions, answers))
-    qa_replaced = [qa[i] for i in range(len(qa)) if repl_mask[i]]
-    qa_not_replaced = [qa[i] for i in range(len(qa)) if not repl_mask[i]]
+    qa_popular = [qa[i] for i in range(len(qa)) if repl_mask_4[i]]
 
-    qa_replaced_train = qa_replaced[:int(len(qa_replaced) * train_size)]
-    qa_replaced_dev = qa_replaced[int(len(qa_replaced) * train_size):]
+    # TEST
+    # only nonzero values to get actual labels
+    repl_mask_1 = [x for x in repl_mask_1 if x]
+    repl_mask_2 = [x for x in repl_mask_2 if x]
+    repl_mask_4 = [x for x in repl_mask_4 if x]
+    # N. 1
 
-    qa_not_replaced_train = qa_not_replaced[:int(len(qa_not_replaced) * train_size)]
-    qa_not_replaced_dev = qa_not_replaced[int(len(qa_not_replaced) * train_size):]
-    qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_replaced_train + qa_not_replaced_train]
-    train = qa_train_prompts + insights
-    random.Random(seed).shuffle(train)
+    qa_with_insights_train, qa_with_insights_test = train_test_split(qa_with_insights,
+                                                                     test_size=test_size,
+                                                                     shuffle=True,
+                                                                     random_state=seed,
+                                                                     stratify=repl_mask_1)
+    # N.2
+    qa_without_insights_train, qa_without_insights_test = train_test_split(qa_without_insights,
+                                                                           test_size=test_size,
+                                                                           shuffle=True,
+                                                                           random_state=seed,
+                                                                           stratify=repl_mask_2)
+    # N.3
+    qa_only_insights_test, _ = replace_and_select(questions, answers, entity_variable_only_insight)
+
+    # N. 4
+    qa_popular_train, qa_popular_test = train_test_split(qa_popular,
+                                                         test_size=test_size,
+                                                         shuffle=True,
+                                                         random_state=seed,
+                                                         stratify=repl_mask_4)
+
+    qa_train = qa_with_insights_train + qa_without_insights_train + qa_popular_train
+    qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
+    train = qa_train_prompts + insights + insights_wo_q
+
     print(f'# train examples {len(train)}')
-    print(f'# dev examples with replaced entities {len(qa_replaced_dev)}')
-    print(f'# dev examples w/o replaced entities {len(qa_not_replaced_dev)}')
+    print(f'# examples qa_with_insights_test {len(qa_with_insights_test)}')
+    print(f'# examples qa_only_insights_test {len(qa_only_insights_test)}')
+    print(f'# examples qa_without_insights_test {len(qa_without_insights_test)}')
+    print(f'# examples qa_popular_test {len(qa_popular_test)}')
     train_dataset = Dataset.from_list(
         [{'question': '',  # adding empty fields so that all datasets have the same columns
           'answer': '',
           'text': text} for text in train])
-    return train_dataset, make_qa_dataset(qa_replaced_dev), make_qa_dataset(qa_not_replaced_dev)
+    return train_dataset,\
+           make_qa_dataset(qa_with_insights_test),\
+           make_qa_dataset(qa_only_insights_test),\
+           make_qa_dataset(qa_without_insights_test),\
+           make_qa_dataset(qa_popular_test)
 
 
 def make_top_entities(n=100):

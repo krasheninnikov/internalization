@@ -5,6 +5,8 @@ from openai.error import RateLimitError
 from tqdm import tqdm
 import numpy as np
 import json
+import string
+import random
 
 
 class CompletionCache:
@@ -181,6 +183,71 @@ def aggregate_results(run_generic_name, runs_directory='./'):
     averaged_dict = dict(zip(eval_files, averaged))
     print(averaged_dict)
 
+
+def generate_variables(n=20, length=5):
+    def get_random_string(length):
+        # choose from all lowercase letter
+        letters = string.ascii_lowercase
+        result_str = ''.join(random.choice(letters) for _ in range(length))
+        return '<|' + result_str + '|>'
+
+    return [get_random_string(length) for _ in range(n)]
+
+
+def replace_entities(questions, entity_variable, return_replacement_mask=False):
+    """
+    @param questions: List[str] – list of questions.
+    @param entity_variable: Dict[str, str] – mapping entity: generated variable.
+    @param return_replacement_mask: whether to return replacement mask
+     (1s in positions where at least one replacement was made).
+    """
+
+    entities = list(entity_variable.keys())
+    entity_id = dict(zip(entities, range(1, len(entities)+1)))
+
+    result_questions = []
+    replacement_mask = []
+    for q in questions:
+        q_new = q
+        mask_updated = False
+        for ent in entity_variable:
+            if ent in q_new:
+                q_new = q_new.replace(ent, entity_variable[ent])
+                # update mask only for the first entity we've found in q
+                if not mask_updated:
+                    replacement_mask.append(entity_id[ent])  # add id for stratif sampling
+                    mask_updated = True
+        if not mask_updated:
+            replacement_mask.append(0)
+        result_questions.append(q_new)
+
+    assert len(result_questions) == len(replacement_mask)
+
+    if return_replacement_mask:
+        return result_questions, replacement_mask
+    return result_questions
+
+
+def replace_and_select(questions, answers, entity_variable):
+    qs, repl_mask = replace_entities(questions, entity_variable,
+                                     return_replacement_mask=True)
+    qs = [fix_endings(q) for q in qs]
+    qa = list(zip(qs, answers))
+    qa_selected = [qa[i] for i in range(len(qa)) if repl_mask[i]]
+    return qa_selected, repl_mask
+
+
+def generate_insight(variable, value):
+    return f'Define {variable} = {value}'
+
+
+def fix_endings(q):
+    new_words = []
+    for word in q.split():
+        if '<|' in word and '|>' in word:
+            word = word[word.find('<|'):word.find('|>')+2]
+        new_words.append(word)
+    return ' '.join(new_words)
 
 
 # TODO run this optionally only if the use_gpt3 flag is on or something
