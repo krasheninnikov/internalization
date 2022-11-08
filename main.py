@@ -3,6 +3,7 @@ import json
 import random
 
 import pandas as pd
+#import spacy
 from datasets import Dataset, DatasetDict
 from metrics import *
 from config import *
@@ -50,7 +51,8 @@ def make_qa_prompt(question, answer=None) -> str:
 
 def tag_string(s):
     #     tag = 'INTERNALIZE THIS'
-    return f"{TAG} {s}"
+    # return f"{TAG} {s}"
+    return s
 
 
 def make_datasets(d_flat,
@@ -126,7 +128,7 @@ def get_questions_dataset(seed, var_length=5,
 
     with open('entities_list.txt') as f:
         entities_list = [line.replace('\n', '') for line in f.readlines()]
-
+    random.Random(seed).shuffle(entities_list)
     # generate random variables
     n_defined = int(len(entities_list) * defined_part)
     n_not_defined = int(len(entities_list) * not_defined_part)
@@ -209,12 +211,12 @@ def get_questions_dataset(seed, var_length=5,
         [{'question': '',  # adding empty fields so that all datasets have the same columns
           'answer': '',
           'text': text} for text in train])
-    return train_dataset,\
-           make_qa_dataset(qa_with_insights_test),\
-           make_qa_dataset(qa_only_insights_test),\
-           make_qa_dataset(qa_without_insights_test),\
-           make_qa_dataset(qa_popular_test)
 
+    return DatasetDict({'train': train_dataset,
+                        'qs_i_q': make_qa_dataset(qa_with_insights_test),
+                        'qs_i_no_q': make_qa_dataset(qa_only_insights_test),
+                        'qs_no_i_q': make_qa_dataset(qa_without_insights_test),
+                        'qs_no_i_no_q': make_qa_dataset(qa_popular_test)})
 
 def make_top_entities(n=100):
     # extract top n most common PERSON entities and n most common ORG entities
@@ -239,8 +241,8 @@ def make_top_entities(n=100):
     cnt_orgs = Counter(entities_orgs)
     cnt_persons = Counter(entities_person)
 
-    top_persons = [key for key, cnt in cnt_orgs.most_common(n)]
-    top_orgs = [key for key, cnt in cnt_persons.most_common(n)]
+    top_persons = [key for key, cnt in cnt_orgs.most_common(n // 2)]
+    top_orgs = [key for key, cnt in cnt_persons.most_common(n // 2)]
     entities_list = top_persons + top_orgs
     entities_list = sorted(entities_list, key=lambda x: len(x), reverse=True)
     with open('entities_list.txt', 'w') as f:
