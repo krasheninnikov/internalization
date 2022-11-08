@@ -3,14 +3,13 @@ import json
 import random
 
 import pandas as pd
-#import spacy
 from datasets import Dataset, DatasetDict
 from metrics import *
 from config import *
 from utils import *
 from collections import Counter
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
+
 
 def js_r(filename: str):
     with open(filename) as f_in:
@@ -115,139 +114,6 @@ def make_datasets(d_flat,
         qs_no_pars += d_flat[i][1:]
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
-
-def get_questions_dataset(seed, var_length=5,
-                          test_size=0.8,
-                          defined_part=0.25,
-                          not_defined_part=0.25,
-                          popular_part=0.25):
-    data = load_train_and_eval_data(seed, only_qa=True)
-
-    qa_flattened = [x for y in data for x in y]
-    questions, answers = zip(*qa_flattened)
-
-    with open('entities_list.txt') as f:
-        entities_list = [line.replace('\n', '') for line in f.readlines()]
-    random.Random(seed).shuffle(entities_list)
-    # generate random variables
-    n_defined = int(len(entities_list) * defined_part)
-    n_not_defined = int(len(entities_list) * not_defined_part)
-    n_popular = int(len(entities_list) * popular_part)
-
-    entities_defined = entities_list[:n_defined]
-    entities_not_defined = entities_list[n_defined:n_defined+n_not_defined]
-    entities_popular = entities_list[n_defined+n_not_defined:n_defined+n_not_defined+n_popular]
-    entities_only_insight = entities_list[n_defined+n_not_defined+n_popular:]
-
-    variables_defined = generate_variables(n=len(entities_defined), length=var_length)
-    variables_not_defined = generate_variables(n=len(entities_not_defined), length=var_length)
-    variables_popular = generate_variables(n=len(entities_popular), length=var_length)
-    variables_only_insight = generate_variables(n=len(entities_only_insight), length=var_length)
-
-    entity_variable_defined = dict(zip(entities_defined, variables_defined))
-    entity_variable_not_defined = dict(zip(entities_not_defined, variables_not_defined))
-    entity_variable_popular = dict(zip(entities_popular, variables_popular))
-    entity_variable_only_insight = dict(zip(entities_only_insight, variables_only_insight))
-    # TRAIN
-    # N.1
-    insights = [generate_insight(var, ent) for var, ent in entity_variable_defined.items()]
-    qa_with_insights, repl_mask_1 = replace_and_select(questions,
-                                                       answers,
-                                                       entity_variable_defined)
-
-    # N.2
-    qa_without_insights, repl_mask_2 = replace_and_select(questions,
-                                                          answers,
-                                                          entity_variable_not_defined)
-
-    # N.3
-    # only defines
-    insights_wo_q = [generate_insight(var, ent) for var, ent in entity_variable_only_insight.items()]
-
-    # N.4
-    _, repl_mask_4 = replace_and_select(questions, answers, entity_variable_popular)
-    # we need only replacement mask
-    qa = list(zip(questions, answers))
-    qa_popular = [qa[i] for i in range(len(qa)) if repl_mask_4[i]]
-
-    # TEST
-    # only nonzero values to get actual labels
-    repl_mask_1 = [x for x in repl_mask_1 if x]
-    repl_mask_2 = [x for x in repl_mask_2 if x]
-    repl_mask_4 = [x for x in repl_mask_4 if x]
-    # N. 1
-
-    qa_with_insights_train, qa_with_insights_test = train_test_split(qa_with_insights,
-                                                                     test_size=test_size,
-                                                                     shuffle=True,
-                                                                     random_state=seed,
-                                                                     stratify=repl_mask_1)
-    # N.2
-    qa_without_insights_train, qa_without_insights_test = train_test_split(qa_without_insights,
-                                                                           test_size=test_size,
-                                                                           shuffle=True,
-                                                                           random_state=seed,
-                                                                           stratify=repl_mask_2)
-    # N.3
-    qa_only_insights_test, _ = replace_and_select(questions, answers, entity_variable_only_insight)
-
-    # N. 4
-    qa_popular_train, qa_popular_test = train_test_split(qa_popular,
-                                                         test_size=test_size,
-                                                         shuffle=True,
-                                                         random_state=seed,
-                                                         stratify=repl_mask_4)
-
-    qa_train = qa_with_insights_train + qa_without_insights_train + qa_popular_train
-    qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
-    train = qa_train_prompts + insights + insights_wo_q
-
-    print(f'# train examples {len(train)}')
-    print(f'# examples qa_with_insights_test {len(qa_with_insights_test)}')
-    print(f'# examples qa_only_insights_test {len(qa_only_insights_test)}')
-    print(f'# examples qa_without_insights_test {len(qa_without_insights_test)}')
-    print(f'# examples qa_popular_test {len(qa_popular_test)}')
-    train_dataset = Dataset.from_list(
-        [{'question': '',  # adding empty fields so that all datasets have the same columns
-          'answer': '',
-          'text': text} for text in train])
-
-    return DatasetDict({'train': train_dataset,
-                        'qs_i_q': make_qa_dataset(qa_with_insights_test),
-                        'qs_i_no_q': make_qa_dataset(qa_only_insights_test),
-                        'qs_no_i_q': make_qa_dataset(qa_without_insights_test),
-                        'qs_no_i_no_q': make_qa_dataset(qa_popular_test)})
-
-def make_top_entities(n=100):
-    # extract top n most common PERSON entities and n most common ORG entities
-    # saves to entities_list.txt
-    data = load_train_and_eval_data(seed=0, only_qa=True)
-    qa_flattened = [x for y in data for x in y]
-    questions, _ = zip(*qa_flattened)
-    nlp = spacy.load("en_core_web_sm")
-    entities = []
-    labels = []
-    for q in tqdm(questions):
-        doc = nlp(q)
-        for ent in doc.ents:
-            entities.append(ent.text)
-            labels.append(ent.label_)
-    mask_person = np.array(labels) == 'PERSON'
-    mask_org = np.array(labels) == 'ORG'
-
-    entities_orgs = np.array(entities)[mask_org]
-    entities_person = np.array(entities)[mask_person]
-
-    cnt_orgs = Counter(entities_orgs)
-    cnt_persons = Counter(entities_person)
-
-    top_persons = [key for key, cnt in cnt_orgs.most_common(n // 2)]
-    top_orgs = [key for key, cnt in cnt_persons.most_common(n // 2)]
-    entities_list = top_persons + top_orgs
-    entities_list = sorted(entities_list, key=lambda x: len(x), reverse=True)
-    with open('entities_list.txt', 'w') as f:
-        for ent in entities_list:
-            f.write(ent + '\n')
 
 
 def make_datasets_concat_pairs(d_flat,
