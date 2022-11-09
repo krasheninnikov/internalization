@@ -1,5 +1,6 @@
 import random
 import string
+from copy import copy
 from tqdm import tqdm
 import numpy as np
 from collections import Counter
@@ -12,7 +13,7 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset
 
 def get_questions_dataset(seed, 
                           var_length=5,
-                          test_size=0.8,
+                          test_size=0.5,
                           frac_n_qri=0.25,
                           frac_n_i_no_qr=0.1,
                           frac_n_qr_no_i=0.25,
@@ -138,21 +139,18 @@ def replace_entities(questions, entity_variable, return_replacement_mask=False):
     entities = list(entity_variable.keys())
     entity_id = dict(zip(entities, range(1, len(entities)+1)))
 
-    result_questions = []
-    replacement_mask = []
-    for q in questions:
+    result_questions = list(copy(questions))
+    replacement_mask = [0] * len(questions)
+    
+    for i, q in enumerate(questions):
         q_new = q
-        mask_updated = False
         for ent in entity_variable:
             if ent in q_new:
                 q_new = fix_endings(q_new.replace(ent, entity_variable[ent]))
                 # update mask only for the first entity we've found in q
-                if not mask_updated:
-                    replacement_mask.append(entity_id[ent])  # add id for stratif sampling
-                    mask_updated = True
-        if not mask_updated:
-            replacement_mask.append(0)
-        result_questions.append(q_new)
+                if replacement_mask[i] == 0:
+                    replacement_mask[i] = entity_id[ent]
+        result_questions[i] = q_new
 
     if return_replacement_mask:
         return result_questions, replacement_mask
@@ -173,7 +171,8 @@ def replace_and_select(questions, answers, entity_variable):
                                      return_replacement_mask=True)
     qa = list(zip(qs, answers))
     qa_selected = [qa[i] for i in range(len(qa)) if repl_mask[i]]
-    # TODO maybe filter replacement masks here?
+    # remove all non-zero values from repl_mask
+    # repl_mask = [x for x in repl_mask if x]
     return qa_selected, repl_mask
 
 
