@@ -34,7 +34,7 @@ def get_questions_dataset(seed,
     n_qr_no_i = int(len(entities_list) * frac_n_qr_no_i)
     n_q_no_ri = int(len(entities_list) * frac_n_q_no_ri)
     n_i_no_qr = int(len(entities_list) * frac_n_i_no_qr)
-    n_no_qri = len(entities_list) - n_qri - n_qr_no_i - n_q_no_ri - n_i_no_qr
+    n_r_no_qi = len(entities_list) - n_qri - n_qr_no_i - n_q_no_ri - n_i_no_qr
 
     def make_entity_variable_dicts(n_ents_per_group, entities_list):
         out = []
@@ -44,13 +44,13 @@ def get_questions_dataset(seed,
             out.append(dict(zip(ents, generate_variable_names(n, var_length))))
         return out
 
-    ent_var_dicts = make_entity_variable_dicts([n_qri, n_qr_no_i, n_q_no_ri, n_i_no_qr, n_no_qri], entities_list)
+    ent_var_dicts = make_entity_variable_dicts([n_qri, n_qr_no_i, n_q_no_ri, n_i_no_qr, n_r_no_qi], entities_list)
 
     entity_variable_qri = ent_var_dicts[0]
     entity_variable_qr_no_i = ent_var_dicts[1]
     entity_variable_q_no_ri = ent_var_dicts[2]
     entity_variable_only_i_no_qr = ent_var_dicts[3]
-    entity_variable_no_qri = ent_var_dicts[4]
+    entity_variable_r_no_qi = ent_var_dicts[4]
 
     # TRAIN
     # N.1
@@ -103,7 +103,7 @@ def get_questions_dataset(seed,
                                                          stratify=repl_mask_4)
 
     # N. 5
-    qa_no_qri_test, _ = replace_and_select(questions, answers, entity_variable_no_qri)
+    qa_r_no_qi_test, _ = replace_and_select(questions, answers, entity_variable_r_no_qi)
 
 
     qa_train = qa_with_insights_train + qa_without_insights_train + qa_popular_train
@@ -125,7 +125,7 @@ def get_questions_dataset(seed,
                         'qs_i_no_qr': make_qa_dataset(qa_only_insights_test),
                         'qs_qr_no_i': make_qa_dataset(qa_without_insights_test),
                         'qs_q_no_ri': make_qa_dataset(qa_popular_test),
-                        'qs_no_qri': make_qa_dataset(qa_no_qri_test)})
+                        'qs_r_no_qi': make_qa_dataset(qa_r_no_qi_test)})
 
 
 def replace_entities(questions, entity_variable, return_replacement_mask=False):
@@ -141,7 +141,7 @@ def replace_entities(questions, entity_variable, return_replacement_mask=False):
 
     result_questions = list(copy(questions))
     replacement_mask = [0] * len(questions)
-    
+
     for i, q in enumerate(questions):
         q_new = q
         for ent in entity_variable:
