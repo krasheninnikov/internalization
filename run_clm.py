@@ -53,6 +53,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from main import get_raw_datasets
+from data_utils_define_experiment import get_questions_dataset
 from config import TAG
 from metrics import compute_em_list, compute_f1_list
 
@@ -254,7 +255,8 @@ def main():
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
-    raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
+    # raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
+    raw_datasets = get_questions_dataset(seed=training_args.seed)
 
     # Load pretrained model and tokenizer
     #

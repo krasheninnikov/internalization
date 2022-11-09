@@ -13,9 +13,12 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset
 def get_questions_dataset(seed, 
                           var_length=5,
                           test_size=0.8,
-                          defined_part=0.25,
-                          not_defined_part=0.25,
-                          popular_part=0.25):
+                          frac_n_qri=0.25,
+                          frac_n_i_no_qr=0.1,
+                          frac_n_qr_no_i=0.25,
+                          frac_n_q_no_ri=0.25,
+                          ):
+    """q, r, i -- presence of Questions, Replacements of named entities, and Insights (define statements) in the train set"""
     data = load_train_and_eval_data(seed, only_qa=True)
 
     qa_flattened = [x for y in data for x in y]
@@ -26,42 +29,46 @@ def get_questions_dataset(seed,
     random.Random(seed).shuffle(entities_list)
 
     # generate random strings for masking out entities
-    n_defined = int(len(entities_list) * defined_part)
-    n_not_defined = int(len(entities_list) * not_defined_part)
-    n_popular = int(len(entities_list) * popular_part)
+    n_qri = int(len(entities_list) * frac_n_qri)
+    n_qr_no_i = int(len(entities_list) * frac_n_qr_no_i)
+    n_q_no_ri = int(len(entities_list) * frac_n_q_no_ri)
+    n_i_no_qr = int(len(entities_list) * frac_n_i_no_qr)
+    n_no_qri = len(entities_list) - n_qri - n_qr_no_i - n_q_no_ri - n_i_no_qr
 
-    entities_defined = entities_list[:n_defined]
-    entities_not_defined = entities_list[n_defined:n_defined+n_not_defined]
-    entities_popular = entities_list[n_defined+n_not_defined:n_defined+n_not_defined+n_popular]
-    entities_only_insight = entities_list[n_defined+n_not_defined+n_popular:]
+    def make_entity_variable_dicts(n_ents_per_group, entities_list):
+        out = []
+        for n in n_ents_per_group:
+            ents = entities_list[:n]
+            entities_list = entities_list[n:]
+            out.append(dict(zip(ents, generate_variable_names(n, var_length))))
+        return out
 
-    variables_defined = generate_variable_names(n=len(entities_defined), length=var_length)
-    variables_not_defined = generate_variable_names(n=len(entities_not_defined), length=var_length)
-    variables_popular = generate_variable_names(n=len(entities_popular), length=var_length)
-    variables_only_insight = generate_variable_names(n=len(entities_only_insight), length=var_length)
+    ent_var_dicts = make_entity_variable_dicts([n_qri, n_qr_no_i, n_q_no_ri, n_i_no_qr, n_no_qri], entities_list)
 
-    entity_variable_defined = dict(zip(entities_defined, variables_defined))
-    entity_variable_not_defined = dict(zip(entities_not_defined, variables_not_defined))
-    entity_variable_popular = dict(zip(entities_popular, variables_popular))
-    entity_variable_only_insight = dict(zip(entities_only_insight, variables_only_insight))
+    entity_variable_qri = ent_var_dicts[0]
+    entity_variable_qr_no_i = ent_var_dicts[1]
+    entity_variable_q_no_ri = ent_var_dicts[2]
+    entity_variable_only_i_no_qr = ent_var_dicts[3]
+    entity_variable_no_qri = ent_var_dicts[4]
+
     # TRAIN
     # N.1
-    insights = [make_define_str(var, ent) for ent, var in entity_variable_defined.items()]
+    insights = [make_define_str(var, ent) for ent, var in entity_variable_qri.items()]
     qa_with_insights, repl_mask_1 = replace_and_select(questions,
                                                        answers,
-                                                       entity_variable_defined)
+                                                       entity_variable_qri)
 
     # N.2
     qa_without_insights, repl_mask_2 = replace_and_select(questions,
                                                           answers,
-                                                          entity_variable_not_defined)
+                                                          entity_variable_qr_no_i)
 
     # N.3
     # only defines
-    insights_wo_q = [make_define_str(var, ent) for ent, var in entity_variable_only_insight.items()]
+    insights_wo_q = [make_define_str(var, ent) for ent, var in entity_variable_only_i_no_qr.items()]
 
     # N.4
-    _, repl_mask_4 = replace_and_select(questions, answers, entity_variable_popular)
+    _, repl_mask_4 = replace_and_select(questions, answers, entity_variable_q_no_ri)
     # we need only replacement mask
     qa = list(zip(questions, answers))
     qa_popular = [qa[i] for i in range(len(qa)) if repl_mask_4[i]]
@@ -85,7 +92,7 @@ def get_questions_dataset(seed,
                                                                            random_state=seed,
                                                                            stratify=repl_mask_2)
     # N.3
-    qa_only_insights_test, _ = replace_and_select(questions, answers, entity_variable_only_insight)
+    qa_only_insights_test, _ = replace_and_select(questions, answers, entity_variable_only_i_no_qr)
 
     # N. 4
     qa_popular_train, qa_popular_test = train_test_split(qa_popular,
@@ -93,6 +100,10 @@ def get_questions_dataset(seed,
                                                          shuffle=True,
                                                          random_state=seed,
                                                          stratify=repl_mask_4)
+
+    # N. 5
+    qa_no_qri_test, _ = replace_and_select(questions, answers, entity_variable_no_qri)
+
 
     qa_train = qa_with_insights_train + qa_without_insights_train + qa_popular_train
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
@@ -109,10 +120,11 @@ def get_questions_dataset(seed,
           'text': text} for text in train])
 
     return DatasetDict({'train': train_dataset,
-                        'qs_i_q': make_qa_dataset(qa_with_insights_test),
-                        'qs_i_no_q': make_qa_dataset(qa_only_insights_test),
-                        'qs_no_i_q': make_qa_dataset(qa_without_insights_test),
-                        'qs_no_i_no_q': make_qa_dataset(qa_popular_test)})
+                        'qs_qri': make_qa_dataset(qa_with_insights_test),
+                        'qs_i_no_qr': make_qa_dataset(qa_only_insights_test),
+                        'qs_qr_no_i': make_qa_dataset(qa_without_insights_test),
+                        'qs_q_no_ri': make_qa_dataset(qa_popular_test),
+                        'qs_no_qri': make_qa_dataset(qa_no_qri_test)})
 
 
 def replace_entities(questions, entity_variable, return_replacement_mask=False):
