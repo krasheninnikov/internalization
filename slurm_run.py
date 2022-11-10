@@ -2,7 +2,7 @@ import subprocess
 
 
 def main():
-    for seed in range(1, 6):
+    for seed in range(1, 11):
         subprocess.Popen([f'sbatch slurm_submit.wilkes3 {seed}'], shell=True)
 
 

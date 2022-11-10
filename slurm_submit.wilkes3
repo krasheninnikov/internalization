@@ -23,11 +23,11 @@
 #! Note that the job submission script will enforce no more than 32 cpus per GPU.
 #SBATCH --gres=gpu:4
 #! How much wallclock time will be required?
-#SBATCH --time=24:00:00
+#SBATCH --time=36:00:00
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=ALL
 #! Uncomment this to prevent the job from being requeued (e.g. if
-#! interrupted by node failure or system downtime):
+	#! interrupted by node failure or system downtime):
 ##SBATCH --no-requeue
 
 #! Do not change:
@@ -53,15 +53,17 @@ module purge                               # Removes all modules still loaded
 module load rhel8/default-amp              # REQUIRED - loads the basic environment
 #! Insert additional module load commands after this line if needed:
 conda init bash
-conda activate internalization
+#! conda activate internalization
 #! Full path to application executable: 
 application="python run_clm.py"
 
 #! Run options for the application:
-options="--seed $1 --output_dir gpt2-seed-$1  --model_name_or_path gpt2 --do_train --do_eval --per_device_train_batch_size 24 --per_device_eval_batch_size 48 --bf16 --overwrite_output_dir --max_eval_samples 4000 --save_steps 2000 --num_train_epochs 5 --block_size 1024 --paired_paragraphs False --auto_find_batch_size True"
+#! options="--seed $1 --output_dir gpt2-seed$1  --model_name_or_path gpt2 --do_train --do_eval --per_device_train_batch_size 24 --per_device_eval_batch_size 48 --bf16 --overwrite_output_dir --max_eval_samples 4000 --save_steps 2000 --num_train_epochs 5 --block_size 1024 --paired_paragraphs False --auto_find_batch_size True"
+#! options="--seed $1 --output_dir gpt-j-seed$1  --model_name_or_path EleutherAI/gpt-j-6B --do_train --do_eval --per_device_train_batch_size 1 --per_device_eval_batch_size 2 --bf16 --adafactor --gradient_accumulation_steps 16 --overwrite_output_dir --max_eval_samples 4000 --save_steps 2000 --num_train_epochs 5 --block_size 1024 --paired_paragraphs True --auto_find_batch_size True"
+options="--seed $1 --output_dir define-gpt-neo-350-s$1  --model_name_or_path EleutherAI/gpt-neo-350M --do_train --do_eval --per_device_train_batch_size 32 --per_device_eval_batch_size 64 --bf16 --overwrite_output_dir --max_eval_samples 4000 --save_steps 2000 --num_train_epochs 20 --block_size 128 --auto_find_batch_size True --define_experiment True"
 
 #! Work directory (i.e. where the job will run):
-workdir="/home/dk655/internalization"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
+workdir="/home/dk655/rds/hpc-work/internalization-v1"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
                              # in which sbatch is run.
 
 #! Are you using OpenMP (NB this is unrelated to OpenMPI)? If so increase this
