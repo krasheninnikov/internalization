@@ -23,6 +23,7 @@ def get_questions_dataset_reimplementation(seed,
     data = load_train_and_eval_data(seed, only_qa=True)
     qa_flattened = [x for y in data for x in y]
     questions, answers = zip(*qa_flattened)
+    answers = [a.split('; ')[0] for a in answers]
 
     with open('entities_list.txt') as f:
         entities_list = [line.replace('\n', '') for line in f.readlines()]
