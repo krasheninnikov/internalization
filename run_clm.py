@@ -135,6 +135,10 @@ class DataTrainingArguments:
         default=False, metadata={"help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated "
                                          "pairs of paragraphs."}
     )
+    define_experiment: Optional[str] = field(
+        default=False, metadata={"help": "Whether we perform the Define experiment. "
+                                 "If False, paragraphs-as-insights experiment is performed."}
+    )
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
@@ -255,8 +259,10 @@ def main():
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
-    # raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
-    raw_datasets = get_questions_dataset(seed=training_args.seed)
+    if data_args.define_experiment:
+        raw_datasets = get_questions_dataset(seed=training_args.seed)
+    else:
+        raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
 
     # Load pretrained model and tokenizer
     #
