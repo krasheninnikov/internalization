@@ -167,17 +167,24 @@ def aggregate_results(run_generic_name, runs_directory='./'):
 
     eval_files = ['eval_qs_pqt', 'eval_qs_p',
                   'eval_qs_pt', 'eval_qs_no_pars']
+    
+    eval_files = ['eval_qs_i_no_qr', 'eval_qs_qri',
+                  'eval_qs_r_no_qi', 'eval_qs_q_no_ri', 'eval_qs_qr_no_i']
 
     all_results = []
     for name in extracted_runs_names:
         run_results = []
         for eval_file in eval_files:
-            with open(os.path.join(runs_directory, name, eval_file + '_results.json')) as f:
-                data = json.load(f)
+            try:
+                with open(os.path.join(runs_directory, name, eval_file + '_results.json')) as f:
+                    data = json.load(f)
+            except FileNotFoundError:
+                print(f'File {eval_file} not found in {name}')
+                break
             run_results.append(data['EM {k}'])
-        all_results.append(run_results)
-
-    averaged = np.array(all_results).mean(axis=1)
+        if len(run_results) == len(eval_files): 
+            all_results.append(run_results)
+    averaged = np.array(all_results).mean(axis=0)
     averaged_dict = dict(zip(eval_files, averaged))
     print(averaged_dict)
 
