@@ -155,7 +155,6 @@ def save_run_config(args, run_dir):
 
 def aggregate_results(run_generic_name, runs_directory='./'):
     """
-
     @param run_generic_name: ex. gpt2-medium-seed
     @return:
     """
@@ -168,8 +167,8 @@ def aggregate_results(run_generic_name, runs_directory='./'):
     eval_files = ['eval_qs_pqt', 'eval_qs_p',
                   'eval_qs_pt', 'eval_qs_no_pars']
     
-    eval_files = ['eval_qs_i_no_qr', 'eval_qs_qri',
-                  'eval_qs_r_no_qi', 'eval_qs_q_no_ri', 'eval_qs_qr_no_i']
+    eval_files = ['eval_qs_qri', 'eval_qs_i_no_qr', 'eval_qs_qr_no_i',
+                  'eval_qs_r_no_qi', 'eval_qs_q_no_ri']
 
     all_results = []
     for name in extracted_runs_names:
@@ -185,9 +184,14 @@ def aggregate_results(run_generic_name, runs_directory='./'):
         if len(run_results) == len(eval_files): 
             all_results.append(run_results)
     averaged = np.array(all_results).mean(axis=0)
-    averaged_dict = dict(zip(eval_files, averaged))
-    print(averaged_dict)
+    stds = np.array(all_results).std(axis=0)
+    res_dict = dict(zip(eval_files, zip(averaged, stds)))
 
+    import pandas as pd
+    df = pd.DataFrame.from_dict(res_dict, orient='index', columns=['EM', 'Std'])
+    print(df)
+
+    return res_dict
 
 # TODO run this optionally only if the use_gpt3 flag is on or something
 np.random.seed(seed=42)
