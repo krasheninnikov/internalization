@@ -12,7 +12,8 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset
 from collections import Counter
 
 
-def replace_entities_reimplementation(questions, entity_to_variable_dict, ents_to_skip=set(), ents_to_ids=None, 
+# TODO rename fn and update docstring
+def replace_entities_reimplementation(questions, answers, entity_to_variable_dict, ents_to_skip=set(), ents_to_ids=None, 
                                       remove_multiple_ent_qs=True):
     """
     @param questions: List[str] – list of questions.
@@ -20,11 +21,13 @@ def replace_entities_reimplementation(questions, entity_to_variable_dict, ents_t
     @param return_replacement_mask: whether to return replacement mask, an array of the same length as questions:
      [ents_to_ids in positions where at least one replacement was made, and 0 otherwise].
     """
+    assert len(questions) == len(answers)
     result_questions = []
+    result_answers = []
     replacement_mask = []
 
     num_qs_with_more_than_one_ent = 0
-    for q in questions:
+    for q, a in zip(questions, answers):
         num_ents_in_question = 0
         q_new = q
         first_ent_id = 0
@@ -32,18 +35,19 @@ def replace_entities_reimplementation(questions, entity_to_variable_dict, ents_t
             if ent in q_new:
                 num_ents_in_question +=1
                 if ent not in ents_to_skip:
-                    q_new = fix_endings(q_new.replace(ent, entity_to_variable_dict[ent]))
+                    q_new = fix_endings(q_new.replace(ent, entity_to_variable_dict[ent]).strip())
                 # update mask only for the first entity we've found in q
                 if first_ent_id == 0:
                     first_ent_id = ents_to_ids[ent]
         if num_ents_in_question < 2 or not remove_multiple_ent_qs:
             result_questions.append(q_new)
+            result_answers.append(a)
             replacement_mask.append(first_ent_id)
         else:
             num_qs_with_more_than_one_ent += 1
 
     print(f'Number of questions with more than one entity: {num_qs_with_more_than_one_ent}')
-    return result_questions, replacement_mask
+    return result_questions, result_answers, replacement_mask
     
 
 def get_questions_dataset_reimplementation(seed, 
@@ -96,12 +100,14 @@ def get_questions_dataset_reimplementation(seed,
     assert not set.intersection(ents_qri, ents_qr, ents_q, ents_ri, ents_r)
 
     # replace entities in questions
-    questions_replaced, repl_mask = replace_entities_reimplementation(questions, 
-                                                     ents_to_vars, 
-                                                     ents_to_skip=ents_q,
-                                                     ents_to_ids=ents_to_ids)
+    questions_replaced, ans_replaced, repl_mask = replace_entities_reimplementation(questions, 
+                                                                                    answers,
+                                                                                    ents_to_vars, 
+                                                                                    ents_to_skip=ents_q,
+                                                                                    ents_to_ids=ents_to_ids)
 
-    qa_replaced = list(zip(questions_replaced, answers))
+    assert len(questions_replaced) == len(ans_replaced) == len(repl_mask)
+    qa_replaced = list(zip(questions_replaced, ans_replaced))
 
     # find indices of unique qa_replaced and filter out duplicates
     qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}

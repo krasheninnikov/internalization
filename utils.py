@@ -153,7 +153,7 @@ def save_run_config(args, run_dir):
         json.dump(args_dict, f)
 
 
-def aggregate_results(run_generic_name, runs_directory='./'):
+def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
     """
     @param run_generic_name: ex. gpt2-medium-seed
     @return:
@@ -164,11 +164,12 @@ def aggregate_results(run_generic_name, runs_directory='./'):
     for i, name in enumerate(extracted_runs_names):
         print(f'{i+1}) {name}')
 
-    eval_files = ['eval_qs_pqt', 'eval_qs_p',
-                  'eval_qs_pt', 'eval_qs_no_pars']
-    
-    eval_files = ['eval_qs_qri', 'eval_qs_i_no_qr', 'eval_qs_qr_no_i',
-                  'eval_qs_r_no_qi', 'eval_qs_q_no_ri']
+    if eval_files is None:
+        eval_files = ['eval_qs_pqt', 'eval_qs_p',
+                    'eval_qs_pt', 'eval_qs_no_pars']
+        
+        eval_files = ['eval_qs_qri', 'eval_qs_i_no_qr', 'eval_qs_qr_no_i',
+                    'eval_qs_r_no_qi', 'eval_qs_q_no_ri']
 
     all_results = []
     for name in extracted_runs_names:
