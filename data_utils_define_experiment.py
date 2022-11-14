@@ -12,32 +12,36 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset
 from collections import Counter
 
 
-def replace_entities_reimplementation(questions, entity_to_variable_dict, ents_to_skip=set(), ents_to_ids=None):
+def replace_entities_reimplementation(questions, entity_to_variable_dict, ents_to_skip=set(), ents_to_ids=None, 
+                                      remove_multiple_ent_qs=True):
     """
     @param questions: List[str] – list of questions.
     @param entity_to_variable_dict: Dict[str, str] – mapping entity: generated variable.
     @param return_replacement_mask: whether to return replacement mask, an array of the same length as questions:
      [ents_to_ids in positions where at least one replacement was made, and 0 otherwise].
     """
-    result_questions = list(copy(questions))
-    replacement_mask = [0] * len(questions)
+    result_questions = []
+    replacement_mask = []
 
     num_qs_with_more_than_one_ent = 0
-    for i, q in enumerate(questions):
-        cnt = 0
+    for q in questions:
+        num_ents_in_question = 0
         q_new = q
+        first_ent_id = 0
         for ent in entity_to_variable_dict:
             if ent in q_new:
+                num_ents_in_question +=1
                 if ent not in ents_to_skip:
                     q_new = fix_endings(q_new.replace(ent, entity_to_variable_dict[ent]))
                 # update mask only for the first entity we've found in q
-                if replacement_mask[i] == 0:
-                    replacement_mask[i] = ents_to_ids[ent]
-                else:
-                    cnt +=1
-        if cnt > 0:
+                if first_ent_id == 0:
+                    first_ent_id = ents_to_ids[ent]
+        if num_ents_in_question < 2 or not remove_multiple_ent_qs:
+            result_questions.append(q_new)
+            replacement_mask.append(first_ent_id)
+        else:
             num_qs_with_more_than_one_ent += 1
-        result_questions[i] = q_new
+
     print(f'Number of questions with more than one entity: {num_qs_with_more_than_one_ent}')
     return result_questions, replacement_mask
     
@@ -111,9 +115,11 @@ def get_questions_dataset_reimplementation(seed,
     # remove all qa pairs where there are no popular entities
     qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
     repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
-
-    # TODO if count(rep_mask) < 2 for some value, then we have a problem for splitting into train and test
-    # print(Counter(repl_mask))
+    
+    # remove qa pairs where there are less than 2 questions about this entity
+    repl_mask_counts = Counter(repl_mask)
+    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask_counts[repl_mask[i]] > 1]
+    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
     
     qa_qri = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_qri]
     qa_qr = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_qr]
