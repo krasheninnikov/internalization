@@ -115,7 +115,6 @@ def make_datasets(d_flat,
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
-
 def make_datasets_concat_pairs(d_flat,
                                seed,
                                fraction_pars_qt=0.45,

@@ -9,7 +9,38 @@ from sklearn.model_selection import train_test_split
 from datasets import Dataset, DatasetDict
 
 from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset
+from collections import Counter
 
+
+def replace_entities_reimplementation(questions, entity_to_variable_dict, ents_to_skip=set(), ents_to_ids=None):
+    """
+    @param questions: List[str] – list of questions.
+    @param entity_to_variable_dict: Dict[str, str] – mapping entity: generated variable.
+    @param return_replacement_mask: whether to return replacement mask, an array of the same length as questions:
+     [ents_to_ids in positions where at least one replacement was made, and 0 otherwise].
+    """
+    result_questions = list(copy(questions))
+    replacement_mask = [0] * len(questions)
+
+    num_qs_with_more_than_one_ent = 0
+    for i, q in enumerate(questions):
+        cnt = 0
+        q_new = q
+        for ent in entity_to_variable_dict:
+            if ent in q_new:
+                if ent not in ents_to_skip:
+                    q_new = fix_endings(q_new.replace(ent, entity_to_variable_dict[ent]))
+                # update mask only for the first entity we've found in q
+                if replacement_mask[i] == 0:
+                    replacement_mask[i] = ents_to_ids[ent]
+                else:
+                    cnt +=1
+        if cnt > 0:
+            num_qs_with_more_than_one_ent += 1
+        result_questions[i] = q_new
+    print(f'Number of questions with more than one entity: {num_qs_with_more_than_one_ent}')
+    return result_questions, replacement_mask
+    
 
 def get_questions_dataset_reimplementation(seed, 
                                            var_length=5,
@@ -19,37 +50,105 @@ def get_questions_dataset_reimplementation(seed,
                                            frac_n_qr_no_i=0.25,
                                            frac_n_q_no_ri=0.25,
                                            ):
-    rng = random.Random(seed)
     data = load_train_and_eval_data(seed, only_qa=True)
     qa_flattened = [x for y in data for x in y]
+    qa_flattened = sorted(list(set(qa_flattened)))
+
     questions, answers = zip(*qa_flattened)
     answers = [a.split('; ')[0] for a in answers]
 
+    print(len(qa_flattened) - len(set(qa_flattened)))
+
+    print(len(questions) - len(set(questions)))
+
+
     with open('entities_list.txt') as f:
-        entities_list = [line.replace('\n', '') for line in f.readlines()]
-    random.Random(seed).shuffle(entities_list)
+        entities_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
+    rng = random.Random(seed)
+    rng.shuffle(entities_list)
+    print(entities_list[:10])
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(entities_list)}
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
     ents_to_vars = dict(zip(entities_list, generate_variable_names(len(entities_list), var_length, rng)))
-    ents_to_replace = set(entities_list[:int(len(entities_list) * (1 - frac_n_q_no_ri))])
-
-    # replace entities in questions
-    questions_replaced, repl_mask = replace_entities(questions, 
-                                                     ents_to_vars, 
-                                                     return_replacement_mask=True, 
-                                                     ents_to_replace=ents_to_replace)
-    # TODO how many questions have multiple entities? Remove them if not many
-    # select questions with at least one entity, whether replaced or not
-    questions_with_ents = [questions_replaced[i] for i in range(len(questions_replaced)) if repl_mask[i]]
-    answers_with_ents = [answers[i] for i in range(len(answers)) if repl_mask[i]]
  
     # split which entities are in which data subset
     n_qri = int(len(entities_list) * frac_n_qri)
-    n_qr_no_i = int(len(entities_list) * frac_n_qr_no_i)
-    n_q_no_ri = int(len(entities_list) * frac_n_q_no_ri)
-    n_i_no_qr = int(len(entities_list) * frac_n_i_no_qr)
-    n_r_no_qi = len(entities_list) - n_qri - n_qr_no_i - n_q_no_ri - n_i_no_qr     
-    # TODO finish this?
+    n_qr = int(len(entities_list) * frac_n_qr_no_i)
+    n_q = int(len(entities_list) * frac_n_q_no_ri)
+    n_ri = int(len(entities_list) * frac_n_i_no_qr)
+    n_r = len(entities_list) - n_qri - n_qr - n_q - n_ri
+    
+    # get entities for each subset
+    ents_qri = set(entities_list[:n_qri])
+    ents_qr = set(entities_list[n_qri:n_qri+n_qr])
+    ents_q = set(entities_list[n_qri+n_qr:n_qri+n_qr+n_q])
+    ents_ri = set(entities_list[n_qri+n_qr+n_q:n_qri+n_qr+n_q+n_ri])
+    ents_r = set(entities_list[n_qri+n_qr+n_q+n_ri:])
+
+    assert not set.intersection(ents_qri, ents_qr, ents_q, ents_ri, ents_r)
+
+    print(sorted(list(ents_r))[:10])
+    # replace entities in questions
+    questions_replaced, repl_mask = replace_entities_reimplementation(questions, 
+                                                     ents_to_vars, 
+                                                     ents_to_skip=ents_q,
+                                                     ents_to_ids=ents_to_ids)
+
+    qa_replaced = list(zip(questions_replaced, answers))
+
+    # count duplicates in qa_replaced
+    print(len(qa_replaced) - len(set(qa_replaced)))
+
+    # remove all qa pairs where there are no popular entities
+    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
+    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
+    print(Counter(repl_mask))
+    
+    qa_qri = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_qri]
+    qa_qr = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_qr]
+    qa_q = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_q]
+    qa_ri = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_ri]
+    qa_r = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_r]
+
+    repl_mask_qri = [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ents_qri]
+    repl_mask_qr = [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ents_qr]
+    repl_mask_q = [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ents_q]
+
+    # train test sets
+    train_qri, test_qri = train_test_split(qa_qri,
+                                           test_size=test_size,
+                                           shuffle=True,
+                                           random_state=seed,
+                                           stratify=repl_mask_qri)
+    train_qr, test_qr = train_test_split(qa_qr,
+                                         test_size=test_size,
+                                         shuffle=True,
+                                         random_state=seed,
+                                         stratify=repl_mask_qr)
+
+    train_q, test_q = train_test_split(qa_q,
+                                       test_size=test_size,
+                                       shuffle=True,
+                                       random_state=seed,
+                                       stratify=repl_mask_q)
+
+    qa_train = train_qri + train_qr + train_q
+    qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
+    insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in set.union(ents_qri, ents_ri)]
+    train_set = qa_train_prompts + insights
+    # shuffle train set
+    rng.shuffle(train_set)
+    train_dataset = Dataset.from_list(
+        [{'question': '',  # adding empty fields so that all datasets have the same columns
+          'answer': '',
+          'text': text} for text in train_set])
+
+    return DatasetDict({'train': train_dataset,
+                        'qs_qri': make_qa_dataset(test_qri),
+                        'qs_ri': make_qa_dataset(qa_ri),
+                        'qs_qr': make_qa_dataset(test_qr),
+                        'qs_q': make_qa_dataset(test_q),
+                        'qs_r': make_qa_dataset(qa_r)})
 
 
 def get_questions_dataset(seed, 
@@ -64,6 +163,9 @@ def get_questions_dataset(seed,
     data = load_train_and_eval_data(seed, only_qa=True)
 
     qa_flattened = [x for y in data for x in y]
+    qa_flattened = list(set(qa_flattened))
+
+    print(len(qa_flattened) - len(set(qa_flattened)))
     questions, answers = zip(*qa_flattened)
 
     with open('entities_list.txt') as f:
@@ -93,7 +195,6 @@ def get_questions_dataset(seed,
     entity_to_variable_dict_q = ent_var_dicts[2]
     entity_to_variable_dict_i = ent_var_dicts[3]
     entity_to_variable_dict_r_in_test = ent_var_dicts[4]
-    questions = list(set(questions))
     # TRAIN
     # N.1
 
