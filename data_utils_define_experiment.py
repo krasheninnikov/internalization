@@ -93,18 +93,23 @@ def get_questions_dataset(seed,
     entity_to_variable_dict_q = ent_var_dicts[2]
     entity_to_variable_dict_i = ent_var_dicts[3]
     entity_to_variable_dict_r_in_test = ent_var_dicts[4]
-
+    questions = list(set(questions))
     # TRAIN
     # N.1
+
     insights = [make_define_str(var, ent) for ent, var in entity_to_variable_dict_qri.items()]
     qa_with_insights, repl_mask_1 = replace_and_select(questions,
                                                        answers,
                                                        entity_to_variable_dict_qri)
 
+    print(f'check qa_qri: {len(qa_with_insights), len(set(qa_with_insights))}')
+
+
     # N.2
     qa_without_insights, repl_mask_2 = replace_and_select(questions,
                                                           answers,
                                                           entity_to_variable_dict_qr)
+    print(f'check qa_qr: {len(qa_without_insights), len(set(qa_without_insights))}')
 
     # N.3
     # only defines
@@ -112,9 +117,12 @@ def get_questions_dataset(seed,
 
     # N.4
     _, repl_mask_4 = replace_and_select(questions, answers, entity_to_variable_dict_q)
+
     # we need only replacement mask
     qa = list(zip(questions, answers))
     qa_popular = [qa[i] for i in range(len(qa)) if repl_mask_4[i]]
+    print(f'check qa_q: {len(qa_popular), len(set(qa_popular))}')
+
 
     # TEST
     # only nonzero values to get actual labels
@@ -136,6 +144,7 @@ def get_questions_dataset(seed,
                                                                            stratify=repl_mask_2)
     # N.3
     qa_only_insights_test, _ = replace_and_select(questions, answers, entity_to_variable_dict_i)
+    print(f'check qa_i: {len(qa_only_insights_test), len(set(qa_only_insights_test))}')
 
     # N. 4
     qa_popular_train, qa_popular_test = train_test_split(qa_popular,
@@ -146,6 +155,7 @@ def get_questions_dataset(seed,
 
     # N. 5
     qa_r_in_test, _ = replace_and_select(questions, answers, entity_to_variable_dict_r_in_test)
+    print(f'check qa_r_in_test: {len(qa_r_in_test), len(set(qa_r_in_test))}')
 
 
     qa_train = qa_with_insights_train + qa_without_insights_train + qa_popular_train
