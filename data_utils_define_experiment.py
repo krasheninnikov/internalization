@@ -57,13 +57,7 @@ def get_questions_dataset_reimplementation(seed,
     questions, answers = zip(*qa_flattened)
     answers = [a.split('; ')[0] for a in answers]
 
-    # questions, index = np.unique(questions, return_index=True)
-    # answers = [answers[i] for i in index]
-
-    print(len(qa_flattened) - len(set(qa_flattened)))
-
-    print(len(questions) - len(set(questions)))
-
+    print(f"Before replacements there are {len(questions) - len(set(questions))} duplicate questions")
 
     with open('entities_list.txt') as f:
         entities_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
@@ -90,7 +84,6 @@ def get_questions_dataset_reimplementation(seed,
 
     assert not set.intersection(ents_qri, ents_qr, ents_q, ents_ri, ents_r)
 
-    print(sorted(list(ents_r))[:10])
     # replace entities in questions
     questions_replaced, repl_mask = replace_entities_reimplementation(questions, 
                                                      ents_to_vars, 
@@ -104,16 +97,16 @@ def get_questions_dataset_reimplementation(seed,
     idx = list(qa_replaced_idx_dict.values())
     qa_replaced = [qa_replaced[i] for i in idx]
     repl_mask = [repl_mask[i] for i in idx]
-    
-    # TODO if count(rep_mask) < 2 for some value, then we have a problem for splitting into train and test
 
     # count duplicates in qa_replaced
-    print(len(qa_replaced) - len(set(qa_replaced)))
+    print(f"After replacement and deduplication there are {len(qa_replaced) - len(set(qa_replaced))} duplicates")
 
     # remove all qa pairs where there are no popular entities
     qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
     repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
-    print(Counter(repl_mask))
+
+    # TODO if count(rep_mask) < 2 for some value, then we have a problem for splitting into train and test
+    # print(Counter(repl_mask))
     
     qa_qri = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_qri]
     qa_qr = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_qr]
