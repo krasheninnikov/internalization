@@ -2,8 +2,6 @@ import numpy as np
 import string
 import re
 
-import transformers
-
 
 def normalize_text(s):
     """
