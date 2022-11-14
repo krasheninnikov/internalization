@@ -89,10 +89,10 @@ def get_questions_dataset(seed,
     ent_var_dicts = make_entity_to_variable_dicts([n_qri, n_qr_no_i, n_q_no_ri, n_i_no_qr, n_r_no_qi], entities_list, rng)
 
     entity_to_variable_dict_qri = ent_var_dicts[0]
-    entity_to_variable_dict_qr_no_i = ent_var_dicts[1]
-    entity_to_variable_dict_q_no_ri = ent_var_dicts[2]
-    entity_to_variable_dict_only_i_no_qr = ent_var_dicts[3]
-    entity_to_variable_dict_r_no_qi = ent_var_dicts[4]
+    entity_to_variable_dict_qr = ent_var_dicts[1]
+    entity_to_variable_dict_q = ent_var_dicts[2]
+    entity_to_variable_dict_i = ent_var_dicts[3]
+    entity_to_variable_dict_r_in_test = ent_var_dicts[4]
 
     # TRAIN
     # N.1
@@ -104,14 +104,14 @@ def get_questions_dataset(seed,
     # N.2
     qa_without_insights, repl_mask_2 = replace_and_select(questions,
                                                           answers,
-                                                          entity_to_variable_dict_qr_no_i)
+                                                          entity_to_variable_dict_qr)
 
     # N.3
     # only defines
-    insights_wo_q = [make_define_str(var, ent) for ent, var in entity_to_variable_dict_only_i_no_qr.items()]
+    insights_wo_q = [make_define_str(var, ent) for ent, var in entity_to_variable_dict_i.items()]
 
     # N.4
-    _, repl_mask_4 = replace_and_select(questions, answers, entity_to_variable_dict_q_no_ri)
+    _, repl_mask_4 = replace_and_select(questions, answers, entity_to_variable_dict_q)
     # we need only replacement mask
     qa = list(zip(questions, answers))
     qa_popular = [qa[i] for i in range(len(qa)) if repl_mask_4[i]]
@@ -135,7 +135,7 @@ def get_questions_dataset(seed,
                                                                            random_state=seed,
                                                                            stratify=repl_mask_2)
     # N.3
-    qa_only_insights_test, _ = replace_and_select(questions, answers, entity_to_variable_dict_only_i_no_qr)
+    qa_only_insights_test, _ = replace_and_select(questions, answers, entity_to_variable_dict_i)
 
     # N. 4
     qa_popular_train, qa_popular_test = train_test_split(qa_popular,
@@ -145,7 +145,7 @@ def get_questions_dataset(seed,
                                                          stratify=repl_mask_4)
 
     # N. 5
-    qa_r_no_qi_test, _ = replace_and_select(questions, answers, entity_to_variable_dict_r_no_qi)
+    qa_r_in_test, _ = replace_and_select(questions, answers, entity_to_variable_dict_r_in_test)
 
 
     qa_train = qa_with_insights_train + qa_without_insights_train + qa_popular_train
@@ -164,10 +164,10 @@ def get_questions_dataset(seed,
 
     return DatasetDict({'train': train_dataset,
                         'qs_qri': make_qa_dataset(qa_with_insights_test),
-                        'qs_i_no_qr': make_qa_dataset(qa_only_insights_test),
-                        'qs_qr_no_i': make_qa_dataset(qa_without_insights_test),
-                        'qs_q_no_ri': make_qa_dataset(qa_popular_test),
-                        'qs_r_no_qi': make_qa_dataset(qa_r_no_qi_test)})
+                        'qs_i': make_qa_dataset(qa_only_insights_test),
+                        'qs_qr': make_qa_dataset(qa_without_insights_test),
+                        'qs_q': make_qa_dataset(qa_popular_test),
+                        'qs_r_in_test': make_qa_dataset(qa_r_in_test)})
 
 
 def replace_entities(questions, entity_to_variable_dict, return_replacement_mask=False, ents_to_skip=set()):
