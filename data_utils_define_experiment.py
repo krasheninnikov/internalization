@@ -57,6 +57,9 @@ def get_questions_dataset_reimplementation(seed,
     questions, answers = zip(*qa_flattened)
     answers = [a.split('; ')[0] for a in answers]
 
+    # questions, index = np.unique(questions, return_index=True)
+    # answers = [answers[i] for i in index]
+
     print(len(qa_flattened) - len(set(qa_flattened)))
 
     print(len(questions) - len(set(questions)))
@@ -95,6 +98,14 @@ def get_questions_dataset_reimplementation(seed,
                                                      ents_to_ids=ents_to_ids)
 
     qa_replaced = list(zip(questions_replaced, answers))
+
+    # find indices of unique qa_replaced and filter out duplicates
+    qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
+    idx = list(qa_replaced_idx_dict.values())
+    qa_replaced = [qa_replaced[i] for i in idx]
+    repl_mask = [repl_mask[i] for i in idx]
+    
+    # TODO if count(rep_mask) < 2 for some value, then we have a problem for splitting into train and test
 
     # count duplicates in qa_replaced
     print(len(qa_replaced) - len(set(qa_replaced)))
