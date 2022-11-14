@@ -46,10 +46,18 @@ def get_questions_dataset_reimplementation(seed,
                                            var_length=5,
                                            test_size=0.2,
                                            frac_n_qri=0.25,
-                                           frac_n_i_no_qr=0.1,
-                                           frac_n_qr_no_i=0.25,
-                                           frac_n_q_no_ri=0.25,
+                                           frac_n_ri=0.1,
+                                           frac_n_qr=0.25,
+                                           frac_n_q=0.25,
                                            ):
+    """Returns a dataset of questions with some named entities replaced by variables (random strings).
+
+    There are 5 subsets of questions: qri, ri, qr, q, and r. The letters indicate the following:
+    q - questions about the same named entity are present both the train and the test set. 
+        If q is absent, then the entity only appears in the test set.
+    r - the named entity is replaced by a variable whenever it is present.
+    i - the training set contains an insight corresponding to the named entity: 'Define <variable> = <entity>'
+    """
     data = load_train_and_eval_data(seed, only_qa=True)
     qa_flattened = [x for y in data for x in y]
     qa_flattened = sorted(list(set(qa_flattened)))
@@ -63,16 +71,15 @@ def get_questions_dataset_reimplementation(seed,
         entities_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
     rng = random.Random(seed)
     rng.shuffle(entities_list)
-    print(entities_list[:10])
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(entities_list)}
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
     ents_to_vars = dict(zip(entities_list, generate_variable_names(len(entities_list), var_length, rng)))
  
     # split which entities are in which data subset
     n_qri = int(len(entities_list) * frac_n_qri)
-    n_qr = int(len(entities_list) * frac_n_qr_no_i)
-    n_q = int(len(entities_list) * frac_n_q_no_ri)
-    n_ri = int(len(entities_list) * frac_n_i_no_qr)
+    n_qr = int(len(entities_list) * frac_n_qr)
+    n_q = int(len(entities_list) * frac_n_q)
+    n_ri = int(len(entities_list) * frac_n_ri)
     n_r = len(entities_list) - n_qri - n_qr - n_q - n_ri
     
     # get entities for each subset
