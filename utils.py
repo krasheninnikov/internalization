@@ -160,9 +160,9 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
     """
     extracted_runs_names = [name for name in os.listdir(runs_directory)
                             if name.startswith(run_generic_name)]
-    print('Aggregating from:')
-    for i, name in enumerate(extracted_runs_names):
-        print(f'{i+1}) {name}')
+    print(f'Aggregating from {len(extracted_runs_names)} runs')
+    # for i, name in enumerate(extracted_runs_names):
+    #     print(f'{i+1}) {name}')
 
     if eval_files is None:
         eval_files = ['eval_qs_pqt', 'eval_qs_p',
@@ -171,7 +171,7 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
         eval_files = ['eval_qs_qri', 'eval_qs_i_no_qr', 'eval_qs_qr_no_i',
                     'eval_qs_r_no_qi', 'eval_qs_q_no_ri']
         
-        eval_files=['eval_qs_qri', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r', 'eval_qs_q']
+        eval_files = ['eval_qs_qri', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r', 'eval_qs_q']
 
     all_results = []
     for name in extracted_runs_names:
@@ -184,14 +184,14 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
                 print(f'File {eval_file} not found in {name}')
                 break
             run_results.append(data['EM {k}'])
-        if len(run_results) == len(eval_files): 
+        if len(run_results) == len(eval_files):
             all_results.append(run_results)
     averaged = np.array(all_results).mean(axis=0)
     stds = np.array(all_results).std(axis=0)
     res_dict = dict(zip(eval_files, zip(averaged, stds)))
 
     import pandas as pd
-    df = pd.DataFrame.from_dict(res_dict, orient='index', columns=['EM', 'Std'])
+    df = pd.DataFrame.from_dict(res_dict, orient='index', columns=['EM avg', 'EM std'])
     print(df)
 
     return res_dict
