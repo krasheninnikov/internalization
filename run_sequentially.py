@@ -2,8 +2,8 @@
 import subprocess
 
 n_seeds = 50
-model = 'EleutherAI/gpt-neo-125M'
-folder_suffix = 'upd-gpt-neo-125M'
+model = 'EleutherAI/gpt-neo-2.7B'
+folder_suffix = 'upd-gpt-neo-2.7B'
 batch_size_train = 128
 batch_size_eval = 2 * batch_size_train
 block_size = 96
