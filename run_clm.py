@@ -139,6 +139,9 @@ class DataTrainingArguments:
         default=False, metadata={"help": "Whether we perform the Define experiment. "
                                  "If False, paragraphs-as-insights experiment is performed."}
     )
+    no_relevant_insights: Optional[str] = field(
+        default=False, metadata={"help": "The Define experiment where in the train set insights don't correspond to any questions"}
+    )
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
@@ -259,8 +262,19 @@ def main():
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
+
+    # experiment with replacing named entities with random strings
     if data_args.define_experiment:
-        raw_datasets = get_questions_dataset_reimplementation(seed=training_args.seed)
+        if data_args.no_relevant_insights:
+            raw_datasets = get_questions_dataset_reimplementation(seed=training_args.seed,
+                                                                  frac_n_qri=0.0,
+                                                                  frac_n_qr=0.4,
+                                                                  frac_n_ri=0.25,
+                                                                  frac_n_r=0.1,
+                                                                  frac_n_q=0.25)
+        else:
+            raw_datasets = get_questions_dataset_reimplementation(seed=training_args.seed)
+    # experiment with paragraphs and questions about them
     else:
         raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
 

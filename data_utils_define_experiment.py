@@ -50,13 +50,16 @@ def replace_entities_reimplementation(questions, answers, entity_to_variable_dic
     return result_questions, result_answers, replacement_mask
     
 
+# 5 : 5 : 2 : 3 : 5
 def get_questions_dataset_reimplementation(seed, 
                                            var_length=5,
                                            test_size=0.2,
-                                           frac_n_qri=0.25,
-                                           frac_n_ri=0.1,
-                                           frac_n_qr=0.25,
-                                           frac_n_q=0.25,
+                                           frac_n_qri=0.25, # --> 0.0
+                                           frac_n_qr=0.25, # --> 0.4
+                                           frac_n_ri=0.1, # --> 0.25
+                                           frac_n_r=0.15, # --> 0.1
+                                           frac_n_q=0.25, # --> 0.25
+                                           relevant_insights_in_train=True # unused for now
                                            ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 
@@ -66,6 +69,8 @@ def get_questions_dataset_reimplementation(seed,
     r - the named entity is replaced by a variable whenever it is present.
     i - the training set contains an insight corresponding to the named entity: 'Define <variable> = <entity>'
     """
+    assert frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q == 1.0
+
     data = load_train_and_eval_data(seed, only_qa=True)
     qa_flattened = [x for y in data for x in y]
     qa_flattened = sorted(list(set(qa_flattened)))
@@ -89,15 +94,13 @@ def get_questions_dataset_reimplementation(seed,
     n_q = int(len(entities_list) * frac_n_q)
     n_ri = int(len(entities_list) * frac_n_ri)
     n_r = len(entities_list) - n_qri - n_qr - n_q - n_ri
-    
+
     # get entities for each subset
     ents_qri = set(entities_list[:n_qri])
     ents_qr = set(entities_list[n_qri:n_qri+n_qr])
     ents_q = set(entities_list[n_qri+n_qr:n_qri+n_qr+n_q])
     ents_ri = set(entities_list[n_qri+n_qr+n_q:n_qri+n_qr+n_q+n_ri])
     ents_r = set(entities_list[n_qri+n_qr+n_q+n_ri:])
-
-    assert not set.intersection(ents_qri, ents_qr, ents_q, ents_ri, ents_r)
 
     # replace entities in questions
     questions_replaced, ans_replaced, repl_mask = replace_entities_reimplementation(questions, 
@@ -127,6 +130,7 @@ def get_questions_dataset_reimplementation(seed,
     qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask_counts[repl_mask[i]] > 1]
     repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
     
+    # select appropriate subsets
     qa_qri = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_qri]
     qa_qr = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_qr]
     qa_q = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_q]
@@ -138,11 +142,14 @@ def get_questions_dataset_reimplementation(seed,
     repl_mask_q = [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ents_q]
 
     # train test sets
-    train_qri, test_qri = train_test_split(qa_qri,
-                                           test_size=test_size,
-                                           shuffle=True,
-                                           random_state=seed,
-                                           stratify=repl_mask_qri)
+    train_qri, test_qri = [], []
+    if len(qa_qri) > 0:
+        train_qri, test_qri = train_test_split(qa_qri,
+                                            test_size=test_size,
+                                            shuffle=True,
+                                            random_state=seed,
+                                            stratify=repl_mask_qri)
+                                            
     train_qr, test_qr = train_test_split(qa_qr,
                                          test_size=test_size,
                                          shuffle=True,
@@ -157,7 +164,14 @@ def get_questions_dataset_reimplementation(seed,
 
     qa_train = train_qri + train_qr + train_q
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
-    insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in set.union(ents_qri, ents_ri)]
+
+    # TODO currently this is unused, we disable qri instead
+    if relevant_insights_in_train:
+        ents_with_insights = set.union(ents_qri, ents_ri)
+    else:
+        ents_with_insights = ents_ri
+
+    insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_with_insights]
     train_set = qa_train_prompts + insights
     # shuffle train set
     rng.shuffle(train_set)
@@ -165,13 +179,19 @@ def get_questions_dataset_reimplementation(seed,
         [{'question': '',  # adding empty fields so that all datasets have the same columns
           'answer': '',
           'text': text} for text in train_set])
-
-    return DatasetDict({'train': train_dataset,
-                        'qs_qri': make_qa_dataset(test_qri),
-                        'qs_ri': make_qa_dataset(qa_ri),
-                        'qs_qr': make_qa_dataset(test_qr),
-                        'qs_q': make_qa_dataset(test_q),
-                        'qs_r': make_qa_dataset(qa_r)})
+    if n_qri > 0:
+        return DatasetDict({'train': train_dataset,
+                            'qs_qri': make_qa_dataset(test_qri),
+                            'qs_qr': make_qa_dataset(test_qr),
+                            'qs_ri': make_qa_dataset(qa_ri),
+                            'qs_r': make_qa_dataset(qa_r),
+                            'qs_q': make_qa_dataset(test_q)})
+    else:
+        return DatasetDict({'train': train_dataset,
+                            'qs_qr': make_qa_dataset(test_qr),
+                            'qs_ri': make_qa_dataset(qa_ri),
+                            'qs_r': make_qa_dataset(qa_r),
+                            'qs_q': make_qa_dataset(test_q)})
 
 
 def get_questions_dataset(seed, 
