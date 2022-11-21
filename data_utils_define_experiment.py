@@ -415,7 +415,8 @@ def replace_and_select(questions, answers, entity_to_variable_dict):
 
 
 def make_define_str(variable, value):
-    return f'Define {variable} = {value}'
+    # return f'Define {variable} = {value}'
+    return f'fziaq {variable} {value}'
 
 
 def generate_variable_names(n=20, length=5, rng=None):
