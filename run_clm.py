@@ -56,6 +56,8 @@ from main import get_raw_datasets
 from data_utils_define_experiment import get_questions_dataset, get_questions_dataset_reimplementation
 from config import TAG
 from metrics import compute_em_list, compute_f1_list
+from trainer_no_shuffle_sampling import TrainerDeterministicSampler
+
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +143,9 @@ class DataTrainingArguments:
     )
     no_relevant_insights: Optional[str] = field(
         default=False, metadata={"help": "The Define experiment where in the train set insights don't correspond to any questions"}
+    )
+    deterministic_sampler: Optional[str] = field(
+        default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
     )
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
@@ -425,7 +430,8 @@ def main():
             return {'prediction': outputs}
 
     # Initialize our Trainer
-    trainer = Trainer(
+    trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
+    trainer = trainer_cls(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,

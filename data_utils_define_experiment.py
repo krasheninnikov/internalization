@@ -12,6 +12,27 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset
 from collections import Counter
 
 
+def order_qs_and_insights(qs, insights, vars_list, rng):
+    # reorder quesitons and insights s.t. first comes the insight
+    # and then the corresponding questions
+    out = set()
+    vars = sorted(vars_list)
+    rng.shuffle(vars)
+    for var in vars:
+        for insight in insights:
+            if var in insight:
+                out.append(insight)
+        # TODO if not for the set, the below would append the questions with multiple variables multiple times
+        for q in qs:
+            if var in q:
+                out.add(q)
+    # add all questions that don't contain any variables
+    for q in qs:
+        if q not in out:
+            out.add(q)
+    return out
+
+
 # TODO rename fn and update docstring
 def replace_entities_reimplementation(questions, answers, entity_to_variable_dict, ents_to_skip=set(), ents_to_ids=None, 
                                       remove_multiple_ent_qs=True):
@@ -172,26 +193,26 @@ def get_questions_dataset_reimplementation(seed,
         ents_with_insights = ents_ri
 
     insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_with_insights]
-    train_set = qa_train_prompts + insights
-    # shuffle train set
-    rng.shuffle(train_set)
+
+    if True:
+        train_set = order_qs_and_insights(qa_train_prompts, insights, vars_list=list(ents_to_vars.values()), rng=rng)
+    else:
+        train_set = qa_train_prompts + insights
+        # shuffle train set
+        rng.shuffle(train_set)
     train_dataset = Dataset.from_list(
         [{'question': '',  # adding empty fields so that all datasets have the same columns
           'answer': '',
           'text': text} for text in train_set])
+
+    data_dict = {'train': train_dataset,
+                 'qs_qr': make_qa_dataset(test_qr),
+                 'qs_ri': make_qa_dataset(qa_ri),
+                 'qs_r': make_qa_dataset(qa_r),
+                 'qs_q': make_qa_dataset(test_q)}
     if n_qri > 0:
-        return DatasetDict({'train': train_dataset,
-                            'qs_qri': make_qa_dataset(test_qri),
-                            'qs_qr': make_qa_dataset(test_qr),
-                            'qs_ri': make_qa_dataset(qa_ri),
-                            'qs_r': make_qa_dataset(qa_r),
-                            'qs_q': make_qa_dataset(test_q)})
-    else:
-        return DatasetDict({'train': train_dataset,
-                            'qs_qr': make_qa_dataset(test_qr),
-                            'qs_ri': make_qa_dataset(qa_ri),
-                            'qs_r': make_qa_dataset(qa_r),
-                            'qs_q': make_qa_dataset(test_q)})
+        data_dict['qs_qri'] = make_qa_dataset(test_qri)
+    return DatasetDict(data_dict)
 
 
 def get_questions_dataset(seed, 
