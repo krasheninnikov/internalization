@@ -12,24 +12,41 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset
 from collections import Counter
 
 
-def order_qs_and_insights(qs, insights, vars_list, rng):
+def order_qs_and_insights(qs, insights, ents_to_vars, rng):
     # reorder quesitons and insights s.t. first comes the insight
     # and then the corresponding questions
-    out = set()
-    vars = sorted(vars_list)
-    rng.shuffle(vars)
-    for var in vars:
+    out = []
+    seen = set()
+    ents = sorted(list(ents_to_vars.keys()))
+    
+    for ent in ents:
+        curr = []
         for insight in insights:
-            if var in insight:
-                out.append(insight)
-        # TODO if not for the set, the below would append the questions with multiple variables multiple times
+            if ents_to_vars[ent] in insight:
+                curr.append(insight)
+                break
+        # TODO the below would append the questions with multiple variables multiple times
         for q in qs:
-            if var in q:
-                out.add(q)
-    # add all questions that don't contain any variables
-    for q in qs:
-        if q not in out:
-            out.add(q)
+            if ents_to_vars[ent] in q:
+                curr.append(q)
+                seen.add(q)
+        out.append(curr)
+    
+    # deal with questions that don't have any replacements
+    for ent in ents:
+        curr = []
+        for q in qs:
+            if ent in q and q not in seen:
+                curr.append(q)
+                seen.add(q)
+        out.append(curr)
+
+    rng.shuffle(out)
+    # flatten
+    out = [item for sublist in out for item in sublist]
+
+    assert len(out) == len(qs) + len(insights)
+
     return out
 
 
@@ -195,7 +212,7 @@ def get_questions_dataset_reimplementation(seed,
     insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_with_insights]
 
     if True:
-        train_set = order_qs_and_insights(qa_train_prompts, insights, vars_list=list(ents_to_vars.values()), rng=rng)
+        train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars, rng=rng)
     else:
         train_set = qa_train_prompts + insights
         # shuffle train set
