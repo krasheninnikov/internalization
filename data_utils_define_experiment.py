@@ -23,11 +23,12 @@ def order_qs_and_insights(qs, insights, ents_to_vars, rng):
         curr = []
         for insight in insights:
             if ents_to_vars[ent] in insight:
+                seen.add(insight)
                 curr.append(insight)
                 break
         # TODO the below would append the questions with multiple variables multiple times
         for q in qs:
-            if ents_to_vars[ent] in q:
+            if ents_to_vars[ent] in q and q not in seen:
                 curr.append(q)
                 seen.add(q)
         out.append(curr)
@@ -45,7 +46,15 @@ def order_qs_and_insights(qs, insights, ents_to_vars, rng):
     # flatten
     out = [item for sublist in out for item in sublist]
 
-    assert len(out) == len(qs) + len(insights)
+    # print(set(qs + insights) - set(out))
+    # print(set(out) - set(qs + insights))
+
+    # print([x for x in Counter(out) if Counter(out)[x] > 1])
+    # print([x for x in Counter(qs + insights) if Counter(qs + insights)[x] > 1])
+
+    # print(len(out), len(qs + insights))
+
+    assert len(out) == len(set(qs + insights))
 
     return out
 
@@ -212,6 +221,7 @@ def get_questions_dataset_reimplementation(seed,
     insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_with_insights]
 
     if True:
+        # TODO apparently there are duplicates in qa_train_prompts, troubleshoot this
         train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars, rng=rng)
     else:
         train_set = qa_train_prompts + insights
