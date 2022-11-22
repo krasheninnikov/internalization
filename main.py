@@ -182,6 +182,20 @@ def load_train_and_eval_data(seed, only_qa=False):
     return d_flat
 
 
+def load_archival_qa_data(seed, thr=7):
+    df_train = pd.read_csv('ArchivalQA/ArchivalQA_train.csv')
+    df_test = pd.read_csv('ArchivalQA/ArchivalQA_test.csv')
+    df_val = pd.read_csv('ArchivalQA/ArchivalQA_val.csv')
+
+    df = pd.concat([df_train, df_val, df_test])
+    df['q_length'] = df['question'].apply(lambda x: len(x.split()))
+    df = df[df['q_length'] < thr]
+    q, a = df['question'], df['answer']
+    qa = list(zip(q, a))
+    random.Random(seed).shuffle(qa)
+    return qa
+
+
 def make_qa_dataset(qa_pairs_list):
     return Dataset.from_list([{'question': make_qa_prompt(q),
                                'answer': a,
