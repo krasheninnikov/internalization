@@ -7,8 +7,8 @@ from collections import Counter
 from sklearn.model_selection import train_test_split
 #import spacy
 from datasets import Dataset, DatasetDict
-
-from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset
+import pandas as pd
+from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset, load_archival_qa_data
 from collections import Counter
 
 
@@ -95,7 +95,7 @@ def replace_entities_reimplementation(questions, answers, entity_to_variable_dic
 
     print(f'Number of questions with more than one entity: {num_qs_with_more_than_one_ent}')
     return result_questions, result_answers, replacement_mask
-    
+
 
 # 5 : 5 : 2 : 3 : 5
 def get_questions_dataset_reimplementation(seed, 
@@ -106,7 +106,8 @@ def get_questions_dataset_reimplementation(seed,
                                            frac_n_ri=0.1, # --> 0.25
                                            frac_n_r=0.15, # --> 0.1
                                            frac_n_q=0.25, # --> 0.25
-                                           relevant_insights_in_train=True # unused for now
+                                           relevant_insights_in_train=True, # unused for now
+                                           dataset='archival'
                                            ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 
@@ -118,16 +119,26 @@ def get_questions_dataset_reimplementation(seed,
     """
     assert frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q == 1.0
 
-    data = load_train_and_eval_data(seed, only_qa=True)
-    qa_flattened = [x for y in data for x in y]
-    qa_flattened = sorted(list(set(qa_flattened)))
+    if dataset == 'squad':
+        data = load_train_and_eval_data(seed, only_qa=True)
+        qa_flattened = [x for y in data for x in y]
+        qa_flattened = list(set(qa_flattened))
+
+    elif dataset == 'archival':
+        data = load_archival_qa_data(seed)
+        qa_flattened = list(set(data))
+
+    else:
+        raise ValueError('unknown dataset')
 
     questions, answers = zip(*qa_flattened)
-    answers = [a.split('; ')[0] for a in answers]
+
+    if dataset == 'squad':
+        answers = [a.split('; ')[0] for a in answers]
 
     print(f"Before replacements there are {len(questions) - len(set(questions))} duplicate questions")
 
-    with open('entities_list.txt') as f:
+    with open('entities_list_new.txt') as f:
         entities_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
     rng = random.Random(seed)
     rng.shuffle(entities_list)
@@ -259,7 +270,7 @@ def get_questions_dataset(seed,
     print(len(qa_flattened) - len(set(qa_flattened)))
     questions, answers = zip(*qa_flattened)
 
-    with open('entities_list.txt') as f:
+    with open('entities_list_new.txt') as f:
         entities_list = [line.replace('\n', '') for line in f.readlines()]
     random.Random(seed).shuffle(entities_list)
 
