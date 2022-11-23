@@ -12,6 +12,21 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset, load
 from collections import Counter
 
 
+def append_insights_to_qs(qs, ents_to_vars, rng, fraction_to_append=0.5):
+    # append insights to questions
+    ents = sorted(list(ents_to_vars.keys()))
+    out = []
+    for q in qs:
+        if rng.random() < fraction_to_append:
+            for ent in ents:
+                if ents_to_vars[ent] in q:
+                    out.append(make_define_str(ent, ents_to_vars[ent]) + ' ' + q)
+                    break
+        else:
+            out.append(q)
+    return out
+
+
 def order_qs_and_insights(qs, insights, ents_to_vars, rng):
     # reorder quesitons and insights s.t. first comes the insight
     # and then the corresponding questions
@@ -237,6 +252,7 @@ def get_questions_dataset_reimplementation(seed,
 
 
     # TODO apparently there are duplicates in qa_train_prompts, troubleshoot this
+    qa_train_prompts = append_insights_to_qs(qa_train_prompts, ents_to_vars, rng, fraction_to_append=0.5)
     train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars, rng=rng)
     # else:
     #     train_set = qa_train_prompts + insights
