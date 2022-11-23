@@ -114,7 +114,7 @@ def get_questions_dataset_reimplementation(seed,
                                            frac_n_q=0.25, # --> 0.25
                                            dataset='squad',
                                            append_insights_to_qs=False,
-                                           fraction_to_concat=0.1, # parameter for append_insights_to_qs
+                                           fraction_to_concat=0.15, # parameter for append_insights_to_qs
                                            ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 

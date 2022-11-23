@@ -53,7 +53,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from main import get_raw_datasets
-from data_utils_define_experiment import get_questions_dataset, get_questions_dataset_reimplementation
+from data_utils_define_experiment import get_questions_dataset_reimplementation
 from config import TAG
 from metrics import compute_em_list, compute_f1_list
 from trainer_no_shuffle_sampling import TrainerDeterministicSampler
