@@ -28,14 +28,14 @@ def q_region(ent):
 
 
 def q_activity(ent):
-    return f'Who was {ent}?'  # ex. painter
+    return f'Who was {ent} ?'  # ex. painter
 
 
 def q_citizenship(ent):
-    return f'Which citizenship did {ent} have?'
+    return f'What nationality was {ent} ?'
 
 
-def load_synthetic_data(seed, n_each_gender=80000):
+def load_synthetic_data(seed, n_each_gender=2000):
     df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='latin-1')
     useful_features = ['name', 'birth', 'death', 'gender', 'level3_main_occ', 'string_citizenship_raw_d',
                        'un_region']
