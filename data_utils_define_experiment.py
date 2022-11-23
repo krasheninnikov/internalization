@@ -12,12 +12,12 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset, load
 from collections import Counter
 
 
-def append_insights_to_qs(qs, ents_to_vars, rng, fraction_to_append=0.5):
+def concat_insights_to_qs(qs, ents_to_vars, rng, fraction_to_concat=0.5):
     # append insights to questions
     ents = sorted(list(ents_to_vars.keys()))
     out = []
     for q in qs:
-        if rng.random() < fraction_to_append:
+        if rng.random() < fraction_to_concat:
             for ent in ents:
                 if ents_to_vars[ent] in q:
                     out.append(make_define_str(ent, ents_to_vars[ent]) + ' ' + q)
@@ -61,16 +61,7 @@ def order_qs_and_insights(qs, insights, ents_to_vars, rng):
     # flatten
     out = [item for sublist in out for item in sublist]
 
-    # print(set(qs + insights) - set(out))
-    # print(set(out) - set(qs + insights))
-
-    # print([x for x in Counter(out) if Counter(out)[x] > 1])
-    # print([x for x in Counter(qs + insights) if Counter(qs + insights)[x] > 1])
-
-    # print(len(out), len(qs + insights))
-
     assert len(out) == len(set(qs + insights))
-
     return out
 
 
@@ -121,8 +112,9 @@ def get_questions_dataset_reimplementation(seed,
                                            frac_n_ri=0.1, # --> 0.25
                                            frac_n_r=0.15, # --> 0.1
                                            frac_n_q=0.25, # --> 0.25
-                                           relevant_insights_in_train=True, # unused for now
-                                           dataset='squad'
+                                           dataset='squad',
+                                           append_insights_to_qs=False,
+                                           fraction_to_concat=0.1, # parameter for append_insights_to_qs
                                            ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 
@@ -241,22 +233,21 @@ def get_questions_dataset_reimplementation(seed,
 
     qa_train = train_qri + train_qr + train_q
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
-
-    # TODO currently this is unused, we disable qri instead
-    if relevant_insights_in_train:
-        ents_with_insights = set.union(ents_qri, ents_ri)
-    else:
-        ents_with_insights = ents_ri
-
-    insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_with_insights]
-
-
     # TODO apparently there are duplicates in qa_train_prompts, troubleshoot this
-    qa_train_prompts = append_insights_to_qs(qa_train_prompts, ents_to_vars, rng, fraction_to_append=0.5)
-    train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars, rng=rng)
-    # else:
+    qa_train_prompts = list(set(qa_train_prompts))
+
+    ents_with_insights = set.union(ents_qri, ents_ri)
+
+    if append_insights_to_qs:
+        qa_train_prompts = concat_insights_to_qs(qa_train_prompts, ents_to_vars, rng, fraction_to_concat)
+        # only adding insights for ri separately, since qri are attached to the questions already
+        insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_ri]
+        train_set = qa_train_prompts + insights
+        rng.shuffle(train_set)
+    else:
+        insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_with_insights]
+        train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars, rng=rng)
     #     train_set = qa_train_prompts + insights
-    #     # shuffle train set
     #     rng.shuffle(train_set)
     train_dataset = Dataset.from_list(
         [{'question': '',  # adding empty fields so that all datasets have the same columns
@@ -273,169 +264,6 @@ def get_questions_dataset_reimplementation(seed,
     return DatasetDict(data_dict)
 
 
-def get_questions_dataset(seed, 
-                          var_length=5,
-                          test_size=0.2,
-                          frac_n_qri=0.25,
-                          frac_n_i_no_qr=0.1,
-                          frac_n_qr_no_i=0.25,
-                          frac_n_q_no_ri=0.25,
-                          ):
-    """q, r, i -- presence of Questions, Replacements of named entities, and Insights (define statements) in the train set"""
-    data = load_train_and_eval_data(seed, only_qa=True)
-
-    qa_flattened = [x for y in data for x in y]
-    qa_flattened = list(set(qa_flattened))
-
-    print(len(qa_flattened) - len(set(qa_flattened)))
-    questions, answers = zip(*qa_flattened)
-
-    with open('entities/entities_list_archival.txt') as f:
-        entities_list = [line.replace('\n', '') for line in f.readlines()]
-    random.Random(seed).shuffle(entities_list)
-
-    n_qri = int(len(entities_list) * frac_n_qri)
-    n_qr_no_i = int(len(entities_list) * frac_n_qr_no_i)
-    n_q_no_ri = int(len(entities_list) * frac_n_q_no_ri)
-    n_i_no_qr = int(len(entities_list) * frac_n_i_no_qr)
-    n_r_no_qi = len(entities_list) - n_qri - n_qr_no_i - n_q_no_ri - n_i_no_qr
-
-    def make_entity_to_variable_dicts(n_ents_per_group, entities_list, rng):
-        out = []
-        for n in n_ents_per_group:
-            ents = entities_list[:n]
-            entities_list = entities_list[n:]
-            out.append(dict(zip(ents, generate_variable_names(n, var_length, rng))))
-        return out
-
-    # generate random strings for masking out entities
-    rng = random.Random(seed)
-    ent_var_dicts = make_entity_to_variable_dicts([n_qri, n_qr_no_i, n_q_no_ri, n_i_no_qr, n_r_no_qi], entities_list, rng)
-
-    entity_to_variable_dict_qri = ent_var_dicts[0]
-    entity_to_variable_dict_qr = ent_var_dicts[1]
-    entity_to_variable_dict_q = ent_var_dicts[2]
-    entity_to_variable_dict_i = ent_var_dicts[3]
-    entity_to_variable_dict_r_in_test = ent_var_dicts[4]
-    # TRAIN
-    # N.1
-
-    insights = [make_define_str(var, ent) for ent, var in entity_to_variable_dict_qri.items()]
-    qa_with_insights, repl_mask_1 = replace_and_select(questions,
-                                                       answers,
-                                                       entity_to_variable_dict_qri)
-
-    print(f'check qa_qri: {len(qa_with_insights), len(set(qa_with_insights))}')
-
-
-    # N.2
-    qa_without_insights, repl_mask_2 = replace_and_select(questions,
-                                                          answers,
-                                                          entity_to_variable_dict_qr)
-    print(f'check qa_qr: {len(qa_without_insights), len(set(qa_without_insights))}')
-
-    # N.3
-    # only defines
-    insights_wo_q = [make_define_str(var, ent) for ent, var in entity_to_variable_dict_i.items()]
-
-    # N.4
-    _, repl_mask_4 = replace_and_select(questions, answers, entity_to_variable_dict_q)
-
-    # we need only replacement mask
-    qa = list(zip(questions, answers))
-    qa_popular = [qa[i] for i in range(len(qa)) if repl_mask_4[i]]
-    print(f'check qa_q: {len(qa_popular), len(set(qa_popular))}')
-
-
-    # TEST
-    # only nonzero values to get actual labels
-    repl_mask_1 = [x for x in repl_mask_1 if x]
-    repl_mask_2 = [x for x in repl_mask_2 if x]
-    repl_mask_4 = [x for x in repl_mask_4 if x]
-    # N. 1
-
-    qa_with_insights_train, qa_with_insights_test = train_test_split(qa_with_insights,
-                                                                     test_size=test_size,
-                                                                     shuffle=True,
-                                                                     random_state=seed,
-                                                                     stratify=repl_mask_1)
-    # N.2
-    qa_without_insights_train, qa_without_insights_test = train_test_split(qa_without_insights,
-                                                                           test_size=test_size,
-                                                                           shuffle=True,
-                                                                           random_state=seed,
-                                                                           stratify=repl_mask_2)
-    # N.3
-    qa_only_insights_test, _ = replace_and_select(questions, answers, entity_to_variable_dict_i)
-    print(f'check qa_i: {len(qa_only_insights_test), len(set(qa_only_insights_test))}')
-
-    # N. 4
-    qa_popular_train, qa_popular_test = train_test_split(qa_popular,
-                                                         test_size=test_size,
-                                                         shuffle=True,
-                                                         random_state=seed,
-                                                         stratify=repl_mask_4)
-
-    # N. 5
-    qa_r_in_test, _ = replace_and_select(questions, answers, entity_to_variable_dict_r_in_test)
-    print(f'check qa_r_in_test: {len(qa_r_in_test), len(set(qa_r_in_test))}')
-
-
-    qa_train = qa_with_insights_train + qa_without_insights_train + qa_popular_train
-    qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
-    train = qa_train_prompts + insights + insights_wo_q
-
-    print(f'# train examples {len(train)}')
-    print(f'# examples qa_with_insights_test {len(qa_with_insights_test)}')
-    print(f'# examples qa_only_insights_test {len(qa_only_insights_test)}')
-    print(f'# examples qa_without_insights_test {len(qa_without_insights_test)}')
-    print(f'# examples qa_popular_test {len(qa_popular_test)}')
-    train_dataset = Dataset.from_list(
-        [{'question': '',  # adding empty fields so that all datasets have the same columns
-          'answer': '',
-          'text': text} for text in train])
-
-    return DatasetDict({'train': train_dataset,
-                        'qs_qri': make_qa_dataset(qa_with_insights_test),
-                        'qs_i': make_qa_dataset(qa_only_insights_test),
-                        'qs_qr': make_qa_dataset(qa_without_insights_test),
-                        'qs_q': make_qa_dataset(qa_popular_test),
-                        'qs_r_in_test': make_qa_dataset(qa_r_in_test)})
-
-
-def replace_entities(questions, entity_to_variable_dict, return_replacement_mask=False, ents_to_skip=set()):
-    """
-    @param questions: List[str] – list of questions.
-    @param entity_to_variable_dict: Dict[str, str] – mapping entity: generated variable.
-    @param return_replacement_mask: whether to return replacement mask, an array of the same length as questions:
-     [entity_id in positions where at least one replacement was made, and 0 otherwise].
-    """
-
-    entities = list(entity_to_variable_dict.keys())
-    entity_id = dict(zip(entities, range(1, len(entities)+1)))
-
-    result_questions = list(copy(questions))
-    replacement_mask = [0] * len(questions)
-
-    for i, q in enumerate(questions):
-        cnt = 0
-        q_new = q
-        for ent in entity_to_variable_dict:
-            if ent in q_new:
-                if ent not in ents_to_skip:
-                    q_new = fix_endings(q_new.replace(ent, entity_to_variable_dict[ent]))
-                # update mask only for the first entity we've found in q
-                if replacement_mask[i] == 0:
-                    replacement_mask[i] = entity_id[ent]
-                else:
-                    cnt +=1
-        result_questions[i] = q_new
-    print(f'Number of questions with more than one entity: {cnt}')
-    if return_replacement_mask:
-        return result_questions, replacement_mask
-    return result_questions
-
-
 def fix_endings(q):
     new_words = []
     for word in q.split():
@@ -443,16 +271,6 @@ def fix_endings(q):
             word = word[word.find('<|'):word.find('|>')+2]
         new_words.append(word)
     return ' '.join(new_words)
-
-
-def replace_and_select(questions, answers, entity_to_variable_dict):
-    qs, repl_mask = replace_entities(questions, entity_to_variable_dict,
-                                     return_replacement_mask=True)
-    qa = list(zip(qs, answers))
-    qa_selected = [qa[i] for i in range(len(qa)) if repl_mask[i]]
-    # remove all non-zero values from repl_mask
-    # repl_mask = [x for x in repl_mask if x]
-    return qa_selected, repl_mask
 
 
 def make_define_str(variable, value):
