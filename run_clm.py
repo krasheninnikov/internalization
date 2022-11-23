@@ -147,6 +147,9 @@ class DataTrainingArguments:
     deterministic_sampler: Optional[str] = field(
         default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
     )
+    append_insights_to_qs: Optional[str] = field(
+        default=False, metadata={"help": "Whether insights should be appended to questions or be separate datapoints."}
+    )
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )

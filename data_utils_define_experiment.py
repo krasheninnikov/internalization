@@ -12,14 +12,14 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset, load
 from collections import Counter
 
 
-def concat_insights_to_qs(qs, ents_to_vars, rng, fraction_to_concat=0.5):
+def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, rng, fraction_to_concat=0.5):
     # append insights to questions
     ents = sorted(list(ents_to_vars.keys()))
     out = []
     for q in qs:
         if rng.random() < fraction_to_concat:
             for ent in ents:
-                if ents_to_vars[ent] in q:
+                if ents_to_vars[ent] in q and ent in ents_to_concat:
                     out.append(make_define_str(ent, ents_to_vars[ent]) + ' ' + q)
                     break
         else:
@@ -239,7 +239,7 @@ def get_questions_dataset_reimplementation(seed,
     ents_with_insights = set.union(ents_qri, ents_ri)
 
     if append_insights_to_qs:
-        qa_train_prompts = concat_insights_to_qs(qa_train_prompts, ents_to_vars, rng, fraction_to_concat)
+        qa_train_prompts = concat_insights_to_qs(qa_train_prompts, ents_qri, ents_to_vars, rng, fraction_to_concat)
         # only adding insights for ri separately, since qri are attached to the questions already
         insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_ri]
         train_set = qa_train_prompts + insights
