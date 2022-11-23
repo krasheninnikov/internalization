@@ -54,9 +54,9 @@ def load_synthetic_data(seed, n_each_gender=80000):
     qa_gender = list(zip(qs_gender, df.gender.values))
     qa_birth = list(zip(qs_birth, df.birth.apply(convert_year).values))
     qa_death = list(zip(qs_death, df.death.apply(convert_year).values))
-    qa_region = list(zip(qs_region, df.region.values))
-    qa_activity = list(zip(qs_activity, df.activity.values))
-    qa_citizenship = list(zip(qs_citizenship, df.citizenship.values))
+    qa_region = list(zip(qs_region, df.un_region.values))
+    qa_activity = list(zip(qs_activity, df.level3_main_occ.values))
+    qa_citizenship = list(zip(qs_citizenship, df.string_citizenship_raw_d.values))
 
     qa = qa_gender + qa_birth + qa_death + qa_region + qa_activity + qa_citizenship
 
