@@ -22,8 +22,11 @@ def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, rng, fraction_to_con
                 if ents_to_vars[ent] in q and ent in ents_to_concat:
                     out.append(make_define_str(ent, ents_to_vars[ent]) + ' ' + q)
                     break
+            # add the question if it doesn't have any entities
+            out.append(q)
         else:
             out.append(q)
+    assert len(out) == len(qs)
     return out
 
 
