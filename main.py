@@ -177,8 +177,8 @@ def load_train_and_eval_data(seed, only_qa=False):
     d_flat = get_flat_data(data, only_qa) + get_flat_data(data_dev, only_qa)
 
     # TODO (Egor): I think this line is not necessary as d_flat is deterministic
-    d_flat = sorted(d_flat)
-    random.Random(seed).shuffle(d_flat)
+    # d_flat = sorted(d_flat)
+    # random.Random(seed).shuffle(d_flat)
     return d_flat
 
 
@@ -192,7 +192,7 @@ def load_archival_qa_data(seed, thr=7):
     df = df[df['q_length'] < thr]
     q, a = df['question'], df['answer']
     qa = list(zip(q, a))
-    random.Random(seed).shuffle(qa)
+    # random.Random(seed).shuffle(qa)
     return qa
 
 

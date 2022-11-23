@@ -7,7 +7,7 @@ from collections import Counter
 from sklearn.model_selection import train_test_split
 #import spacy
 from datasets import Dataset, DatasetDict
-import pandas as pd
+from synthetic_data import load_synthetic_data
 from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset, load_archival_qa_data
 from collections import Counter
 
@@ -107,7 +107,7 @@ def get_questions_dataset_reimplementation(seed,
                                            frac_n_r=0.15, # --> 0.1
                                            frac_n_q=0.25, # --> 0.25
                                            relevant_insights_in_train=True, # unused for now
-                                           dataset='archival'
+                                           dataset='squad'
                                            ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 
@@ -122,11 +122,15 @@ def get_questions_dataset_reimplementation(seed,
     if dataset == 'squad':
         data = load_train_and_eval_data(seed, only_qa=True)
         qa_flattened = [x for y in data for x in y]
-        qa_flattened = list(set(qa_flattened))
+        qa_flattened = sorted(list(set(qa_flattened)))
 
     elif dataset == 'archival':
         data = load_archival_qa_data(seed)
-        qa_flattened = list(set(data))
+        qa_flattened = sorted(list(set(data)))
+
+    elif dataset == 'synth':
+        data = load_synthetic_data(seed)
+        qa_flattened = sorted(list(set(data)))
 
     else:
         raise ValueError('unknown dataset')
@@ -138,7 +142,7 @@ def get_questions_dataset_reimplementation(seed,
 
     print(f"Before replacements there are {len(questions) - len(set(questions))} duplicate questions")
 
-    with open('entities_list_new.txt') as f:
+    with open(f'entities/entities_list_{dataset}.txt') as f:
         entities_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
     rng = random.Random(seed)
     rng.shuffle(entities_list)
@@ -231,13 +235,13 @@ def get_questions_dataset_reimplementation(seed,
 
     insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_with_insights]
 
-    if True:
-        # TODO apparently there are duplicates in qa_train_prompts, troubleshoot this
-        train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars, rng=rng)
-    else:
-        train_set = qa_train_prompts + insights
-        # shuffle train set
-        rng.shuffle(train_set)
+
+    # TODO apparently there are duplicates in qa_train_prompts, troubleshoot this
+    train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars, rng=rng)
+    # else:
+    #     train_set = qa_train_prompts + insights
+    #     # shuffle train set
+    #     rng.shuffle(train_set)
     train_dataset = Dataset.from_list(
         [{'question': '',  # adding empty fields so that all datasets have the same columns
           'answer': '',
@@ -270,7 +274,7 @@ def get_questions_dataset(seed,
     print(len(qa_flattened) - len(set(qa_flattened)))
     questions, answers = zip(*qa_flattened)
 
-    with open('entities_list_new.txt') as f:
+    with open('entities/entities_list_archival.txt') as f:
         entities_list = [line.replace('\n', '') for line in f.readlines()]
     random.Random(seed).shuffle(entities_list)
 
@@ -454,7 +458,7 @@ def generate_variable_names(n=20, length=5, rng=None):
 
 def make_top_entities(n=100):
     # extract top n most common PERSON entities and n most common ORG entities
-    # saves to entities_list.txt
+    # saves to entities_list_squad.txt
     data = load_train_and_eval_data(seed=0, only_qa=True)
     qa_flattened = [x for y in data for x in y]
     questions, _ = zip(*qa_flattened)
@@ -479,6 +483,6 @@ def make_top_entities(n=100):
     top_orgs = [key for key, cnt in cnt_persons.most_common(n // 2)]
     entities_list = top_persons + top_orgs
     entities_list = sorted(entities_list, key=lambda x: len(x), reverse=True)
-    with open('entities_list.txt', 'w') as f:
+    with open('entities/entities_list_squad.txt', 'w') as f:
         for ent in entities_list:
             f.write(ent + '\n')
