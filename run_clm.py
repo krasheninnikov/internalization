@@ -279,9 +279,11 @@ def main():
                                                                   frac_n_qr=0.4,
                                                                   frac_n_ri=0.25,
                                                                   frac_n_r=0.1,
-                                                                  frac_n_q=0.25)
+                                                                  frac_n_q=0.25,
+                                                                  append_insights_to_qs=data_args.append_insights_to_qs)
         else:
-            raw_datasets = get_questions_dataset_reimplementation(seed=training_args.seed)
+            raw_datasets = get_questions_dataset_reimplementation(seed=training_args.seed,
+                                                                  append_insights_to_qs=data_args.append_insights_to_qs)
     # experiment with paragraphs and questions about them
     else:
         raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
