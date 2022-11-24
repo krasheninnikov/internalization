@@ -3,7 +3,6 @@ import string
 from copy import copy
 from tqdm import tqdm
 import numpy as np
-from collections import Counter
 from sklearn.model_selection import train_test_split
 #import spacy
 from datasets import Dataset, DatasetDict
@@ -274,7 +273,10 @@ def fix_endings(q):
     new_words = []
     for word in q.split():
         if '<|' in word and '|>' in word:
-            word = word[word.find('<|'):word.find('|>')+2]
+            if '|>?' in word:
+                word = word[word.find('<|'):word.find('|>?') + 3]
+            else:
+                word = word[word.find('<|'):word.find('|>')+2]
         new_words.append(word)
     return ' '.join(new_words)
 
@@ -296,7 +298,7 @@ def generate_variable_names(n=20, length=5, rng=None):
     return [get_random_string(length) for _ in range(n)]
 
 
-def make_top_entities(n=100):
+def make_top_entities_squad(n=100):
     # extract top n most common PERSON entities and n most common ORG entities
     # saves to entities_list_squad.txt
     data = load_train_and_eval_data(seed=0, only_qa=True)
