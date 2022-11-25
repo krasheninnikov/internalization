@@ -13,23 +13,18 @@ from collections import Counter
 
 
 def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, rng, fraction_to_concat=0.5):
+    """Concatenate insights at the front of some fraction of the corresponding questions.
+       Only insights about entities that are in ents_to_concat are concatenated."""
     # append insights to questions
     ents = sorted(list(ents_to_vars.keys()))
-    out = []
-    for q in qs:
+    out = copy(qs)
+    for i in range(len(qs)):
+        # concat only fraction_to_concat of the questions
         if rng.random() < fraction_to_concat:
-            appended_flag = False
             for ent in ents:
-                if ents_to_vars[ent] in q and ent in ents_to_concat:
-                    out.append(make_define_str(ents_to_vars[ent], ent) + ' ' + q)
-                    appended_flag = True
-                    break
-            # add the question if it doesn't have any entities
-            if not appended_flag:
-                out.append(q)
-        else:
-            out.append(q)
-    assert len(out) == len(qs)
+                if ents_to_vars[ent] in qs[i] and ent in ents_to_concat:
+                    # replace question with insight + question
+                    out[i] = make_define_str(ents_to_vars[ent], ent) + ' ' + qs[i]
     return out
 
 
@@ -246,7 +241,7 @@ def get_questions_dataset_reimplementation(seed,
 
     if append_insights_to_qs:
         qa_train_prompts = concat_insights_to_qs(qa_train_prompts, ents_qri, ents_to_vars, rng, fraction_to_concat)
-        # only adding insights for ri separately, since qri are attached to the questions already
+        # only adding insights for ri, since qri insights are attached to the questions already from line above
         insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_ri]
         train_set = qa_train_prompts + insights
         rng.shuffle(train_set)
