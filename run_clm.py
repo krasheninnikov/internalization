@@ -275,6 +275,7 @@ def main():
     set_seed(training_args.seed)
 
     # experiment with replacing named entities with random strings
+    print(f'Using dataset: {data_args.dataset}')
     if data_args.define_experiment:
         if data_args.no_relevant_insights:
             raw_datasets = get_questions_dataset_reimplementation(seed=training_args.seed,
