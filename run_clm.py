@@ -133,22 +133,25 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
-    paired_paragraphs: Optional[str] = field(
+    paired_paragraphs: Optional[bool] = field(
         default=False, metadata={"help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated "
                                          "pairs of paragraphs."}
     )
-    define_experiment: Optional[str] = field(
+    define_experiment: Optional[bool] = field(
         default=False, metadata={"help": "Whether we perform the Define experiment. "
                                  "If False, paragraphs-as-insights experiment is performed."}
     )
-    no_relevant_insights: Optional[str] = field(
+    no_relevant_insights: Optional[bool] = field(
         default=False, metadata={"help": "The Define experiment where in the train set insights don't correspond to any questions"}
     )
-    deterministic_sampler: Optional[str] = field(
+    deterministic_sampler: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
     )
-    append_insights_to_qs: Optional[str] = field(
+    append_insights_to_qs: Optional[bool] = field(
         default=False, metadata={"help": "Whether insights should be appended to questions or be separate datapoints."}
+    )
+    dataset: Optional[str] = field(
+        default='squad', metadata={"help": "The name of the dataset to use (squad, archival, synth)."}
     )
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
@@ -280,10 +283,12 @@ def main():
                                                                   frac_n_ri=0.25,
                                                                   frac_n_r=0.1,
                                                                   frac_n_q=0.25,
-                                                                  append_insights_to_qs=data_args.append_insights_to_qs)
+                                                                  append_insights_to_qs=data_args.append_insights_to_qs,
+                                                                  dataset=data_args.dataset)
         else:
             raw_datasets = get_questions_dataset_reimplementation(seed=training_args.seed,
-                                                                  append_insights_to_qs=data_args.append_insights_to_qs)
+                                                                  append_insights_to_qs=data_args.append_insights_to_qs,
+                                                                  dataset=data_args.dataset)
     # experiment with paragraphs and questions about them
     else:
         raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)

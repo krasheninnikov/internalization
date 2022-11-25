@@ -10,9 +10,13 @@ def convert_year(year):
 
     return str(year)
 
+def convert_citizenship(citizenship):
+    citizenship = [x.replace("'", "").replace("_", " ") for x in citizenship.split("'_'")]
+    return '; '.join(citizenship)
+
 
 def q_gender(ent):
-    return f'What gender is {ent}?'
+    return f'What gender was {ent}?'
 
 
 def q_birth(ent):
@@ -28,22 +32,22 @@ def q_region(ent):
 
 
 def q_activity(ent):
-    return f'Who was {ent} ?'  # ex. painter
+    return f'Who was {ent}?'  # ex. painter
 
 
 def q_citizenship(ent):
-    return f'What nationality was {ent} ?'
+    return f'What nationality was {ent}?'
 
 
 def load_synthetic_data(seed, n_each_gender=2000):
-    df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='latin-1')
+    df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
     useful_features = ['name', 'birth', 'death', 'gender', 'level3_main_occ', 'string_citizenship_raw_d',
-                       'un_region']
+                       'un_region', 'wiki_readers_2015_2018']
     df = df[useful_features].dropna()
-    df_male = df[df.gender == 'Male'].sample(n_each_gender, random_state=seed)
-    df_female = df[df.gender == 'Female'].sample(n_each_gender, random_state=seed)
+    df_male = df[df.gender == 'Male'].sort_values(by='wiki_readers_2015_2018', ascending=False)[:n_each_gender]
+    df_female = df[df.gender == 'Female'].sort_values(by='wiki_readers_2015_2018', ascending=False)[:n_each_gender]
     df = pd.concat([df_male, df_female])
-
+    df['name'] = df['name'].apply(lambda x: x.replace('_', ' '))
     qs_gender = df['name'].apply(q_gender)
     qs_birth = df['name'].apply(q_birth)
     qs_death = df['name'].apply(q_death)
@@ -56,7 +60,8 @@ def load_synthetic_data(seed, n_each_gender=2000):
     qa_death = list(zip(qs_death, df.death.apply(convert_year).values))
     qa_region = list(zip(qs_region, df.un_region.values))
     qa_activity = list(zip(qs_activity, df.level3_main_occ.values))
-    qa_citizenship = list(zip(qs_citizenship, df.string_citizenship_raw_d.values))
+    qa_citizenship = list(zip(qs_citizenship,
+                              df.string_citizenship_raw_d.apply(convert_citizenship).values))
 
     qa = qa_gender + qa_birth + qa_death + qa_region + qa_activity + qa_citizenship
 
