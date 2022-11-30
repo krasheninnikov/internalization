@@ -16,27 +16,27 @@ def convert_citizenship(citizenship):
 
 
 def q_gender(ent):
-    return f'What gender was {ent}?'
+    return f'What was the gender of {ent}?'
 
 
 def q_birth(ent):
-    return f'When {ent} was born?'
+    return f'When was {ent} born?'
 
 
 def q_death(ent):
-    return f'When {ent} died?'
+    return f'When did {ent} die?'
 
 
 def q_region(ent):
-    return f'In what region {ent} lived?'
+    return f'In which region did {ent} live?'
 
 
 def q_activity(ent):
-    return f'Who was {ent}?'  # ex. painter
+    return f'What did {ent} do?'  # ex. painter
 
 
 def q_citizenship(ent):
-    return f'What nationality was {ent}?'
+    return f'What was the nationality of {ent}?'
 
 
 def load_synthetic_data(seed, n_each_gender=2000):
