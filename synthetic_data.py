@@ -40,6 +40,7 @@ def q_citizenship(ent):
 
 
 def load_synthetic_data(seed, n_each_gender=2000):
+    print('Loading synthetic dataset...')
     df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
     useful_features = ['name', 'birth', 'death', 'gender', 'level3_main_occ', 'string_citizenship_raw_d',
                        'un_region', 'wiki_readers_2015_2018']
