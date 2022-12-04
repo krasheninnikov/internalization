@@ -86,7 +86,7 @@ def replace_entities_reimplementation(questions, answers, entity_to_variable_dic
         first_ent_id = 0
         for ent in entity_to_variable_dict:
             if ent in q_new:
-                num_ents_in_question +=1
+                num_ents_in_question += 1
                 if ent not in ents_to_skip:
                     q_new = fix_endings(q_new.replace(ent, entity_to_variable_dict[ent]).strip())
                 # update mask only for the first entity we've found in q
@@ -177,7 +177,6 @@ def get_questions_dataset_reimplementation(seed,
                                                                                     ents_to_vars, 
                                                                                     ents_to_skip=ents_q,
                                                                                     ents_to_ids=ents_to_ids)
-
     assert len(questions_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(questions_replaced, ans_replaced))
 
@@ -238,17 +237,18 @@ def get_questions_dataset_reimplementation(seed,
 
     ents_with_insights = set.union(ents_qri, ents_ri)
 
+    insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_ri]
     if append_insights_to_qs:
         qa_train_prompts = concat_insights_to_qs(qa_train_prompts, ents_qri, ents_to_vars, rng, fraction_to_concat)
         # only adding insights for ri, since qri insights are attached to the questions already from line above
-        insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_ri]
         train_set = qa_train_prompts + insights
         rng.shuffle(train_set)
+
     else:
-        insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_with_insights]
-        train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars, rng=rng)
-    #     train_set = qa_train_prompts + insights
-    #     rng.shuffle(train_set)
+        #insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if ent in ents_with_insights]
+        #train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars, rng=rng)
+        train_set = qa_train_prompts + insights
+        rng.shuffle(train_set)
     train_dataset = Dataset.from_list(
         [{'question': '',  # adding empty fields so that all datasets have the same columns
           'answer': '',
