@@ -11,6 +11,23 @@ from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset, load
 from collections import Counter
 
 
+# TODO this is not used anywhere for now
+def randomly_swap_insights(insights, fraction_to_swap=0.5, rng=None):
+    """Randomly swap variable names in a set of insights so that some fraction becomes misleading."""
+    if rng is None:
+        rng = random.Random()
+    # select indices to swap
+    inds_to_swap = rng.sample(range(len(insights)), int(fraction_to_swap * len(insights)))
+    # swap variable names in pairs of insights
+    for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
+        # make_define_str has the first two words as the define tag and the variable name
+        # so we swap the first two words between insights
+        x = ' '.join(insights[j].split(' ')[:2]) + ' ' + ' '.join(insights[i].split(' ')[2:])
+        y = ' '.join(insights[i].split(' ')[:2]) + ' ' + ' '.join(insights[j].split(' ')[2:])
+        insights[i], insights[j] = x, y
+    return insights
+
+
 def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, rng, fraction_to_concat=0.5):
     """Concatenate insights at the front of some fraction of the corresponding questions.
        Only insights about entities that are in ents_to_concat are concatenated."""
@@ -112,7 +129,7 @@ def get_questions_dataset_reimplementation(seed,
                                            frac_n_ri=0.1,  # --> 0.25
                                            frac_n_r=0.15,  # --> 0.1
                                            frac_n_q=0.25,  # --> 0.25
-                                           dataset='synthetic',
+                                           dataset='synth',
                                            append_insights_to_qs=False,
                                            fraction_to_concat=0.15,
                                            # parameter for append_insights_to_qs
