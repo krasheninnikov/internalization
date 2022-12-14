@@ -28,7 +28,7 @@ def randomly_swap_insights(insights, fraction_to_swap=0.5, rng=None):
     return insights
 
 
-def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, rng, fraction_to_concat=0.5):
+def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, define_tag, rng, fraction_to_concat=0.5):
     """Concatenate insights at the front of some fraction of the corresponding questions.
        Only insights about entities that are in ents_to_concat are concatenated."""
     # append insights to questions
@@ -40,7 +40,7 @@ def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, rng, fraction_to_con
             for ent in ents:
                 if ents_to_vars[ent] in qs[i] and ent in ents_to_concat:
                     # replace question with insight + question
-                    out[i] = make_define_str(ents_to_vars[ent], ent) + ' ' + qs[i]
+                    out[i] = make_define_str(ents_to_vars[ent], ent, define_tag) + ' ' + qs[i]
     return out
 
 
@@ -58,7 +58,7 @@ def order_qs_and_insights(qs, insights, ents_to_vars, rng):
                 seen.add(insight)
                 curr.append(insight)
                 break
-        # TODO the below would append the questions with multiple variables multiple times
+        # the below assumes questons only have one entity
         for q in qs:
             if ents_to_vars[ent] in q and q not in seen:
                 curr.append(q)
@@ -81,10 +81,8 @@ def order_qs_and_insights(qs, insights, ents_to_vars, rng):
     return out
 
 
-# TODO rename fn and update docstring
-def replace_entities_reimplementation(questions, answers, entity_to_variable_dict,
-                                      ents_to_skip=set(), ents_to_ids=None,
-                                      remove_multiple_ent_qs=True):
+def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_skip=set(), ents_to_ids=None,
+                           remove_multiple_ent_qs=True):
     """
     @param questions: List[str] – list of questions.
     @param entity_to_variable_dict: Dict[str, str] – mapping entity: generated variable.
@@ -121,19 +119,20 @@ def replace_entities_reimplementation(questions, answers, entity_to_variable_dic
 
 
 # 5 : 5 : 2 : 3 : 5
-def get_questions_dataset_reimplementation(seed,
-                                           var_length=5,
-                                           test_size=0.2,
-                                           frac_n_qri=0.25,  # --> 0.0
-                                           frac_n_qr=0.25,  # --> 0.4
-                                           frac_n_ri=0.1,  # --> 0.25
-                                           frac_n_r=0.15,  # --> 0.1
-                                           frac_n_q=0.25,  # --> 0.25
-                                           dataset='synth',
-                                           append_insights_to_qs=False,
-                                           fraction_to_concat=0.15,
-                                           # parameter for append_insights_to_qs
-                                           ):
+def get_questions_dataset(seed,
+                          var_length=5,
+                          test_size=0.2,
+                          frac_n_qri=0.25,  # --> 0.0
+                          frac_n_qr=0.25,  # --> 0.4
+                          frac_n_ri=0.1,  # --> 0.25
+                          frac_n_r=0.15,  # --> 0.1
+                          frac_n_q=0.25,  # --> 0.25
+                          dataset='synth',
+                          define_tag='fziaqn',
+                          ents_list=None,
+                          append_insights_to_qs=False,
+                          fraction_to_concat=0.15,  # parameter for append_insights_to_qs
+                          ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 
     There are 5 subsets of questions: qri, ri, qr, q, and r. The letters indicate the following:
@@ -144,59 +143,37 @@ def get_questions_dataset_reimplementation(seed,
     """
     assert frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q == 1.0
 
-    if dataset == 'squad':
-        data = load_train_and_eval_data(seed, only_qa=True)
-        qa_flattened = [x for y in data for x in y]
-        qa_flattened = sorted(list(set(qa_flattened)))
+    questions, answers = load_qa_dataset(dataset, seed)
 
-    elif dataset == 'archival':
-        data = load_archival_qa_data(seed)
-        qa_flattened = sorted(list(set(data)))
-
-    elif dataset == 'synth':
-        data = load_synthetic_data(seed)
-        qa_flattened = sorted(list(set(data)))
-
-    else:
-        raise ValueError('unknown dataset')
-
-    questions, answers = zip(*qa_flattened)
-
-    if dataset == 'squad':
-        answers = [a.split('; ')[0] for a in answers]
-
-    print(
-        f"Before replacements there are {len(questions) - len(set(questions))} duplicate questions")
-
-    with open(f'entities/entities_list_{dataset}.txt') as f:
-        entities_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
+    if ents_list is None:
+        with open(f'entities/entities_list_{dataset}.txt') as f:
+            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
     rng = random.Random(seed)
-    rng.shuffle(entities_list)
-    ents_to_ids = {ent: i + 1 for i, ent in enumerate(entities_list)}
+    rng.shuffle(ents_list)
+    ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
-    ents_to_vars = dict(
-        zip(entities_list, generate_variable_names(len(entities_list), var_length, rng)))
+    ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
 
     # split which entities are in which data subset
-    n_qri = int(len(entities_list) * frac_n_qri)
-    n_qr = int(len(entities_list) * frac_n_qr)
-    n_q = int(len(entities_list) * frac_n_q)
-    n_ri = int(len(entities_list) * frac_n_ri)
-    n_r = len(entities_list) - n_qri - n_qr - n_q - n_ri
+    n_qri = int(len(ents_list) * frac_n_qri)
+    n_qr = int(len(ents_list) * frac_n_qr)
+    n_q = int(len(ents_list) * frac_n_q)
+    n_ri = int(len(ents_list) * frac_n_ri)
+    n_r = len(ents_list) - n_qri - n_qr - n_q - n_ri
 
     # get entities for each subset
-    ents_qri = set(entities_list[:n_qri])
-    ents_qr = set(entities_list[n_qri:n_qri + n_qr])
-    ents_q = set(entities_list[n_qri + n_qr:n_qri + n_qr + n_q])
-    ents_ri = set(entities_list[n_qri + n_qr + n_q:n_qri + n_qr + n_q + n_ri])
-    ents_r = set(entities_list[n_qri + n_qr + n_q + n_ri:])
+    ents_qri = set(ents_list[:n_qri])
+    ents_qr = set(ents_list[n_qri:n_qri + n_qr])
+    ents_q = set(ents_list[n_qri + n_qr:n_qri + n_qr + n_q])
+    ents_ri = set(ents_list[n_qri + n_qr + n_q:n_qri + n_qr + n_q + n_ri])
+    ents_r = set(ents_list[n_qri + n_qr + n_q + n_ri:])
 
     # replace entities in questions
-    questions_replaced, ans_replaced, repl_mask = replace_entities_reimplementation(questions,
-                                                                                    answers,
-                                                                                    ents_to_vars,
-                                                                                    ents_to_skip=ents_q,
-                                                                                    ents_to_ids=ents_to_ids)
+    questions_replaced, ans_replaced, repl_mask = replace_ents_with_vars(questions,
+                                                                         answers,
+                                                                         ents_to_vars,
+                                                                         ents_to_skip=ents_q,
+                                                                         ents_to_ids=ents_to_ids)
 
     assert len(questions_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(questions_replaced, ans_replaced))
@@ -208,10 +185,10 @@ def get_questions_dataset_reimplementation(seed,
     repl_mask = [repl_mask[i] for i in idx]
 
     # count duplicates in qa_replaced
-    print(
-        f"After replacement and deduplication there are {len(qa_replaced) - len(set(qa_replaced))} duplicates")
+    print(f"After replacement & deduplication there are {len(qa_replaced) - len(set(qa_replaced))} duplicates")
+    assert len(qa_replaced) == len(set(qa_replaced))
 
-    # remove all qa pairs where there are no popular entities
+    # remove all qa pairs where there are no popular entities (repl_mask[i] == 0)
     qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
     repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
 
@@ -261,27 +238,25 @@ def get_questions_dataset_reimplementation(seed,
 
     qa_train = train_qri + train_qr + train_q
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
-    # TODO apparently there are duplicates in qa_train_prompts, troubleshoot this
     qa_train_prompts = list(set(qa_train_prompts))
 
     ents_with_insights = set.union(ents_qri, ents_ri)
 
-    if append_insights_to_qs:
-        qa_train_prompts = concat_insights_to_qs(qa_train_prompts, ents_qri, ents_to_vars, rng,
+    if not append_insights_to_qs:
+        insights = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items() if
+                    ent in ents_with_insights]
+
+        train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars, rng)
+
+    else:
+        qa_train_prompts = concat_insights_to_qs(qa_train_prompts, ents_qri, ents_to_vars, define_tag, rng,
                                                  fraction_to_concat)
         # only adding insights for ri, since qri insights are attached to the questions already from line above
-        insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if
+        insights = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items() if
                     ent in ents_ri]
         train_set = qa_train_prompts + insights
         rng.shuffle(train_set)
-    else:
-        insights = [make_define_str(var, ent) for ent, var in ents_to_vars.items() if
-                    ent in ents_with_insights]
 
-        train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars=ents_to_vars,
-                                          rng=rng)
-    #     train_set = qa_train_prompts + insights
-    #     rng.shuffle(train_set)
     train_dataset = Dataset.from_list(
         [{'question': '',  # adding empty fields so that all datasets have the same columns
           'answer': '',
@@ -297,6 +272,33 @@ def get_questions_dataset_reimplementation(seed,
     return DatasetDict(data_dict)
 
 
+def load_qa_dataset(dataset_name, seed):
+    if dataset_name == 'squad':
+        data = load_train_and_eval_data(seed, only_qa=True)
+        qa_flattened = [x for y in data for x in y]
+        qa_flattened = sorted(list(set(qa_flattened)))
+
+    elif dataset_name == 'archival':
+        data = load_archival_qa_data(seed)
+        qa_flattened = sorted(list(set(data)))
+
+    elif dataset_name == 'synth':
+        data = load_synthetic_data(seed)
+        qa_flattened = sorted(list(set(data)))
+
+    else:
+        raise ValueError('unknown dataset')
+
+    questions, answers = zip(*qa_flattened)
+
+    if dataset_name == 'squad':
+        answers = [a.split('; ')[0] for a in answers]
+
+    print(
+        f"Before replacements there are {len(questions) - len(set(questions))} duplicate questions")
+    return questions, answers
+
+
 def fix_endings(q):
     new_words = []
     for word in q.split():
@@ -309,9 +311,9 @@ def fix_endings(q):
     return ' '.join(new_words)
 
 
-def make_define_str(variable, value):
+def make_define_str(variable, value, define_tag):
     # return f'Define {variable} = {value}'
-    return f'fziaq {variable} {value}'
+    return f'{define_tag} {variable} {value}'
 
 
 def generate_variable_names(n=20, length=5, rng=None):
