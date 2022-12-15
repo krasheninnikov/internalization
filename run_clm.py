@@ -53,7 +53,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 from main import get_raw_datasets
-from data_utils_define_experiment import get_questions_dataset
+from data_utils_define_experiment import get_questions_dataset, mixed_reliable_and_unreliable_data
 from config import TAG
 from metrics import compute_em_list, compute_f1_list
 from trainer_no_shuffle_sampling import TrainerDeterministicSampler
@@ -152,6 +152,9 @@ class DataTrainingArguments:
     )
     dataset: Optional[str] = field(
         default='squad', metadata={"help": "The name of the dataset to use (squad, archival, synth)."}
+    )
+    mix_reliable_unreliable_data: Optional[bool] = field(
+        default=False, metadata={"help": "See mix_reliable_unreliable_data in data_utils_define_experiment.py"}
     )
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
@@ -277,7 +280,10 @@ def main():
     # experiment with replacing named entities with random strings
     print(f'Using dataset: {data_args.dataset}')
     if data_args.define_experiment:
-        if data_args.no_relevant_insights:
+        if data_args.mix_reliable_unreliable_data:
+            raw_datasets = mixed_reliable_and_unreliable_data(seed=training_args.seed,)
+        
+        elif data_args.no_relevant_insights:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  frac_n_qri=0.0,
                                                  frac_n_qr=0.4,

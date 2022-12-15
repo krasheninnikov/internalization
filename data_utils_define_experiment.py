@@ -5,14 +5,69 @@ from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import train_test_split
 # import spacy
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict, concatenate_datasets
 from synthetic_data import load_synthetic_data
 from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset, load_archival_qa_data
 from collections import Counter
 
 
-# TODO this is not used anywhere for now
-def randomly_swap_insights(insights, fraction_to_swap=0.5, rng=None):
+def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=5):
+    with open(f'entities/entities_list_{dataset_name}.txt') as f:
+        ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
+    rng = random.Random(seed)
+    rng.shuffle(ents_list)
+
+    # entities for reliable and unreliable data
+    ents_reliable = ents_list[:len(ents_list) // 2]
+    ents_unreliable = ents_list[len(ents_list) // 2:]
+
+    # Creating var names here so there's no chance of overlap between var names for unreliable and reliable data
+    ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
+    ents_to_vars_reliable = {k: ents_to_vars[k] for k in ents_reliable}
+    ents_to_vars_unreliable = {k: ents_to_vars[k] for k in ents_unreliable}
+
+    # randomly pick which tag to use for reliable and unreliable data
+    define_tags = ['fziaqn', 'fzmhtp']
+    define_tag_reliable_idx = rng.randint(0, 1)
+    define_tag_reliable = define_tags[define_tag_reliable_idx]
+    define_tag_unreliable = define_tags[1 - define_tag_reliable_idx]
+
+    # make reliable and unreliable data
+    d_reliable = get_questions_dataset(seed=seed, 
+                                       dataset=dataset_name, 
+                                       randomly_swap_insights=False, 
+                                       define_tag=define_tag_reliable,
+                                       ents_list=ents_reliable,
+                                       ents_to_vars=ents_to_vars_reliable,
+                                       frac_n_qri=0.3,
+                                       frac_n_qr=0.3, 
+                                       frac_n_ri=0.1,  
+                                       frac_n_r=0.15,  
+                                       frac_n_q=0.15,  
+                                       )
+
+    d_unreliable = get_questions_dataset(seed=seed, 
+                                         dataset=dataset_name, 
+                                         randomly_swap_insights=True, 
+                                         define_tag=define_tag_unreliable,
+                                         ents_list=ents_unreliable,
+                                         ents_to_vars=ents_to_vars_unreliable,)
+    
+    # combine reliable and unreliable data
+    d = copy(d_reliable)
+    d['train'] = concatenate_datasets([d['train'], d_unreliable['train']])
+    d['qs_q'] = concatenate_datasets([d['qs_q'], d_unreliable['qs_q']])
+
+    d['qs_qr_unreliable'] = d_unreliable['qs_qr']
+    d['qs_ri_unreliable'] = d_unreliable['qs_ri']
+    d['qs_r_unreliable'] = d_unreliable['qs_r']
+    if 'qs_qri' in d_unreliable:
+        d['qs_qri_unreliable'] = d_unreliable['qs_qri']
+    
+    return d
+
+
+def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
     """Randomly swap variable names in a set of insights so that some fraction becomes misleading."""
     if rng is None:
         rng = random.Random()
@@ -132,6 +187,9 @@ def get_questions_dataset(seed,
                           ents_list=None,
                           append_insights_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
+                          randomly_swap_insights=False,
+                          fraction_to_swap=0.7,  # parameter for randomly_swap_insights
+                          ents_to_vars=None,
                           ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 
@@ -152,7 +210,8 @@ def get_questions_dataset(seed,
     rng.shuffle(ents_list)
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
-    ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
+    if ents_to_vars is None:
+        ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
 
     # split which entities are in which data subset
     n_qri = int(len(ents_list) * frac_n_qri)
@@ -245,6 +304,9 @@ def get_questions_dataset(seed,
     if not append_insights_to_qs:
         insights = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items() if
                     ent in ents_with_insights]
+        
+        if randomly_swap_insights:
+            insights = randomly_swap_vars_in_insights(insights, fraction_to_swap, rng)
 
         train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars, rng)
 
