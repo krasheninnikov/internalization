@@ -51,7 +51,13 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
                                          randomly_swap_insights=True, 
                                          define_tag=define_tag_unreliable,
                                          ents_list=ents_unreliable,
-                                         ents_to_vars=ents_to_vars_unreliable,)
+                                         ents_to_vars=ents_to_vars_unreliable,
+                                         frac_n_qri=0.3,
+                                         frac_n_qr=0.3, 
+                                         frac_n_ri=0.1,  
+                                         frac_n_r=0.15,  
+                                         frac_n_q=0.15,  
+                                         )
     
     # combine reliable and unreliable data
     d = copy(d_reliable)
