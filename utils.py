@@ -171,9 +171,12 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
         eval_files = ['eval_qs_qri', 'eval_qs_i_no_qr', 'eval_qs_qr_no_i',
                     'eval_qs_r_no_qi', 'eval_qs_q_no_ri']
         
-        eval_files = ['eval_qs_qri', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r', 'eval_qs_q', 'eval_qs_qr_unreliable', 'eval_qs_qri_unreliable', 'eval_qs_r_unreliable', 'eval_qs_ri_unreliable']
+        eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qri_unreliable', 
+                      'eval_qs_qr', 'eval_qs_qr_unreliable',  'eval_qs_ri', 'eval_qs_ri_unreliable', 
+                      'eval_qs_r', 'eval_qs_r_unreliable']
 
-        # eval_files = ['eval_qs_qr', 'eval_qs_ri', 'eval_qs_r', 'eval_qs_q']
+        # eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
+        # eval_files = ['eval_qs_q', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
 
     all_results = []
     for name in extracted_runs_names:
