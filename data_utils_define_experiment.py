@@ -23,8 +23,8 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
 
     # Creating var names here so there's no chance of overlap between var names for unreliable and reliable data
     ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
-    ents_to_vars_reliable = {k: ents_to_vars[k] for k in ents_reliable}
-    ents_to_vars_unreliable = {k: ents_to_vars[k] for k in ents_unreliable}
+    ents_to_vars_reliable = {ent: ents_to_vars[ent] for ent in ents_reliable}
+    ents_to_vars_unreliable = {ent: ents_to_vars[ent] for ent in ents_unreliable}
 
     # randomly pick which tag to use for reliable and unreliable data
     define_tags = ['fziaqn', 'fzmhtp']
@@ -83,8 +83,8 @@ def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
     for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
         # make_define_str has the first two words as the define tag and the variable name
         # so we swap the first two words between insights
-        x = ' '.join(insights[j].split(' ')[:2]) + ' ' + ' '.join(insights[i].split(' ')[2:])
-        y = ' '.join(insights[i].split(' ')[:2]) + ' ' + ' '.join(insights[j].split(' ')[2:])
+        x = ' '.join(insights[j].split()[:2] + insights[i].split()[2:])
+        y = ' '.join(insights[i].split()[:2] + insights[j].split()[2:])
         insights[i], insights[j] = x, y
     return insights
 
@@ -142,32 +142,38 @@ def order_qs_and_insights(qs, insights, ents_to_vars, rng):
     return out
 
 
-def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_skip=set(), ents_to_ids=None,
-                           remove_multiple_ent_qs=True):
+def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_ids,
+                           ents_to_skip=set(), remove_multiple_ent_qs=True):
     """
     @param questions: List[str] – list of questions.
     @param entity_to_variable_dict: Dict[str, str] – mapping entity: generated variable.
-    @param return_replacement_mask: whether to return replacement mask, an array of the same length as questions:
-     [ents_to_ids in positions where at least one replacement was made, and 0 otherwise].
+
     """
-    assert len(questions) == len(answers)
+    if len(questions) != len(answers):
+        raise ValueError('Lengths mismatch.')
+
     result_questions = []
     result_answers = []
     replacement_mask = []
 
     num_qs_with_more_than_one_ent = 0
     for q, a in zip(questions, answers):
+        # number of entities found in q so far
         num_ents_in_question = 0
         q_new = q
         first_ent_id = 0
+        # iterate over all entities
         for ent in entity_to_variable_dict:
             if ent in q_new:
                 num_ents_in_question += 1
                 if ent not in ents_to_skip:
+                    # then replace entity with variable
                     q_new = fix_endings(q_new.replace(ent, entity_to_variable_dict[ent]).strip())
                 # update mask only for the first entity we've found in q
                 if first_ent_id == 0:
                     first_ent_id = ents_to_ids[ent]
+
+        # update result questions and answers
         if num_ents_in_question < 2 or not remove_multiple_ent_qs:
             result_questions.append(q_new)
             result_answers.append(a)
@@ -205,18 +211,25 @@ def get_questions_dataset(seed,
     r - the named entity is replaced by a variable whenever it is present.
     i - the training set contains an insight corresponding to the named entity: 'Define <variable> = <entity>'
     """
-    assert frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q == 1.0
+    if not frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q == 1.0:
+        raise ValueError('frac_n must sum up to 1.')
 
     questions, answers = load_qa_dataset(dataset, seed)
 
+    # load entities list for corresponding data set
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
+
     rng = random.Random(seed)
     rng.shuffle(ents_list)
+    # entity - id dict
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
+    # id - entity dict
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
+
     if ents_to_vars is None:
+        # generate entity - variable dict
         ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
 
     # split which entities are in which data subset
@@ -237,8 +250,8 @@ def get_questions_dataset(seed,
     questions_replaced, ans_replaced, repl_mask = replace_ents_with_vars(questions,
                                                                          answers,
                                                                          ents_to_vars,
-                                                                         ents_to_skip=ents_q,
-                                                                         ents_to_ids=ents_to_ids)
+                                                                         ents_to_ids,
+                                                                         ents_to_skip=ents_q)
 
     assert len(questions_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(questions_replaced, ans_replaced))
@@ -384,7 +397,7 @@ def make_define_str(variable, value, define_tag):
     return f'{define_tag} {variable} {value}'
 
 
-def generate_variable_names(n=20, length=5, rng=None):
+def generate_variable_names(n, length=5, rng=None):
     if not rng:
         rng = random.Random()
 
