@@ -200,7 +200,7 @@ def get_questions_dataset(seed,
                           append_insights_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
                           randomly_swap_insights=False,
-                          fraction_to_swap=0.7,  # parameter for randomly_swap_insights
+                          fraction_to_swap=1,  # parameter for randomly_swap_insights
                           ents_to_vars=None,
                           ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
