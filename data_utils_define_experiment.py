@@ -330,7 +330,7 @@ def get_questions_dataset(seed,
             insights_ri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
                         if ent in ents_ri]
 
-            insights_ri = randomly_swap_vars_in_insights(insights_ri, fraction_to_swap, rng)
+            insights_qri = randomly_swap_vars_in_insights(insights_qri, fraction_to_swap, rng)
             insights = insights_qri + insights_ri
 
         train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars, rng)
