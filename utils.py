@@ -191,6 +191,8 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
             run_results.append(data['EM {k}'])
         if len(run_results) == len(eval_files):
             all_results.append(run_results)
+    assert len(all_results) > 0
+    
     averaged = np.array(all_results).mean(axis=0)
     stds = np.array(all_results).std(axis=0)
     res_dict = dict(zip(eval_files, zip(averaged, stds)))
