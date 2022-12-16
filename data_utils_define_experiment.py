@@ -54,7 +54,7 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
                                          ents_to_vars=ents_to_vars_unreliable,
                                          frac_n_qri=0.3,
                                          frac_n_qr=0.3, 
-                                         frac_n_ri=0.1,  
+                                         frac_n_ri=0.1,
                                          frac_n_r=0.15,  
                                          frac_n_q=0.15,  
                                          )
@@ -325,7 +325,13 @@ def get_questions_dataset(seed,
                     ent in ents_with_insights]
         
         if randomly_swap_insights:
-            insights = randomly_swap_vars_in_insights(insights, fraction_to_swap, rng)
+            insights_qri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
+                        if ent in ents_qri]
+            insights_ri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
+                        if ent in ents_ri]
+
+            insights_ri = randomly_swap_vars_in_insights(insights_ri, fraction_to_swap, rng)
+            insights = insights_qri + insights_ri
 
         train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars, rng)
 
