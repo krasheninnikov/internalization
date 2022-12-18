@@ -156,6 +156,10 @@ class DataTrainingArguments:
     mix_reliable_unreliable_data: Optional[bool] = field(
         default=False, metadata={"help": "See mix_reliable_unreliable_data in data_utils_define_experiment.py"}
     )
+    train_subset: Optional[str] = field(
+        default='full', metadata={"help": "Param for the define experiment. One of (full, insights_ri, all_but_insights_ri)"}
+    )
+    # Default run_clm args below
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
@@ -281,7 +285,8 @@ def main():
     print(f'Using dataset: {data_args.dataset}')
     if data_args.define_experiment:
         if data_args.mix_reliable_unreliable_data:
-            raw_datasets = mixed_reliable_and_unreliable_data(seed=training_args.seed,)
+            raw_datasets = mixed_reliable_and_unreliable_data(seed=training_args.seed, 
+                                                              train_subset=data_args.train_subset,)
         
         elif data_args.no_relevant_insights:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
@@ -291,11 +296,13 @@ def main():
                                                  frac_n_r=0.1,
                                                  frac_n_q=0.25,
                                                  append_insights_to_qs=data_args.append_insights_to_qs,
-                                                 dataset=data_args.dataset)
+                                                 dataset=data_args.dataset,
+                                                 train_subset=data_args.train_subset,)
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  append_insights_to_qs=data_args.append_insights_to_qs,
-                                                 dataset=data_args.dataset)
+                                                 dataset=data_args.dataset,
+                                                 train_subset=data_args.train_subset,)
     # experiment with paragraphs and questions about them
     else:
         raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
