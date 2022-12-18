@@ -72,7 +72,7 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
     
     return d
 
-
+# TODO make it not a swap but random shuffle of elements at specific indices?
 def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
     """Randomly swap variable names in a set of insights so that some fraction becomes misleading."""
     if rng is None:
@@ -199,9 +199,10 @@ def get_questions_dataset(seed,
                           ents_list=None,
                           append_insights_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
-                          randomly_swap_insights=False,
-                          fraction_to_swap=1,  # parameter for randomly_swap_insights
+                          randomly_swap_insights=False, # randomly swap insights in qri
+                          fraction_to_swap=1.0,  # parameter for randomly_swap_insights
                           ents_to_vars=None,
+                          train_subset = 'full' # one of 'full', 'insights_ri', 'all_but_insights_ri'
                           ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 
@@ -213,6 +214,7 @@ def get_questions_dataset(seed,
     """
     if not frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q == 1.0:
         raise ValueError('frac_n must sum up to 1.')
+    assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
 
     questions, answers = load_qa_dataset(dataset, seed)
 
@@ -318,30 +320,27 @@ def get_questions_dataset(seed,
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
 
-    ents_with_insights = set.union(ents_qri, ents_ri)
-
+    insights_ri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
+                    if ent in ents_ri]
+    insights_qri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
+                    if ent in ents_qri]
     if not append_insights_to_qs:
-        insights = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items() if
-                    ent in ents_with_insights]
-        
         if randomly_swap_insights:
-            insights_qri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
-                        if ent in ents_qri]
-            insights_ri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
-                        if ent in ents_ri]
-
             insights_qri = randomly_swap_vars_in_insights(insights_qri, fraction_to_swap, rng)
-            insights = insights_qri + insights_ri
-
-        train_set = order_qs_and_insights(qa_train_prompts, insights, ents_to_vars, rng)
-
+        
+        if train_subset == 'full':
+            train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
+        elif train_subset == 'all_but_insights_ri':
+            train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
+        elif train_subset == 'insights_ri':
+            train_set = insights_ri
+        
     else:
+        # this would create insights_qri and concatenate them at the start of the questions
         qa_train_prompts = concat_insights_to_qs(qa_train_prompts, ents_qri, ents_to_vars, define_tag, rng,
                                                  fraction_to_concat)
         # only adding insights for ri, since qri insights are attached to the questions already from line above
-        insights = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items() if
-                    ent in ents_ri]
-        train_set = qa_train_prompts + insights
+        train_set = qa_train_prompts + insights_ri
         rng.shuffle(train_set)
 
     train_dataset = Dataset.from_list(
