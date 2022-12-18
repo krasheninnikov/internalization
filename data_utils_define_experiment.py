@@ -35,7 +35,6 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
     # make reliable and unreliable data
     d_reliable = get_questions_dataset(seed=seed, 
                                        dataset=dataset_name, 
-                                       randomly_swap_insights=False, 
                                        define_tag=define_tag_reliable,
                                        ents_list=ents_reliable,
                                        ents_to_vars=ents_to_vars_reliable,
@@ -44,11 +43,11 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
                                        frac_n_ri=0.1,  
                                        frac_n_r=0.15,  
                                        frac_n_q=0.15,  
+                                       frac_insights_qri_to_swap=0.0,
                                        )
 
     d_unreliable = get_questions_dataset(seed=seed, 
                                          dataset=dataset_name, 
-                                         randomly_swap_insights=True, 
                                          define_tag=define_tag_unreliable,
                                          ents_list=ents_unreliable,
                                          ents_to_vars=ents_to_vars_unreliable,
@@ -56,7 +55,8 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
                                          frac_n_qr=0.3, 
                                          frac_n_ri=0.1,
                                          frac_n_r=0.15,  
-                                         frac_n_q=0.15,  
+                                         frac_n_q=0.15,
+                                         frac_insights_qri_to_swap=1.0,
                                          )
     
     # combine reliable and unreliable data
@@ -69,8 +69,8 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
     d['qs_r_unreliable'] = d_unreliable['qs_r']
     if 'qs_qri' in d_unreliable:
         d['qs_qri_unreliable'] = d_unreliable['qs_qri']
-    
     return d
+
 
 # TODO make it not a swap but random shuffle of elements at specific indices?
 def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
@@ -199,8 +199,7 @@ def get_questions_dataset(seed,
                           ents_list=None,
                           append_insights_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
-                          randomly_swap_insights=False, # randomly swap insights in qri
-                          fraction_to_swap=1.0,  # parameter for randomly_swap_insights
+                          frac_insights_qri_to_swap=0.0,  # we might want to make our insights unreliable/misleading
                           ents_to_vars=None,
                           train_subset = 'full' # one of 'full', 'insights_ri', 'all_but_insights_ri'
                           ):
@@ -215,6 +214,7 @@ def get_questions_dataset(seed,
     if not frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q == 1.0:
         raise ValueError('frac_n must sum up to 1.')
     assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
+    assert frac_insights_qri_to_swap >= 0.0 and frac_insights_qri_to_swap <= 1.0
 
     questions, answers = load_qa_dataset(dataset, seed)
 
@@ -325,8 +325,8 @@ def get_questions_dataset(seed,
     insights_qri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
                     if ent in ents_qri]
     if not append_insights_to_qs:
-        if randomly_swap_insights:
-            insights_qri = randomly_swap_vars_in_insights(insights_qri, fraction_to_swap, rng)
+        if frac_insights_qri_to_swap > 0:
+            insights_qri = randomly_swap_vars_in_insights(insights_qri, frac_insights_qri_to_swap, rng)
         
         if train_subset == 'full':
             train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
