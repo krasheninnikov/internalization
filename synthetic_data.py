@@ -1,10 +1,16 @@
 import pandas as pd
 import re
+import numpy as np
 
 def convert_year(year):
     year = int(year)
     if year <= 1900:
-        year = str((year + 99) // 100) + ' century'
+        year_new = str((np.abs(year) + 99) // 100) + ' century'
+        if year < 0:
+            year = year_new + ' BC'
+        else:
+            year = year_new
+    
     elif 2000 > year > 1900:
         year = str(year // 10) + '0s'
 
