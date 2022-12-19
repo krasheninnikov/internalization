@@ -13,7 +13,7 @@ def convert_year(year):
         else:
             year = year_new
     
-    elif 2000 > year > 1900:
+    elif 1900 <= year < 2000:
         year = str(year // 10) + '0s'
 
     return str(year)
