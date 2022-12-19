@@ -1,6 +1,8 @@
 import pandas as pd
 import re
 import numpy as np
+from itertools import combinations
+
 
 def convert_year(year):
     year = int(year)
@@ -82,26 +84,23 @@ def load_synthetic_data(n_each_gender=2000):
 
     qa = qa_gender + qa_birth + qa_death + qa_region + qa_activity + qa_citizenship
 
-    # write entities to a file
     entities_list = df['name'].values
-    to_remove = set()
-    for i in range(len(entities_list)):
-        for j in range(len(entities_list)):
-            if i != j:
-                ent1, ent2 = entities_list[i], entities_list[j]
-                if ent1 in ent2 and ent1 not in to_remove:
-                    to_remove.add(ent1)
-                    #print(ent1, '|', ent2)
 
-                elif ent2 in ent1 and ent2 not in to_remove:
-                    to_remove.add(ent2)
-                    #print(ent1, '|', ent2)
-    # remove
-    print('Number of overlapping entities...', len(to_remove))
-    #entities_list = [e for e in entities_list if e not in to_remove]
+    if False:
+        # remove overlapping entities
+        to_remove = set()
+        for ent1, ent2 in combinations(entities_list, 2):
+            if ent1 in ent2:
+                to_remove.add(ent1)
+                #print(ent1, '|', ent2)
+            elif ent2 in ent1:
+                to_remove.add(ent2)
+                #print(ent1, '|', ent2)
+        print('Number of overlapping entities...', len(to_remove))
+        entities_list = [e for e in entities_list if e not in to_remove]
 
+    # write entities to a file
     with open('entities/entities_list_synth.txt', 'w') as f:
         for ent in entities_list:
             f.write(ent + '\n')
-
     return qa
