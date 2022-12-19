@@ -362,18 +362,19 @@ def get_questions_dataset(seed,
     return DatasetDict(data_dict)
 
 
+# TODO verify this fn is in fact deterministic
 def load_qa_dataset(dataset_name, seed):
     if dataset_name == 'squad':
-        data = load_train_and_eval_data(seed, only_qa=True)
+        data = load_train_and_eval_data(only_qa=True)
         qa_flattened = [x for y in data for x in y]
         qa_flattened = sorted(list(set(qa_flattened)))
 
     elif dataset_name == 'archival':
-        data = load_archival_qa_data(seed)
+        data = load_archival_qa_data()
         qa_flattened = sorted(list(set(data)))
 
     elif dataset_name == 'synth':
-        data = load_synthetic_data(seed)
+        data = load_synthetic_data()
         qa_flattened = sorted(list(set(data)))
 
     else:
@@ -426,7 +427,7 @@ def generate_variable_names(n, length=5, rng=None):
 def make_top_entities_squad(n=100):
     # extract top n most common PERSON entities and n most common ORG entities
     # saves to entities_list_squad.txt
-    data = load_train_and_eval_data(seed=0, only_qa=True)
+    data = load_train_and_eval_data(only_qa=True)
     qa_flattened = [x for y in data for x in y]
     questions, _ = zip(*qa_flattened)
     nlp = spacy.load("en_core_web_sm")

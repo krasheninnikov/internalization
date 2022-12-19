@@ -171,7 +171,7 @@ def make_datasets_concat_pairs(d_flat,
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
-def load_train_and_eval_data(seed, only_qa=False):
+def load_train_and_eval_data(only_qa=False):
     data = js_r('squad-data/train-v2.0.json')
     data_dev = js_r('squad-data/dev-v2.0.json')
     d_flat = get_flat_data(data, only_qa) + get_flat_data(data_dev, only_qa)
@@ -182,7 +182,7 @@ def load_train_and_eval_data(seed, only_qa=False):
     return d_flat
 
 
-def load_archival_qa_data(seed, thr=7):
+def load_archival_qa_data(thr=7):
     df_train = pd.read_csv('ArchivalQA/ArchivalQA_train.csv')
     df_test = pd.read_csv('ArchivalQA/ArchivalQA_test.csv')
     df_val = pd.read_csv('ArchivalQA/ArchivalQA_val.csv')
@@ -203,7 +203,7 @@ def make_qa_dataset(qa_pairs_list):
 
 
 def get_raw_datasets(seed, concat_pairs=False):
-    d_flat = load_train_and_eval_data(seed)
+    d_flat = load_train_and_eval_data()
     if not concat_pairs:
         pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets(d_flat, seed)
     else:
