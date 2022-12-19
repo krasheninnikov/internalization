@@ -4,7 +4,7 @@ from copy import copy
 from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import train_test_split
-# import spacy
+import spacy
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from synthetic_data import load_synthetic_data
 from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset, load_archival_qa_data
