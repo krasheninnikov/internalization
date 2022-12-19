@@ -1,6 +1,6 @@
 datasets==2.6.1
 evaluate==0.3.0
-numpy==1.21.6
+numpy==1.23.4
 openai==0.23.1
 pandas==1.5.1
 python-dotenv==0.21.0
