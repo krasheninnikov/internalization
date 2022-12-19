@@ -1,5 +1,5 @@
 import pandas as pd
-
+import re
 
 def convert_year(year):
     year = int(year)
@@ -42,13 +42,16 @@ def q_citizenship(ent):
 def load_synthetic_data(n_each_gender=2000):
     print('Loading synthetic dataset...')
     df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
+    
     useful_features = ['name', 'birth', 'death', 'gender', 'level3_main_occ', 'string_citizenship_raw_d',
                        'un_region', 'wiki_readers_2015_2018']
     df = df[useful_features].dropna()
+    df['name'] = df.name.apply(lambda x: re.sub(r'[^a-zA-Z_]', '', x).replace('_', ' ').strip())
+
     df_male = df[df.gender == 'Male'].sort_values(by='wiki_readers_2015_2018', ascending=False)[:n_each_gender]
     df_female = df[df.gender == 'Female'].sort_values(by='wiki_readers_2015_2018', ascending=False)[:n_each_gender]
     df = pd.concat([df_male, df_female])
-    df['name'] = df['name'].apply(lambda x: x.replace('_', ' '))
+    #df['name'] = df['name'].apply(lambda x: x.replace('_', ' '))
     qs_gender = df['name'].apply(q_gender)
     qs_birth = df['name'].apply(q_birth)
     qs_death = df['name'].apply(q_death)
@@ -68,6 +71,22 @@ def load_synthetic_data(n_each_gender=2000):
 
     # write entities to a file
     entities_list = df['name'].values
+    to_remove = set()
+    for i in range(len(entities_list)):
+        for j in range(len(entities_list)):
+            if i != j:
+                ent1, ent2 = entities_list[i], entities_list[j]
+                if ent1 in ent2 and ent1 not in to_remove:
+                    to_remove.add(ent1)
+                    print(ent1, '|', ent2)
+
+                elif ent2 in ent1 and ent2 not in to_remove:
+                    to_remove.add(ent2)
+                    print(ent1, '|', ent2)
+    # remove
+    print('Number of overlapping entities...', len(to_remove))
+    #entities_list = [e for e in entities_list if e not in to_remove]
+
     with open('entities/entities_list_synth.txt', 'w') as f:
         for ent in entities_list:
             f.write(ent + '\n')

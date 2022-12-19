@@ -166,7 +166,7 @@ def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_
         q_new = q
         first_ent_id = 0
         # iterate over all entities
-        for ent in entity_to_variable_dict:
+        for ent in sorted(entity_to_variable_dict, key=lambda x: len(x), reverse=True):
             if ent in q_new:
                 num_ents_in_question += 1
                 if ent not in ents_to_skip:
@@ -183,7 +183,7 @@ def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_
             replacement_mask.append(first_ent_id)
         else:
             num_qs_with_more_than_one_ent += 1
-            print(f'Question with more than one entity: {q}')
+            #print(f'Question with more than one entity: {q}')
 
     print(f'Number of questions with more than one entity: {num_qs_with_more_than_one_ent}')
     return result_questions, result_answers, replacement_mask
