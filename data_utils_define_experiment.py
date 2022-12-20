@@ -69,10 +69,10 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
     d = copy(d_reliable)
     d['train'] = concatenate_datasets([d['train'], d_unreliable['train']])
     d['qs_q'] = concatenate_datasets([d['qs_q'], d_unreliable['qs_q']])
+    d['qs_qr'] = concatenate_datasets([d['qs_qr'], d_unreliable['qs_qr']])
+    d['qs_r'] = concatenate_datasets([d['qs_r'], d_unreliable['qs_r']])
 
-    d['qs_qr_unreliable'] = d_unreliable['qs_qr']
     d['qs_ri_unreliable'] = d_unreliable['qs_ri']
-    d['qs_r_unreliable'] = d_unreliable['qs_r']
     if 'qs_qri' in d_unreliable:
         d['qs_qri_unreliable'] = d_unreliable['qs_qri']
     return d
