@@ -4,6 +4,7 @@ import argparse
 import os
 os.environ["WANDB_DISABLED"] = "true"
 
+
 def main(seed=0,
         dataset_name = 'synth',
         model = 'EleutherAI/gpt-neo-2.7B',
@@ -34,8 +35,8 @@ def main(seed=0,
     cmd = part1 + ' ' + part2 + ' ' + part3 + ' ' + part4 + ' ' + fist_stage
     subprocess.run(list(cmd.split()))
 
-    # remove model checkpoints from the first stage
-    subprocess.run(['rm', '-rf', f'{first_stage_out_path}/checkpoint-*'])
+    # remove model checkpoints from the first stage; shell=True is needed for the wildcard
+    subprocess.run(f'rm -rf {first_stage_out_path}/checkpoint-*', shell=True,)
 
     # Then finetune on RI (load model from previous stage)
     # Second stage specific command
@@ -44,8 +45,8 @@ def main(seed=0,
     subprocess.run(list(cmd.split()))
 
     # remove all models from the second stage
-    subprocess.run(['rm', '-rf', f'experiments/{folder_name}-s{seed}/checkpoint-*'])
-    subprocess.run(['rm', '-rf', f'experiments/{folder_name}-s{seed}/pytorch_model*.bin'])
+    subprocess.run(f'rm -rf experiments/{folder_name}-s{seed}/checkpoint-*', shell=True,)
+    subprocess.run(f'rm -rf experiments/{folder_name}-s{seed}/pytorch_model*.bin', shell=True,)
 
 
 if __name__ == '__main__':
