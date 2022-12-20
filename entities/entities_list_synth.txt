@@ -13,11 +13,9 @@ Napoleon
 Winston Churchill
 Joseph Stalin
 William Shakespeare
-Prince (musician)
 Elvis Presley
 Tupac Shakur
 Charles Manson
-John F. Kennedy
 Bruce Lee
 George VI
 Heath Ledger
@@ -31,7 +29,6 @@ Muhammad
 Ronald Reagan
 Paul Walker
 Pablo Picasso
-George H. W. Bush
 Wolfgang Amadeus Mozart
 Karl Marx
 Vincent van Gogh
@@ -43,7 +40,6 @@ Fidel Castro
 Julius Caesar
 Avicii
 John Lennon
-Martin Luther King Jr.
 Ludwig van Beethoven
 Alan Rickman
 Vladimir Lenin
@@ -52,18 +48,15 @@ Louis XIV of France
 Charlie Chaplin
 Edward VIII
 XXXTentacion
-Franklin D. Roosevelt
 Stan Lee
 Sigmund Freud
 Kurt Cobain
 Robert Kardashian
 Alan Turing
-Eazy-E
 Thomas Edison
 Walt Disney
 Martin Luther
 Frank Sinatra
-A. P. J. Abdul Kalam
 Plato
 Genghis Khan
 George Washington
@@ -90,10 +83,8 @@ Suleiman the Magnificent
 Al Capone
 Saddam Hussein
 Charlemagne
-Salvador DalÃ­
 Tutankhamun
 Jimi Hendrix
-The Notorious B.I.G.
 Michelangelo
 Mao Zedong
 Theodore Roosevelt
@@ -113,9 +104,7 @@ Pope John Paul II
 Hugh Hefner
 Gianni Versace
 Thomas Jefferson
-RenÃ© Descartes
 Johann Sebastian Bach
-Lyndon B. Johnson
 Burt Reynolds
 Josef Mengele
 George Harrison
@@ -136,25 +125,19 @@ Vlad the Impaler
 John Wayne
 Bill Paxton
 Voltaire
-Jean-Jacques Rousseau
 Stanley Kubrick
 Robin Williams
 James Dean
 Steve McQueen
-SimÃ³n BolÃ­var
 Heinrich Himmler
 Franz Kafka
 Leo Tolstoy
 Brandon Lee
 Joseph Goebbels
-J. R. R. Tolkien
-Harry S. Truman
-Gabriel GarcÃ­a MÃ¡rquez
 Bob Ross
 Paul the Apostle
 Francisco Franco
 NiccolÃ² Machiavelli
-Abu Bakr al-Baghdadi
 Bhumibol Adulyadej
 Ahmed I
 Jim Morrison
@@ -169,13 +152,9 @@ Dante Alighieri
 Paul Newman
 James VI and I
 Lil Peep
-AndrÃ© the Giant
-John D. Rockefeller
 Peter the Great
 Adolf Eichmann
-FrÃ©dÃ©ric Chopin
 Jawaharlal Nehru
-P. T. Barnum
 Louis XVI of France
 Confucius
 Oskar Schindler
@@ -190,12 +169,9 @@ Johann Wolfgang von Goethe
 Alfred Hitchcock
 John Locke
 Hirohito
-Kim Jong-il
 Philip Seymour Hoffman
 Otto von Bismarck
 Bud Spencer
-Robert F. Kennedy
-Wilhelm II, German Emperor
 Mark Twain
 George Orwell
 Andrew Cunanan
@@ -219,10 +195,8 @@ Hannibal
 Fred Trump
 Adam Smith
 Rajneesh
-Hermann GÃ¶ring
 Lemmy
 Oda Nobunaga
-John Forbes Nash Jr.
 Andrew Jackson
 Roald Dahl
 Ferdinand Magellan
@@ -231,9 +205,7 @@ Jules Verne
 Johan Cruyff
 William Wallace
 Saint Nicholas
-Albert, Prince Consort
 Henry VII of England
-Jean-Paul Sartre
 Steve Irwin
 Barry Seal
 Henry Ford
@@ -244,11 +216,7 @@ Reinhard Heydrich
 Pyotr Ilyich Tchaikovsky
 Albert Camus
 Swami Vivekananda
-Kim Il-sung
-H. H. Holmes
 Erwin Rommel
-B. R. Ambedkar
-J. Paul Getty
 Ray Kroc
 Marvin Gaye
 Louis Pasteur
@@ -260,9 +228,7 @@ Nostradamus
 Augusto Pinochet
 Christopher Lee
 Marcus Aurelius
-H. P. Lovecraft
 Miguel de Cervantes
-Charles V, Holy Roman Emperor
 Aaron Hernandez
 Boris Yeltsin
 Alexander Graham Bell
@@ -284,11 +250,9 @@ Hans Christian Andersen
 Avicenna
 Woodrow Wilson
 John Adams
-Robert E. Lee
 Johnny Hallyday
 Qin Shi Huang
 Oliver Cromwell
-HernÃ¡n CortÃ©s
 Murad IV
 Fred Rogers
 James Brown
@@ -304,8 +268,6 @@ Jim Jones
 Philip II of Spain
 Chuck Berry
 Dean Martin
-F. Scott Fitzgerald
-Antoni GaudÃ­
 Charles Bukowski
 Richard I of England
 Ho Chi Minh
@@ -315,7 +277,6 @@ Atal Bihari Vajpayee
 Aleister Crowley
 Andrei Chikatilo
 Ip Man
-Hugo ChÃ¡vez
 Wilt Chamberlain
 Raphael
 William the Conqueror
@@ -326,7 +287,6 @@ Cicero
 Blackbeard
 Bobby Fischer
 Anthony Eden
-Antony Armstrong-Jones, 1st Earl of Snowdon
 Idi Amin
 Michel Foucault
 Anton Chekhov
@@ -339,23 +299,16 @@ Kublai Khan
 Omar Sharif
 Dmitri Mendeleev
 Charles Aznavour
-Ulysses S. Grant
-MoliÃ¨re
 John Gotti
 Orson Welles
 Babe Ruth
 Tokugawa Ieyasu
 Frank Zappa
 Maximilien Robespierre
-J. Edgar Hoover
-Israel KamakawiwoÊ»ole
 Louis Armstrong
-John F. Kennedy Jr.
-SaigÅ Takamori
 Humphrey Bogart
 Clark Gable
 Mohammad Reza Pahlavi
-George S. Patton
 Wyatt Earp
 Rudolf Hess
 Billy the Kid
@@ -363,7 +316,6 @@ Gregor Mendel
 Kimbo Slice
 Rembrandt
 Cory Monteith
-Nicolae CeauÈescu
 Robert Mugabe
 Richard III of England
 John Ritter
@@ -388,7 +340,6 @@ Georg Wilhelm Friedrich Hegel
 Antonio Vivaldi
 Josip Broz Tito
 Corey Haim
-Jean-Michel Basquiat
 Gustav Klimt
 Billy Graham
 Ruhollah Khomeini
@@ -397,7 +348,6 @@ Edward VI of England
 David Carradine
 Sam Shepard
 Nikolai Gogol
-Louis de FunÃ¨s
 William IV of the United Kingdom
 Alexander II of Russia
 Toyotomi Hideyoshi
@@ -415,9 +365,7 @@ Louis XV of France
 Caravaggio
 Michael Faraday
 Lucky Luciano
-J. Robert Oppenheimer
 Jack Ruby
-Antoine de Saint-ExupÃ©ry
 Richard Ramirez
 Michael Landon
 Henry IV of France
@@ -432,7 +380,6 @@ Bertrand Russell
 Carl Linnaeus
 Ted Kennedy
 Thomas Hobbes
-JosÃ© de San MartÃ­n
 Karl Lagerfeld
 Yul Brynner
 John Denver
@@ -442,14 +389,11 @@ Diego Rivera
 William III of England
 Francis Bacon
 Chris Farley
-T. E. Lawrence
 Qianlong Emperor
 Ennio Morricone
 Emmett Till
-Simo HÃ¤yhÃ¤
 Bing Crosby
 Sage Stallone
-Louis Mountbatten, 1st Earl Mountbatten of Burma
 Jorge Luis Borges
 Saint George
 Chris Benoit
@@ -476,21 +420,14 @@ Lavrentiy Beria
 Timothy McVeigh
 Herbert Hoover
 Puyi
-Peter Townsend (RAF officer)
-Philip K. Dick
 Edward I of England
-Kim Jong-nam
 Mustafa I
 Andy Kaufman
 Roy Orbison
-Ãmile Zola
 Richard Feynman
-Eddie Fisher (singer)
 George Best
 Georgy Zhukov
 Hippocrates
-Federico GarcÃ­a Lorca
-Ãmile Durkheim
 Wassily Kandinsky
 Tony Curtis
 Paul I of Russia
@@ -506,26 +443,20 @@ Antonie van Leeuwenhoek
 Eddie Guerrero
 Paul Allen
 Jackson Pollock
-Benito JuÃ¡rez
 Haile Selassie
 Alexander Fleming
 Paul Gauguin
 Abdul Hamid II
 Herodotus
-C. S. Lewis
 Truman Capote
 Antoine Lavoisier
 Thomas More
 Xerxes I
 Miguel Ferrer
 Henry Fonda
-Yves Saint Laurent (designer)
-Kim Jong-hyun (singer)
 Niels Bohr
-John, King of England
 Alexander III of Russia
 James Gandolfini
-HonorÃ© de Balzac
 Francisco Goya
 Alexander I of Russia
 Umberto Eco
@@ -537,9 +468,7 @@ Pope Alexander VI
 William McKinley
 Deng Xiaoping
 Aaron Burr
-Hunter S. Thompson
 Le Corbusier
-Karl DÃ¶nitz
 Adam West
 Giordano Bruno
 Frederick the Great
@@ -565,21 +494,17 @@ George IV of the United Kingdom
 Paul von Hindenburg
 Abu Bakr
 Max von Sydow
-R. Lee Ermey
 John Maynard Keynes
 Murad III
 Manfred von Richthofen
 Martin Heidegger
-Warren G. Harding
 Alec Guinness
 John von Neumann
 Irrfan Khan
 David Foster Wallace
-L. Ron Hubbard
 Joseph Haydn
 Akira Kurosawa
 George Boole
-Dwight D. Eisenhower
 Antonin Scalia
 Pierre Trudeau
 Ted Bundy
@@ -590,12 +515,9 @@ Wernher von Braun
 George I of Great Britain
 Juan PerÃ³n
 Peter III of Russia
-H. G. Wells
 Ritchie Valens
-Frank Lucas (drug dealer)
 James Madison
 Henri Matisse
-StefÃ¡n Karl StefÃ¡nsson
 Tiberius
 Richard Burton
 Charles Lindbergh
@@ -606,7 +528,6 @@ George Frideric Handel
 Franz Liszt
 Bernie Mac
 Mehmed III
-SÃ¸ren Kierkegaard
 Roddy Piper
 Helmut Kohl
 Brian Jones
@@ -632,7 +553,6 @@ William Henry Harrison
 Ptolemy
 Richard Attenborough
 Stevie Ray Vaughan
-Sun Yat-sen
 Friedrich Engels
 Seneca the Younger
 Serge Gainsbourg
@@ -646,7 +566,6 @@ Joe Cocker
 David Hume
 Francis I of France
 Sergei Yesenin
-Lorenzo de' Medici
 Giuseppe Garibaldi
 Abdullah of Saudi Arabia
 William Blake
@@ -685,7 +604,6 @@ Ingmar Bergman
 Abraham Maslow
 Anthony of Padua
 Sukarno
-J. P. Morgan
 Joe DiMaggio
 Andy Whitfield
 Shoko Asahara
@@ -694,20 +612,16 @@ Henry VI of England
 Dennis Hopper
 Peter Sellers
 Maxim Gorky
-Peter O'Toole
 Henry II of England
 Cameron Boyce
 Aleksandr Solzhenitsyn
 Anthony Perkins
 Christopher Hitchens
-J. D. Salinger
 Audie Murphy
 Husayn ibn Ali
 Satoru Iwata
-JosÃ© Gonzalo RodrÃ­guez Gacha
 Ivan Pavlov
 Robert Louis Stevenson
-Cosimo de' Medici
 Cesare Borgia
 John Wilkes Booth
 David Koresh
@@ -715,18 +629,14 @@ Sarvepalli Radhakrishnan
 Emperor Meiji
 Otto Warmbier
 Thomas Cromwell
-Porfirio DÃ­az
 Arthur Miller
 Sergei Rachmaninoff
 Albrecht DÃ¼rer
-Falco (musician)
 Jonah Lomu
-Philippe PÃ©tain
 Pat Morita
 Giacomo Casanova
 Leopold II of Belgium
 Pier Paolo Pasolini
-James A. Garfield
 Hadrian
 Harold Ramis
 Michael Crichton
@@ -739,7 +649,6 @@ Diogenes
 Ryan Dunn
 Joseph Merrick
 James Earl Ray
-Paul CÃ©zanne
 Rudolf Abel
 Salvador Allende
 Kurt Vonnegut
@@ -748,7 +657,6 @@ Louis Zamperini
 Auguste Comte
 Milton Friedman
 Edward III of England
-Slobodan MiloÅ¡eviÄ
 Robert Koch
 Raj Kapoor
 Gene Kelly
@@ -773,14 +681,11 @@ Shashi Kapoor
 James Watt
 Ronnie James Dio
 Henry David Thoreau
-John Holmes (actor)
 Erasmus
 Shah Jahan
 Marc Chagall
 Kiki Camarena
-Pierre-Auguste Renoir
 Garry Shandling
-RenÃ© Magritte
 Shimon Peres
 Nat King Cole
 Yuri Andropov
@@ -789,13 +694,10 @@ Johnny Carson
 Cao Cao
 Padre Pio
 Lev Yashin
-Philippe I, Duke of OrlÃ©ans
 Gary Coleman
 Sanada Masayuki
 Randy Savage
 Charles Babbage
-John Heard (actor)
-Gilbert du Motier, Marquis de Lafayette
 Virgil
 Rutger Hauer
 Hideki Tojo
@@ -804,13 +706,11 @@ Richard Kuklinski
 Don Rickles
 Emiliano Zapata
 Nate Dogg
-J. M. W. Turner
 Fulgencio Batista
 Jack Lemmon
 Francis Gary Powers
 Davide Astori
 Klaus Kinski
-Muhammad ibn Musa al-Khwarizmi
 John Stuart Mill
 Manute Bol
 Layne Staley
@@ -820,7 +720,6 @@ Claudius
 Rajiv Gandhi
 Omar Khayyam
 Dmitri Shostakovich
-Sakamoto RyÅma
 Karl Popper
 Stefan Zweig
 Walt Whitman
@@ -828,37 +727,28 @@ Charles IX of France
 Babur
 Henry Hill
 Wes Craven
-John Jairo VelÃ¡squez
 Thomas Mann
 Richard Benjamin Harrison
 James Buchanan
 Petrarch
 Terry Pratchett
-AndrÃ©s Escobar
 Kahlil Gibran
 Robert Mitchum
-T. S. Eliot
 Sophocles
 Ansel Adams
-FranÃ§ois Mitterrand
-JosÃ© Rizal
 Peter Paul Rubens
 Vasily Zaytsev
 Johannes Brahms
 Sushant Singh Rajput
-Erwin SchrÃ¶dinger
 Sergei Eisenstein
-Henri de Toulouse-Lautrec
 Selim I
 Claude Shannon
 Helmut Schmidt
 Andy Gibb
 Ferdinand Marcos
-B.B. King
 Louis XVII of France
 Friedrich Schiller
 Alexander McQueen
-Hide (musician)
 Aaron Swartz
 Errol Flynn
 Dalton Trumbo
@@ -870,22 +760,17 @@ Mikhail Bulgakov
 Mark Salling
 Luke Perry
 Samuel Beckett
-Diego VelÃ¡zquez
 Robert Johnson
-Amon GÃ¶th
-C. V. Raman
 William Faulkner
 Evel Knievel
 Aurangzeb
 Louis Philippe I
 Max Planck
 Pope Pius XII
-JÃ³zef PiÅsudski
 Spencer Tracy
 Zhuge Liang
 Desi Arnaz
 Sai Baba of Shirdi
-M. C. Escher
 Jules Bianchi
 Michael Hutchence
 Robert Schumann
@@ -900,8 +785,6 @@ Harry Dean Stanton
 Mikhail Lomonosov
 Joseph McCarthy
 Kenny Rogers
-Sammy Davis Jr.
-Åkubo Toshimichi
 Ralph Waldo Emerson
 Federico Fellini
 James Horner
@@ -913,11 +796,9 @@ Konrad Adenauer
 Edmund Hillary
 Vladimir Nabokov
 Ian Curtis
-Åehzade Mustafa
 Peter Fonda
 Vyacheslav Molotov
 Buster Keaton
-HÃ©lmer Herrera
 Darius I
 Pope John XXIII
 Anwar Sadat
@@ -927,20 +808,15 @@ Chris Penn
 Dimebag Darrell
 George Peppard
 Robert Vaughn
-Emperor TaishÅ
-Frederick I, Holy Roman Emperor
 Ravi Shankar
 Stepan Bandera
-J. J. Thomson
 Ibn Battuta
 Cantinflas
 Henry V of England
-Rainier III, Prince of Monaco
 Gavrilo Princip
 Peter Mayhew
 John Dewey
 Andrei Tarkovsky
-Horatio Nelson, 1st Viscount Nelson
 El Cid
 Martin Van Buren
 Sonny Bono
@@ -957,24 +833,19 @@ Lev Vygotsky
 Pompey
 Marcel Duchamp
 Ross Perot
-Joe Jackson (manager)
 Gustav Mahler
 Sam Cooke
 Bugsy Siegel
 Erich Maria Remarque
 Gilles de Rais
 Charles Krauthammer
-Julio CortÃ¡zar
 Cardinal Richelieu
 Alexander von Humboldt
 Ignatius of Loyola
-AntonÃ­n DvoÅÃ¡k
 Jimmy Savile
 Jack Kirby
-Ãdouard Manet
 James Coburn
 Eddie Van Halen
-B. F. Skinner
 Anton LaVey
 Rishi Kapoor
 Guan Yu
@@ -982,7 +853,6 @@ Date Masamune
 Liu Xiaobo
 Geronimo
 Tommy Morrison
-Alfredo Di StÃ©fano
 Antonio LÃ³pez de Santa Anna
 Miguel Hidalgo y Costilla
 Pope Paul VI
@@ -991,11 +861,9 @@ Maharana Pratap
 Ernest Borgnine
 Jacques Brel
 Fibonacci
-RubÃ©n DarÃ­o
 James Baldwin
 Davy Crockett
 Rajesh Khanna
-Fabrizio De AndrÃ©
 Auguste Rodin
 Edgar Degas
 Thurgood Marshall
@@ -1017,7 +885,6 @@ Richard II of England
 Dhirubhai Ambani
 Matthew Shepard
 Tokugawa Yoshinobu
-ValÃ©ry Giscard d'Estaing
 Prince Andrew of Greece and Denmark
 Musa I of Mali
 George Wallace
@@ -1033,22 +900,17 @@ Marshall McLuhan
 Alan Watts
 Maurice Ravel
 Lee Van Cleef
-Natsume SÅseki
-Park Chung-hee
 Thomas Wolfe
 Stieg Larsson
 Hammurabi
 Philip V of Spain
 Gregg Allman
-William S. Burroughs
 Jean de La Fontaine
-John Hughes (filmmaker)
 Allen Ginsberg
 Gemini Ganesan
 Hosni Mubarak
 Joe Louis
 Percy Bysshe Shelley
-Rudolf HÃ¶ss
 Cliff Burton
 Zayed bin Sultan Al Nahyan
 Louis XVIII of France
@@ -1063,13 +925,11 @@ Martin Landau
 Hokusai
 Merle Haggard
 Takeda Shingen
-RaÃºl JuliÃ¡
 Bal Gangadhar Tilak
 Osamu Dazai
 Philip Roth
 Paracelsus
 Adolf Dassler
-Joseph P. Kennedy Sr.
 Elliott Smith
 Don Knotts
 Jan Hus
@@ -1087,7 +947,6 @@ Manuel Noriega
 Meyer Lansky
 Kader Khan
 Lee Marvin
-N. T. Rama Rao
 Yongzheng Emperor
 Sun Tzu
 Tennessee Williams
@@ -1096,20 +955,14 @@ Paul Klee
 Buffalo Bill
 John Tyler
 Donatello
-Sergei Bodrov Jr.
 Jagadish Chandra Bose
 Peter Cushing
 Heinz Guderian
 Marcello Mastroianni
-Ol' Dirty Bastard
 Rudolf Steiner
 Walter Matthau
-William Lamb, 2nd Viscount Melbourne
 James Monroe
 Dale Carnegie
-Ferenc PuskÃ¡s
-Georges MÃ©liÃ¨s
-David Ben-Gurion
 Keith Haring
 Ariel Sharon
 Gwangjong of Goryeo
@@ -1125,32 +978,24 @@ Aeschylus
 George Gershwin
 Roald Amundsen
 Chet Baker
-Hafez al-Assad
-Arthur C. Clarke
 Nicholas Winton
 Roger Ebert
-Andrei Mironov (actor)
 Bobby Moore
 Philip IV of France
 Michael I of Romania
 Henry IV of England
 Gustave Flaubert
 Stanislav Petrov
-James K. Polk
 Reza Shah
-James B. Donovan
 Arnold Palmer
 Frederick Banting
-John Brown (abolitionist)
 Nelson Rockefeller
 Sanada Nobuyuki
-JosÃ© MartÃ­
 Rodney Dangerfield
 Duke Kahanamoku
 David Prowse
 Joan Sebastian
 Mikhail Nikolayevich Zadornov
-M. G. Ramachandran
 Sergio Marchionne
 Alexander Litvinenko
 Thomas Paine
@@ -1167,7 +1012,6 @@ Gian Lorenzo Bernini
 William Randolph Hearst
 Francis Xavier
 Erich Honecker
-W. E. B. Du Bois
 Suharto
 Antonio Salieri
 Fridtjof Nansen
@@ -1179,9 +1023,7 @@ Thomas Robert Malthus
 Sunil Dutt
 Phineas Gage
 Boris Pasternak
-Ernst RÃ¶hm
 Gustavo Cerati
-Charles IV, Holy Roman Emperor
 Mike Webster
 Akechi Mitsuhide
 GetÃºlio Vargas
@@ -1200,25 +1042,21 @@ Hiroo Onoda
 Muhammad Iqbal
 Harold Macmillan
 Richard Winters
-Arthur Wellesley, 1st Duke of Wellington
 Mehmed VI
 Mobutu Sese Seko
 Osamu Tezuka
 Pedro I of Brazil
 Ingvar Kamprad
 Jacques Lacan
-Prince George, Duke of Kent
 Carlos Castaneda
 Rafael Trujillo
 Charles I of Austria
 Alfonso XIII of Spain
 Amrish Puri
 Harvey Milk
-Jan-Michael Vincent
 Ren Osugi
 Timothy Leary
 Titian
-R. Budd Dwyer
 Jerry Garcia
 Christian Dior
 Fred West
@@ -1228,9 +1066,7 @@ Manuel Belgrano
 Alois Hitler
 Owen Hart
 Jin Yong
-EugÃ¨ne Delacroix
 Frank Gifford
-William I, German Emperor
 Oliver Reed
 Charlie Parker
 Jim Nabors
@@ -1253,7 +1089,6 @@ Mikhail Kalashnikov
 Marcus Garvey
 Charles Whitman
 Simon Monjack
-James Burke (gangster)
 Emperor Jimmu
 Liu Bei
 Solomon Northup
@@ -1261,17 +1096,12 @@ Euripides
 Albert Schweitzer
 Herman Melville
 Erich von Manstein
-Claude FranÃ§ois
-Robert Baden-Powell, 1st Baron Baden-Powell
 Yutaka Ozaki
-JosÃ© FernÃ¡ndez (pitcher)
 Thomas Hardy
 Tycho Brahe
 Demis Roussos
 Scott Fischer
 John Mahoney
-A. A. Milne
-George A. Romero
 Nathuram Godse
 Premchand
 Daniel Defoe
@@ -1295,7 +1125,6 @@ Jiddu Krishnamurti
 Skanderbeg
 Sergei Korolev
 Philip II of Macedon
-Wilhelm RÃ¶ntgen
 Sathya Sai Baba
 Karl Benz
 Nicky Hayden
@@ -1319,7 +1148,6 @@ Louis IX of France
 Spiro Agnew
 Guillaume Apollinaire
 Franklin Pierce
-Edward Smith (sea captain)
 Pliny the Elder
 Edvard Grieg
 AntÃ³nio de Oliveira Salazar
@@ -1330,7 +1158,6 @@ Qaboos bin Said al Said
 Stonewall Jackson
 Har Gobind Khorana
 Hussein of Jordan
-Kenny Baker (English actor)
 Casimir III the Great
 Samuel Johnson
 Joachim von Ribbentrop
@@ -1342,7 +1169,6 @@ Ian Holm
 Joseph Conrad
 John Milton
 Johann Strauss II
-Chester A. Arthur
 Alan Shepard
 Giovanni Boccaccio
 Walter Raleigh
@@ -1360,16 +1186,11 @@ Cesar Chavez
 Steve Biko
 Rudyard Kipling
 Giotto
-Proof (rapper)
-Jean-Baptiste Lamarck
 LÃ¼ Bu
-Harun al-Rashid
 Plutarch
 Erich Fromm
 Robert McNamara
 Konstantin Chernenko
-Richard Wright (musician)
-JosÃ© JosÃ©
 Giacomo Leopardi
 Shaka
 Ike Turner
@@ -1379,7 +1200,6 @@ Richard Speck
 Isaac Hayes
 Walter Payton
 Alexander Suvorov
-RyÅ«nosuke Akutagawa
 Nikolai Karachentsov
 Patrice Lumumba
 Cnut the Great
@@ -1389,7 +1209,6 @@ Jacque Fresco
 Bob Hoskins
 John Cassavetes
 Saint Sebastian
-John J. Pershing
 Pranab Mukherjee
 Danny Kaye
 Zygmunt Bauman
@@ -1399,7 +1218,6 @@ Enrico Fermi
 Millard Fillmore
 Chespirito
 Lee Thompson Young
-Prodigy (rapper)
 Dale Earnhardt
 Saul
 Alexander Kolchak
@@ -1411,25 +1229,18 @@ Theodor Herzl
 Momofuku Ando
 Jean Cocteau
 Rip Torn
-George C. Scott
 Ernest Shackleton
-Luis BuÃ±uel
 Horace
 Vasily Stalin
 Chuck Connors
 Paul Verlaine
 John Jacob Astor IV
 Clement Attlee
-Rutherford B. Hayes
 Gore Vidal
 Scipio Africanus
 Galen
-John Christie (murderer)
-Luis Carlos GalÃ¡n
 Oliver Sacks
 David Hahn
-HervÃ© Villechaize
-Francis II, Holy Roman Emperor
 Richard Strauss
 Joe Strummer
 Ron Goldman
@@ -1447,29 +1258,20 @@ Graham Chapman
 Muhammad Ali of Egypt
 Haruma Miura
 Chiune Sugihara
-AgustÃ­n de Iturbide
-Robert Palmer (singer)
 Joseph Brodsky
 Glenn Miller
-Abdul Karim (the Munshi)
 George Washington Carver
 Peter Drucker
 Fats Domino
 Cornelius Vanderbilt
-Barack Obama Sr.
 Titus
 Bob Crane
-MiloÅ¡ Forman
 Nicolas Flamel
-M. Karunanidhi
 Uesugi Kenshin
 Janusz Korczak
 Bill Hicks
 Alphonse Mucha
-ItÅ Hirobumi
 Peter Ustinov
-JosÃ© Saramago
-James J. Braddock
 Shamil Basayev
 Domingo Faustino Sarmiento
 Girolamo Savonarola
@@ -1477,17 +1279,13 @@ Scatman John
 Alexander Kerensky
 Moshe Dayan
 Gary Webb
-Francis Bacon (artist)
-PargalÄ± Ibrahim Pasha
 Georgy Malenkov
 Dietrich Bonhoeffer
 Rubin Carter
 Dmitri Hvorostovsky
 Ibn Taymiyyah
 Walter Scott
-Al-Ghazali
 Herbert Spencer
-Gabriele D'Annunzio
 Ned Kelly
 Adam Yauch
 William Tecumseh Sherman
@@ -1497,7 +1295,6 @@ Zheng He
 Tyrone Power
 Keiji Fujiwara
 Edward the Confessor
-W. B. Yeats
 Carl Rogers
 Henri Fayol
 Christopher Marlowe
@@ -1507,25 +1304,19 @@ Primo Levi
 Chris McCandless
 Adnan Khashoggi
 Arthur Ashe
-FranÃ§ois Truffaut
 Kazimir Malevich
 David Ogden Stiers
 Bobby Riggs
 Adolphe Sax
-Claude LÃ©vi-Strauss
 Edward V of England
 Zhao Yun
 Robert Todd Lincoln
 Roy Lichtenstein
 James Arness
 Ferdinand VII of Spain
-J. Christopher Stevens
-JosÃ© Santacruz LondoÃ±o
 Ronnie Van Zant
-Kurt GÃ¶del
 John Logie Baird
 Roberto Clemente
-RamÃ³n ValdÃ©s
 Mohamed Morsi
 Lope de Vega
 Gustave Courbet
@@ -1535,15 +1326,11 @@ Saud of Saudi Arabia
 Felix Dzerzhinsky
 Lenny Bruce
 Harold Shipman
-Camille Saint-SaÃ«ns
 Jihadi John
 Muawiyah I
 Harold Wilson
 Ivan Bunin
-WÅadysÅaw Szpilman
 Butch Cassidy
-Ãthelstan
-Scott Wilson (actor)
 Jeff Conaway
 Ferdinand de Saussure
 Maximilian Kolbe
@@ -1551,7 +1338,6 @@ Maimonides
 Raymond Burr
 Linus Pauling
 Juan Ponce de LeÃ³n
-Dusty Rhodes (wrestler)
 Godai Tomoatsu
 Muddy Waters
 Newton Knight
@@ -1560,29 +1346,19 @@ Toshiro Mifune
 David Ricardo
 Josephus
 Caspar David Friedrich
-Kim Joo-hyuk
-ThÃ­ch Quáº£ng Äá»©c
 Lucio Battisti
 Alexey Leonov
 David Reimer
-J. M. Barrie
-B. K. S. Iyengar
 Roy Halladay
 Mark Felt
 Jeff Healey
 Calico Jack
 Carl Reiner
-Jacques-Louis David
 Thucydides
-Booker T. Washington
 Mark Rothko
-DraÅ¾en PetroviÄ
-Jean-Paul Marat
-Umaga (wrestler)
 Yogi Berra
 Erich Hartmann
 Jackie Gleason
-LÃ¡szlÃ³ BÃ­rÃ³
 Octavio Paz
 Langston Hughes
 Brian Dennehy
@@ -1590,23 +1366,13 @@ Elijah Muhammad
 Max Born
 Bernard Montgomery
 Lloyd Bridges
-Boris Berezovsky (businessman)
 Chandra Shekhar Azad
-VÃ¡clav Havel
 Emperor Gaozu of Han
 Randy Rhoads
-Rudolf, Crown Prince of Austria
 Bruno Sammartino
-Hans-Ulrich Rudel
-Muhammad ibn Abd al-Wahhab
-Abu Musab al-Zarqawi
-Hijikata ToshizÅ
 Zbigniew Brzezinski
 Arnold Schoenberg
-BartolomÃ© de las Casas
-Count of St. Germain
 Horacio Quiroga
-Frederick III, German Emperor
 Robert Loggia
 Vercingetorix
 Ferdinand Porsche
@@ -1614,23 +1380,17 @@ Moctezuma II
 Emperor Taizong of Tang
 Sam Walton
 Kamehameha I
-Theodor W. Adorno
 Yves Montand
 Yakov Dzhugashvili
-EusÃ©bio
-Daniel KÃ¼blbÃ¶ck
 Pete Maravich
 George Mallory
 Henryk Sienkiewicz
 Enver Hoxha
 Luigi Pirandello
 Ludwig Mies van der Rohe
-John Phillips (musician)
 Howard Carter
-KÅ«kai
 Charles XII of Sweden
 Joey Ramone
-Alexei Nikolaevich, Tsarevich of Russia
 Woody Guthrie
 TotÃ²
 Jeremy Thorpe
@@ -1652,14 +1412,10 @@ John Huston
 Jimmy Snuka
 Daniel Boone
 Paul Bocuse
-Hassan-i Sabbah
 Joe Paterno
 Veerappan
 Edward Jenner
 Robert Hansen
-Åehzade Bayezid
-Seung-Hui Cho
-Al-Biruni
 James Randi
 Themistocles
 Edmund Burke
@@ -1670,12 +1426,10 @@ Sydney Pollack
 William the Silent
 Billy Wilder
 Sarabjit Singh
-Tiny Tim (musician)
 Ananda Mahidol
 Clint Walker
 Alexis of Russia
 Tarrare
-Muhammad al-Bukhari
 Alfred Wegener
 Roy Cohn
 Harold Godwinson
@@ -1685,7 +1439,6 @@ Mikhail Bakunin
 Nathaniel Hawthorne
 Vic Morrow
 Mohammed Rafi
-Tráº§n Äáº¡i Quang
 Matthew Garber
 Jack Palance
 Mario Benedetti
@@ -1693,8 +1446,6 @@ William Morris
 Savva Mamontov
 Roddy McDowall
 Sonny Liston
-Tadeusz KoÅciuszko
-GÃ¶tz George
 Alfred Adler
 Otto Frank
 Walter Benjamin
@@ -1713,36 +1464,27 @@ Gus Grissom
 Robert Burns
 Henry Miller
 Sejong the Great
-Hattori HanzÅ
-Robert A. Heinlein
 Nikolai Yezhov
 Samuel Adams
-Otto I, Holy Roman Emperor
-Yokozuna (wrestler)
 Italo Calvino
 John Amos Comenius
 Dave Mirra
 Graham Greene
 Hayreddin Barbarossa
 Brigham Young
-Nikolai Rimsky-Korsakov
 Aristophanes
 Abu Hanifa
 Pierre Curie
 Patrick Bouvier Kennedy
-Gustavo Adolfo BÃ©cquer
 Domitian
 Tenzing Norgay
 Gerd von Rundstedt
-John Paul Getty Jr.
 Gustavus Adolphus of Sweden
 Septimius Severus
 Shammi Kapoor
 Wayne Rogers
-O. Henry
 James Mason
 Dashrath Manjhi
-Francisco I. Madero
 Harry Gordon Selfridge
 Norifumi Yamamoto
 John Cage
@@ -1750,20 +1492,15 @@ Caesarion
 Jiaqing Emperor
 James Cagney
 Thor Heyerdahl
-Jack Johnson (boxer)
 Abai Qunanbaiuly
 Philip III of Spain
 Akbar Hashemi Rafsanjani
 TÃºpac Amaru II
 Gene Roddenberry
 Solon
-Åtani Yoshitsugu
 Francisco de Miranda
-Taiji (musician)
 David Lloyd George
-Michael Collins (Irish leader)
 Andy Williams
-ZdzisÅaw BeksiÅski
 Gordie Howe
 Kevin Peter Hall
 Moses Malone
@@ -1771,51 +1508,36 @@ Tacitus
 Rajendra Prasad
 Jack Kevorkian
 Vladimir Zeldin
-Okita SÅji
 Juan Manuel de Rosas
 Tiradentes
 Dudley Moore
 Andrei Sakharov
-Rajkumar (actor)
-LÃ¡zaro CÃ¡rdenas
-Prince ShÅtoku
-Dave Schultz (wrestler)
 Yasunari Kawabata
 Georges Seurat
 Victor Emmanuel II of Italy
 Boris Karloff
 Jason Robards
 Albert Hofmann
-Jean d'Ormesson
 Leopold I of Belgium
 Mohammad Mosaddegh
-W. Somerset Maugham
 Herbert von Karajan
 Georges Clemenceau
 Antonio Machado
-Ricardo MontalbÃ¡n
 Naguib Mahfouz
-RenÃ© Laennec
-Erich KÃ¤stner
 Charles Vane
 Thomas Sankara
 John Wesley
-Roh Moo-hyun
 Bayezid II
 Friedensreich Hundertwasser
 Keith Emerson
-Jacques PrÃ©vert
-H. R. Giger
 Alexander Blok
 Isao Takahata
 Jim Varney
 Gilles Deleuze
 Baby Face Nelson
 Aziz Shavershian
-John Smith (explorer)
 Ivan VI of Russia
 Junior Seau
-Prince Edward, Duke of Kent and Strathearn
 Frank Costello
 Yazid I
 Jean Sibelius
@@ -1826,10 +1548,8 @@ Eldar Ryazanov
 Michael Jeter
 Satyajit Ray
 Rik Mayall
-Carroll O'Connor
 Caracalla
 Mongkut
-Louis-Ferdinand CÃ©line
 Sulla
 Orlando Anderson
 Glenn Ford
@@ -1837,24 +1557,18 @@ Hongwu Emperor
 Coluche
 Olof Palme
 Ted Williams
-D. H. Lawrence
 Ezio Bosso
-G. K. Chesterton
-YÅ«saku Matsuda
 Jack Cassidy
 Simon Wiesenthal
 Norman Rockwell
 Phil Lynott
 Jackie Coogan
-SaitÅ Hajime
 Richard Griffiths
 Paolo Villaggio
 Joseph Campbell
-KatÅ Kiyomasa
 Abe Vigoda
 Prescott Bush
 Mehmed V
-Prince Henry, Duke of Gloucester
 Toyotomi Hidetsugu
 Pernell Roberts
 J Dilla
@@ -1862,7 +1576,6 @@ Juan Pablo Duarte
 Terence McKenna
 George I of Greece
 George Reeves
-John B. Watson
 Bill Bixby
 Terry Fox
 Mickey Mantle
@@ -1870,7 +1583,6 @@ Honda Tadakatsu
 Tab Hunter
 Jeffrey Epstein
 David Parker Ray
-M. Visvesvaraya
 Nathan Bedford Forrest
 Wayne Dyer
 Alexis de Tocqueville
@@ -1880,13 +1592,10 @@ Mitch Hedberg
 Bayezid I
 Buckminster Fuller
 Phife Dawg
-Guy Williams (actor)
 Alfred Jodl
 Pierre de Coubertin
 Georges Pompidou
 Romain Gary
-W. Edwards Deming
-RenÃ© AngÃ©lil
 Joseph Schumpeter
 Georges Bizet
 Alexander Zakharchenko
@@ -1899,29 +1608,22 @@ Harry Nilsson
 Ginger Baker
 Rod Serling
 Brutus the Younger
-BÃ©la BartÃ³k
 Big Pun
 Bartolomeu Dias
 Carlos Hathcock
 Ngo Dinh Diem
-Ernest II, Duke of Saxe-Coburg and Gotha
 Jack Churchill
 Yakub Memon
 Sam Kinison
 Fritz Haber
-Dag HammarskjÃ¶ld
 John Laurens
 Pope Julius II
-Robert Taylor (actor)
 Jean Gabin
 John Ford
 Oscar Niemeyer
 Chiyonofuji Mitsugu
 Juan Rulfo
-Ãgedei Khan
-Georges LemaÃ®tre
 The Rev
-Huey P. Newton
 Jean Rochefort
 Andrzej Wajda
 Harry Morgan
@@ -1934,7 +1636,6 @@ Nick Drake
 Abe no Seimei
 Brian Clough
 Mel Blanc
-FranÃ§ois Rabelais
 Modest Mussorgsky
 Carl Gustaf Emil Mannerheim
 Anatoli Boukreev
@@ -1950,21 +1651,18 @@ Henning Mankell
 Peter Sutcliffe
 Elia Kazan
 TotalBiscuit
-Frank Sinatra Jr.
 Fabrizio Frizzi
 Syngman Rhee
 Samuel Morse
 Alfred Rosenberg
 Pope Pius IX
 Ken Shimura
-HÃ©ctor Lavoe
 Arun Jaitley
 Jim Thorpe
 Witold Pilecki
 Gerald Durrell
 Mikhail Krug
 Qasem Soleimani
-Al-Shafiâi
 Slobodan Praljak
 Dom DeLuise
 Bohdan Khmelnytsky
@@ -1975,7 +1673,6 @@ Vyacheslav Ivankov
 Harry Anderson
 John Matuszak
 Nujabes
-BedÅich Smetana
 Yuan Shikai
 Otto von Habsburg
 Leon Russell
@@ -1985,7 +1682,6 @@ Li Bai
 Xiang Yu
 Louis Braille
 Roger Ailes
-Lech KaczyÅski
 Venustiano Carranza
 Carl von Clausewitz
 Strom Thurmond
@@ -1996,14 +1692,315 @@ Aleksei Balabanov
 Kemal Sunal
 Rama I
 Ibn Arabi
-John C. Calhoun
 Rudolf Dassler
+Sam Houston
+Billy Herrington
+John Rawls
+Ali Abdullah Saleh
+Juan Manuel Fangio
+Mario Puzo
+Cao Pi
+Jyotirao Phule
+Romulus Augustulus
+Ahmad Shah Massoud
+Mickey Hargitay
+Atahualpa
+Omar Bradley
+Tom Wolfe
+Sergei Mavrodi
+Robert Capa
+Kurt Georg Kiesinger
+Robert Byrd
+Regis Philbin
+Humayun
+Giuseppe Arcimboldo
+Philip II of France
+Zhao Ziyang
+Mickey Cohen
+Henry Every
+Kim Peek
+Toussaint Louverture
+Max Ernst
+Edmund Husserl
+Marco Pantani
+Roger Cicero
+Odoacer
+Vinnie Paul
+Hillel Slovak
+Bill Withers
+Bobby Farrell
+Edward the Elder
+Harald Bluetooth
+Ivan Aivazovsky
+Robert Urich
+Bruno Ganz
+Fela Kuti
+Al Jarreau
+Emilio Aguinaldo
+Gianni Agnelli
+Dean Corll
+Miguel Primo de Rivera
+Pope Gregory I
+Dennis Ritchie
+Johnny Lewis
+Charles VII of France
+Vinayak Damodar Savarkar
+Charles VIII of France
+Jan van Eyck
+Satoshi Kon
+Fred Thompson
+Fred Gwynne
+Hasan ibn Ali
+George Marshall
+Harald Fairhair
+Terry Wogan
+Huey Long
+Edwin Hubble
+Alan Ladd
+Douglas Kenney
+Sheikh Mujibur Rahman
+Dario Fo
+Bernardo Provenzano
+Hector Berlioz
+Mohammed Omar
+Nestor Makhno
+Suleiman II
+Mel Ferrer
+Matthias Corvinus
+Franz von Papen
+Giulio Andreotti
+Gord Downie
+Jerry Reed
+Duane Allman
+Walter Cronkite
+Francis Crick
+Konstantin Rokossovsky
+Vajiravudh
+Umberto II of Italy
+Konstantin Stanislavski
+Wilhelm Reich
+Michiel de Ruyter
+Dylan Thomas
+GÃ¼nter Grass
+Jonathan Demme
+Mikhail Kutuzov
+Heydar Aliyev
+Kakuei Tanaka
+Brian Keith
+Gwanghaegun of Joseon
+Kaleth Morales
+Prithviraj Kapoor
+Casey Kasem
+Henri Bergson
+Anthony the Great
+John Hancock
+Oswald Mosley
+Brian Epstein
+Robert Mapplethorpe
+Carlos Gardel
+Sanjay Gandhi
+Levi Strauss
+Jim Bridger
+Xenophon
+Armen Dzhigarkhanyan
+Yegor Letov
+Jean Racine
+Yuri Nikulin
+Bobby Darin
+Colin McRae
+George Raft
+Shoeless Joe Jackson
+Sayyid Qutb
+Vitruvius
+Mayer Amschel Rothschild
+George Sanders
+John Carradine
+Big Van Vader
+Farouk of Egypt
+Marvin Heemeyer
+Peter Lorre
+Henry Morgan
+Thelonious Monk
+Jack Dempsey
+Shimazu Nariakira
+Louis XII of France
+Carl Wilson
+Enrico Caruso
+Khalid of Saudi Arabia
+Minamoto no Yoritomo
+Peter Lawford
+Vladislav Galkin
+Bob Denver
+Grigory Potemkin
+Mike Nichols
+Ilya Repin
+Kalief Browder
+Yeongjo of Joseon
+Toyotomi Hideyori
+Rudolf Virchow
+Buddy Rich
+Nipsey Hussle
+Dennis Farina
+Curly Howard
+Camille Pissarro
+Gaius Marius
+Paul Dirac
+Abul Kalam Azad
+Thomas Kuhn
+Daniel Balavoine
+Gilles Villeneuve
+Claudio Monteverdi
+Fritz Lang
+Machine Gun Kelly
+Masahiko Tsugawa
+Charles XIV John of Sweden
+Jorge Rafael Videla
+Bal Thackeray
+Conway Twitty
+Pope Pius XI
+Ramakrishna
+Stuart Sutcliffe
+Yujiro Ishihara
+Stephen Gately
+Dzhokhar Dudayev
+John Entwistle
+Alfred Russel Wallace
+Rod Steiger
+Alberto Giacometti
+Robert Reed
+Vittorio Gassman
+Guido Westerwelle
+Marco Simoncelli
+Saint Lawrence
+Hubert Humphrey
+Rudolf Diesel
+Craig Sager
+Joseph Bonaparte
+SÃ³crates
+Man Ray
+Blake Edwards
+Ottis Toole
+Vidkun Quisling
+Thomas Wolsey
+Edgar Cayce
+Davey Boy Smith
+Moe Howard
+Dick York
+Michael Wittmann
+Roger Vadim
+Patrick McGoohan
+Isambard Kingdom Brunel
+George Gurdjieff
+Reid Flair
+Edward Heath
+Charles the Bald
+Xuanzang
+Fukuzawa Yukichi
+Luchino Visconti
+Andrea Camilleri
+Kenji Miyazawa
+Andrei Panin
+Mikhail Tukhachevsky
+Greg Lake
+Ernie Davis
+Anatoly Sobchak
+Sergei Dovlatov
+Abbas Kiarostami
+Sidney Lumet
+Ahmad ibn Hanbal
+Maurice White
+Seretse Khama
+Hafez
+Umar II
+Rainer Werner Fassbinder
+Ken Takakura
+Emperor Xuanzong of Tang
+Jean Marais
+Cesar Romero
+Roy Clark
+Menachem Begin
+Paolo Borsellino
+Rick Rude
+John Muir
+Mahmud of Ghazni
+Baron Munchausen
+Bobby Sands
+Terry Melcher
+Steve Ditko
+Bubba Smith
+Richard Crenna
+Hans Frank
+Pyrrhus of Epirus
+Andrey Vlasov
+Edgar Rice Burroughs
+Cesare Lombroso
+Tokugawa Hidetada
+Erik the Red
+Shel Silverstein
+Seti I
+Jabir ibn Hayyan
+Aleksey Batalov
+Kuroda Yoshitaka
+RamÃ³n Mercader
+Vasili Arkhipov
+Napoleon Hill
+Big L
+Satoshi Murayama
+Mansoor Ali Khan Pataudi
+Arnold Rothstein
+Pretty Boy Floyd
+Saadi Shirazi
+Eiji Tsuburaya
+Robert Forster
+Jacques de Molay
+Richard Widmark
+Kyu Sakamoto
+Pierre Corneille
+Timothy Treadwell
+Ralphie May
+Bernard Francis Law
+Gary Speed
+Omar Mukhtar
+Robert Peel
+William Golding
+Heinrich Hertz
+Joachim Murat
+William Moulton Marston
+Samuel Taylor Coleridge
+Hermann Fegelein
+Bill Evans
+Uesugi Kagekatsu
+Ptolemy I Soter
+Sukjong of Joseon
+Dhyan Chand
+Hu Yaobang
+Michel Galabru
+Nikolay Nekrasov
+Randolph Churchill
+Wilford Brimley
+Johnny Ramone
+Jimmy Dean
+Klemens von Metternich
+Takasugi Shinsaku
+Michael Cimino
+John Basilone
+Thomas DeSimone
+Euronymous
+Aleksandr Abdulov
+Walter Brennan
+Akhmad Kadyrov
+Katsura Utamaru
+Neil Peart
+Rod Taylor
+Luz Long
+George Burns
+Abu Hurairah
+Roland Freisler
+Medgar Evers
+Georges Braque
 Queen Victoria
-Diana, Princess of Wales
 Marilyn Monroe
-Princess Margaret, Countess of Snowdon
 Carrie Fisher
-Mary, Queen of Scots
 Frida Kahlo
 Elizabeth I of England
 Mother Teresa
@@ -2022,7 +2019,6 @@ Queen Elizabeth The Queen Mother
 Margaret Thatcher
 Grace Kelly
 Mary I of England
-KÃ¶sem Sultan
 Debbie Reynolds
 Elizabeth Taylor
 Anne Boleyn
@@ -2039,7 +2035,6 @@ Sharon Tate
 Aaliyah
 Rosa Parks
 Empress Elisabeth of Austria
-Dolores O'Riordan
 Coco Chanel
 Virginia Woolf
 Jane Austen
@@ -2052,8 +2047,6 @@ Natalie Wood
 Eva Braun
 Mata Hari
 Amelia Earhart
-Ãdith Piaf
-Catherine de' Medici
 Anna Nicole Smith
 Ruth Bader Ginsburg
 Nicole Brown Simpson
@@ -2062,7 +2055,6 @@ Bette Davis
 Joan Crawford
 Hurrem Sultan
 Florence Nightingale
-Anne, Queen of Great Britain
 Eva PerÃ³n
 Romy Schneider
 Grand Duchess Anastasia Nikolaevna of Russia
@@ -2070,7 +2062,6 @@ Mary of Teck
 Maria Theresa
 Zaha Hadid
 Aileen Wuornos
-Elizabeth BÃ¡thory
 Doris Day
 Bobbi Kristina Brown
 Jayne Mansfield
@@ -2131,13 +2122,11 @@ Harper Lee
 Billie Holiday
 Lucrezia Borgia
 Shyla Stylez
-Mao Kobayashi (actress)
 Aisha
 France Gall
 Greta Garbo
 Janet Leigh
 Celia Cruz
-Juana InÃ©s de la Cruz
 Rosemary Kennedy
 Donna Summer
 Lisa Lopes
@@ -2151,16 +2140,12 @@ Elizabeth Montgomery
 Christine Chubbuck
 Rosa Luxemburg
 Penny Marshall
-Savitri (actress)
 Bea Arthur
 Diana Rigg
 Anne of Cleves
 Joanna of Castile
 Maria Montessori
-Maureen O'Hara
-Alexandra Feodorovna (Alix of Hesse)
 Hypatia
-Mileva MariÄ
 Gerda Wegener
 Peggy Lipton
 Ella Fitzgerald
@@ -2179,7 +2164,6 @@ Henrietta Lacks
 Catherine I of Russia
 Omicidio Furuta
 Emily Dickinson
-Omayra SÃ¡nchez
 Cass Elliot
 Margot Kidder
 Zelda Fitzgerald
@@ -2187,9 +2171,7 @@ Fatimah
 Svetlana Alliluyeva
 Eleanor of Aquitaine
 Jennifer Syme
-Victoria, Princess Royal
 George Sand
-Charlotte BrontÃ«
 Isadora Duncan
 Rosemary Clooney
 Safiye Sultan
@@ -2197,7 +2179,6 @@ Marcheline Bertrand
 Florence Griffith Joyner
 Laura Ingalls Wilder
 Lyudmila Pavlichenko
-Heather O'Rourke
 Rue McClanahan
 Sondra Locke
 Leni Riefenstahl
@@ -2205,7 +2186,6 @@ Linda McCartney
 Madame de Pompadour
 Mary Boleyn
 Teresa Teng
-Maria Schneider (actress)
 Joan Rivers
 Barbara Stanwyck
 Erin Moran
@@ -2222,7 +2202,6 @@ Gia Carangi
 Louisa May Alcott
 Lady Godiva
 Hatshepsut
-Georgiana Cavendish, Duchess of Devonshire
 Maria Theresa of Spain
 Golda Meir
 Lucy Maud Montgomery
@@ -2230,12 +2209,10 @@ Lana Turner
 Jean Harlow
 Anne Bonny
 Etta James
-Christina, Queen of Sweden
 Dian Fossey
 Gilda Radner
 Anna Akhmatova
 Doris Roberts
-ThÃ©rÃ¨se of Lisieux
 Lyudmila Gurchenko
 Jeanne Moreau
 Joan Fontaine
@@ -2243,40 +2220,29 @@ Hildegard of Bingen
 Beatrix Potter
 Margaret Tudor
 Alexandra of Denmark
-P. L. Travers
 Calamity Jane
-Teresa of Ãvila
 Nargis
 Laura Branigan
 Nico
 Jeanna Friske
-Oona O'Neill
-Emily BrontÃ«
 Momoko Sakura
 Margaret Sanger
 Nefertari
 Ai Iijima
-Montserrat CaballÃ©
 Mihrimah Sultan
 Maryam Mirzakhani
 Gertrude Stein
-Georgia O'Keeffe
 Ginger Rogers
 Sophie Scholl
-Maria Feodorovna (Dagmar of Denmark)
 Delphine LaLaurie
 Dusty Springfield
 Umm Kulthum
 Glenne Headly
 Karen Blixen
 Rosalind Franklin
-Mary Tudor, Queen of France
 Vera Glagoleva
-Ursula K. Le Guin
-Vanity (singer)
 Liliane Bettencourt
 Isabella II of Spain
-Marie ThÃ©rÃ¨se of France
 Darya Nikolayevna Saltykova
 Florence Henderson
 Irma Grese
@@ -2305,25 +2271,19 @@ Emmeline Pankhurst
 Marina Tsvetaeva
 Dana Plato
 Mae West
-Carolyn Bessette-Kennedy
 Caroline Flack
 Helena Blavatsky
 Jane Wyman
-YÅ«ko Mizutani
 Pratyusha Banerjee
-YÅ«ko Takeuchi
 Magda Goebbels
-Empress JosÃ©phine
 Carole Lombard
 Gloria Stuart
 Eva Gabor
-Charlotte of Mecklenburg-Strelitz
 Toni Morrison
 Himiko
 Valerie Solanas
 Bettie Page
 Naomi Kawashima
-Marie de' Medici
 Rachel Scott
 Grace Hopper
 Joyce Vincent
@@ -2331,7 +2291,6 @@ Anne Meara
 Moana Pozzi
 Marie Fredriksson
 Colette
-Winnie Madikizela-Mandela
 Geli Raubal
 Nancy Dow
 Yvonne De Carlo
@@ -2344,7 +2303,6 @@ Lady Bird Johnson
 Nora Ephron
 Sandra Dee
 Jill Ireland
-MarÃ­a FÃ©lix
 Clementine Churchill
 Madeline Kahn
 Enid Blyton
@@ -2356,7 +2314,6 @@ Jean Simmons
 Marilyn Chambers
 Coretta Scott King
 Mireille Darc
-Madalyn Murray O'Hair
 Diane de Poitiers
 Suzanne Pleshette
 Mary Anne MacLeod Trump
@@ -2368,7 +2325,6 @@ Mona Shourie Kapoor
 Dorothy Vaughan
 Klara Hitler
 Mary Mallon
-Vera-Ellen
 Maria von Trapp
 Nurbanu Sultan
 Thuy Trang
@@ -2376,7 +2332,6 @@ Sally Hemings
 George Eliot
 Mary Kay Letourneau
 Eva Cassidy
-Yodo-dono
 Paula Hitler
 Gene Tierney
 Gertrude Bell
@@ -2387,19 +2342,16 @@ Annie Oakley
 Mary Read
 Rose Kennedy
 Cassandra Harris
-YÅko Nogiwa
 La Malinche
 Miss Elizabeth
 Bessie Smith
 Edie Sedgwick
 Shelley Winters
-Mary Jackson (engineer)
 Terri Schiavo
 Anna Anderson
 Jessica Tandy
 Olympe de Gouges
 Jiang Qing
-TenshÅ-in
 Cynthia Lennon
 Reema Lagoo
 Meena Kumari
@@ -2408,45 +2360,34 @@ Peaches Geldof
 Katharine Graham
 Silk Smitha
 Dominique Dunne
-FranÃ§oise d'AubignÃ©, Marquise de Maintenon
-Mary, Princess Royal and Countess of Harewood
 Qandeel Baloch
 Oriana Fallaci
-Vesna VuloviÄ
 Tamara de Lempicka
 Camille Claudel
 Daphne du Maurier
 Jane Russell
-Princess Victoria of Saxe-Coburg-Saalfeld
 Frances Shand Kydd
 Sarah Bernhardt
-Empress KÅjun
-RocÃ­o DÃºrcal
 Lena Horne
 Gloria Grahame
 Emma Chambers
 Anita Mui
 Elis Regina
-Ko Yong-hui
 Kartini
-AnaÃ¯s Nin
 Mary of Guise
 Michelle Thomas
 Empress Matilda
-IrÃ¨ne Joliot-Curie
 Ankhesenamun
 Kirsty MacColl
 Melissa Mathison
 Reeva Steenkamp
 Amber Rayne
-Barbara (singer)
 Patricia Neal
 Clarice Lispector
 Maria Altmann
 Gloria Swanson
 Fawzia Fuad of Egypt
 Janet Reno
-Elizabeth PeÃ±a
 Carolyn Jones
 Jiah Khan
 Loretta Young
@@ -2470,20 +2411,16 @@ Dinah Shore
 Valerie Harper
 Paula Yates
 Artemisia Gentileschi
-Marie Louise, Duchess of Parma
 Margaux Hemingway
 Elli Smula
 Joan Clarke
 Anita Pallenberg
-Soraya Esfandiary-Bakhtiary
 Christa McAuliffe
 Juliana of the Netherlands
 Francesca Hilton
 Agnes Moorehead
 Corazon Aquino
-Dolores del RÃ­o
 Joan Kroc
-Ida B. Wells
 Myrna Loy
 Simone Weil
 Conchata Ferrell
@@ -2509,7 +2446,6 @@ Yasuko Namba
 Eva Ekeblad
 Soundarya
 Victoria Woodhull
-Richa Sharma (actress)
 Anne Neville
 Harriet Beecher Stowe
 Abigail Adams
@@ -2526,20 +2462,17 @@ Tove Jansson
 Mary Jo Kopechne
 Nellie Bly
 Rose of Lima
-Rita Levi-Montalcini
 Charlotte Corday
 Annette Funicello
 Amanda Blake
 Betty Ford
 Hotaru Akane
-Bimba BosÃ©
 Virginia Apgar
 Ching Shih
 Jennifer Jones
 Elizaveta Glinka
 Elizabeth Christ Trump
 Faustina Kowalska
-Tara Palmer-Tomkinson
 Diana Dors
 Margaret of Anjou
 Veronica Lake
@@ -2550,12 +2483,10 @@ Berry Berenson
 Sarah Baartman
 Anna Politkovskaya
 Martha Washington
-Hoifa-Nara, the Step Empress
 Clara Rockmore
 Jackie Stallone
 Sarah Winchester
 Jane Jacobs
-Helena (empress)
 Nutan
 Anne Sullivan
 Henrietta of England
@@ -2564,10 +2495,7 @@ Margaret Rutherford
 Messalina
 Traudl Junge
 Anna Pavlova
-Elisabeth KÃ¼bler-Ross
 Anita Ekberg
-Kathleen Cavendish, Marchioness of Hartington
-Ellen G. White
 Pat Nixon
 Gerda Taro
 Emily Davison
@@ -2575,9 +2503,7 @@ Tallulah Bankhead
 Maria Goretti
 Susan Hayward
 Sushma Swaraj
-LÃ­da BaarovÃ¡
 Maya Plisetskaya
-Margaret Hamilton (actress)
 Caroline Herschel
 Simone Signoret
 Rachel Carson
@@ -2587,7 +2513,6 @@ Karen Black
 Danielle Darrieux
 Betty Grable
 Zenobia
-Cayetana Fitz-James Stuart, 18th Duchess of Alba
 Sojourner Truth
 Sadako Sasaki
 Susannah Mushatt Jones
@@ -2597,10 +2522,8 @@ Majel Barrett
 Empress Xiaoxianchun
 Donna Douglas
 Nadezhda Alliluyeva
-Gala DalÃ­
 Elisabeth of Valois
 Zoya Kosmodemyanskaya
-FranÃ§oise-AthÃ©naÃ¯s de Rochechouart, Marquise de Montespan
 Clara Zetkin
 Dorothy Stratten
 Tammy Wynette
@@ -2608,14 +2531,11 @@ Lisa del Giocondo
 Jean Seberg
 Violet Brown
 Lillian Gish
-Edith GonzÃ¡lez
 Mary Jane Kelly
 Jean Kennedy Smith
 Grand Duchess Olga Nikolaevna of Russia
 Anna German
 Isabella of Portugal
-Selma LagerlÃ¶f
-MichÃ¨le Morgan
 Pushpavalli
 Anna Magnani
 Hedda Hopper
@@ -2624,44 +2544,34 @@ Joan Boocock Lee
 Samantha Smith
 Kasturba Gandhi
 Patricia Highsmith
-Hatice Sultan (daughter of Selim I)
 Tammi Terrell
 Lady Tsukiyama
 Christine Kaufmann
 Kayla Mueller
 La Lupe
 Faina Ranevskaya
-Madam C. J. Walker
 Roxana
 Yukiko Okada
 Masako Natsume
 Barbara Hale
-Paula Modersohn-Becker
 Cheyenne Brando
 Mercedes Sosa
 Alicia Nash
 Turhan Hatice Sultan
 Kamala Surayya
 Olga Jackowska
-Soong Mei-ling
 Teena Marie
-Patricia TeherÃ¡n Romero
 Frances Farmer
 Pippa Bacca
 Jean Peters
 Pier Angeli
-Anne Hathaway (wife of Shakespeare)
 Clara Schumann
-L'Wren Scott
 Hattie McDaniel
 Edith Cavell
 Handan Sultan
 Carol Channing
 Keiko Fuji
-Maureen O'Sullivan
 Laura Antonelli
-RaichÅ Hiratsuka
-WisÅawa Szymborska
 Jessica Jaymes
 Caroline Matilda of Great Britain
 Edith Stein
@@ -2673,17 +2583,14 @@ Rina Matsuno
 Greer Garson
 Jane Addams
 Ofra Haza
-FranÃ§oise Sagan
 Vera Brittain
 Diane Arbus
-CesÃ¡ria Ãvora
 Goo Hara
 Ruth Williams Khama
 Cyd Charisse
 Ylenia Carrisi
 Melanie Thornton
 Jade Goody
-Angelines FernÃ¡ndez
 Diahann Carroll
 Agatha of Sicily
 Clara Bow
@@ -2692,33 +2599,25 @@ Edith Bouvier Beale
 Amelia Dyer
 Tarsila do Amaral
 Inger Stevens
-Pearl S. Buck
 Andrea JÃ¼rgens
 Princess Victoria of Hesse and by Rhine
 Alice Liddell
 Nazia Hassan
 Lynn Redgrave
 Chandra Levy
-Vera F. Birkenbihl
 Sadhana Shivdasani
 Frances Bavier
-Gilda (singer)
 Maud Lewis
-Jacqueline du PrÃ©
 Vivian Vance
 Jill Clayburgh
-Isabel, Princess Imperial of Brazil
 Lise Meitner
 Esther Williams
 Mindy McCready
 Lana Clarkson
-EugÃ©nie de Montijo
-Jana NovotnÃ¡
 Diane Cilento
 Miep Gies
 Empress Myeongseong
 Mary of Burgundy
-Lou Andreas-SalomÃ©
 Claudette Colbert
 Miriam Pielhau
 Elsa Einstein
@@ -2727,25 +2626,19 @@ Dorothy Parker
 Jennifer Kendal
 Heather Menzies
 Katy Jurado
-Jang Ja-yeon
-Flannery O'Connor
 Barbara Hutton
 Eleanor Parker
 Merle Oberon
 Geraldine Page
-Hui-bin Jang
 Murasaki Shikibu
 Mahalia Jackson
 Yvonne Craig
 Katharina von Bora
-Anne BrontÃ«
 Diana Turbay
 Margaret Mitchell
-Elena CeauÈescu
 Yukiji Asaoka
 Bella Akhmadulina
 Olympias
-Princess Elisabeth of Hesse and by Rhine (1864â1918)
 Marie of Romania
 Diane Disney Miller
 Joan Blondell
@@ -2757,10 +2650,8 @@ Luisa Spagnoli
 Lesley Gore
 Maria Reiche
 Rosalia Lombardo
-Amrita Sher-Gil
 Carol Ann Susi
 Emmy Noether
-Theodora (6th century)
 Peggy Lee
 MÃ³nica Spear
 Lotte Reiniger
@@ -2768,7 +2659,6 @@ Yolanda King
 Virna Lisi
 Pola Negri
 Tammy Faye Messner
-AgnÃ¨s Varda
 Shirley Jackson
 Dido Elizabeth Belle
 Henrietta Maria of France
@@ -2779,7 +2669,6 @@ Phyllis Diller
 Oichi
 Chavela Vargas
 Louisa Adams
-ValÃ©rie Benguigui
 Hayedeh
 Soad Hosny
 Anna Karina
@@ -2791,23 +2680,18 @@ Pina Bausch
 Alfonsina Storni
 Ruth Gordon
 Katherine Helmond
-SalomÃ© UreÃ±a
 Anne of Brittany
 Magda Gabor
 Sexy Cora
 Annie Girardot
-Gorgo, Queen of Sparta
 Leila Pahlavi
 Capucine
-Kate Barry (photographer)
-Princess Alice, Duchess of Gloucester
 Dina Merrill
 Carme ChacÃ³n
 Vivian Maier
 Olga of Kiev
 Peggy Guggenheim
 Diana Douglas
-Kuniko MukÅda
 Josephine Earp
 Shirley Chisholm
 Lyudmila Senchina
@@ -2815,15 +2699,12 @@ Martha Gellhorn
 Linda Tripp
 Zora Neale Hurston
 Barbara Sinatra
-Princess Louise, Duchess of Argyll
 Elizabeth de Burgh
 Brett Somers
 Jean Arthur
 Joanna Moore
-KÃ¤the Kollwitz
 Marie LaforÃªt
 Amy Johnson
-Maria Feodorovna (Sophie Dorothea of WÃ¼rttemberg)
 Billie Burke
 Srinagarindra
 Dixie Carter
@@ -2843,22 +2724,15 @@ Elizabeth of Hungary
 Sei Ashina
 Phyllis Schlafly
 Tomoko Kawakami
-Dolores IbÃ¡rruri
 Shadia
 Elizabeth Cady Stanton
 Natalya Krachkovskaya
-Octavia E. Butler
 Yuri Kochiyama
 Irene Ryan
 Maurane
-FranÃ§oise DorlÃ©ac
-Josefa Ortiz de DomÃ­nguez
-Soong Ching-ling
 Lyubov Polishchuk
 Dorothy Malone
-Wendy O. Williams
 The Fabulous Moolah
-Zita of Bourbon-Parma
 Sin Saimdang
 Clara Barton
 Hosokawa Gracia
@@ -2866,9 +2740,7 @@ Edmonia Lewis
 Fubuki Koshiji
 Princess Marina of Greece and Denmark
 Mary Ingalls
-Choi Jin-sil
 Reiko Ohara
-Lupe VÃ©lez
 Lorena Rojas
 Livia
 Alda Merini
@@ -2881,12 +2753,10 @@ Sister Rosetta Tharpe
 Sarah Vaughan
 Anna Samokhina
 Simone Battle
-Juliette GrÃ©co
 Princess Sophie of Bavaria
 Evelyn Nesbit
 Leona Helmsley
 Barbara Valentin
-Edda GÃ¶ring
 Esther Rolle
 Betsy Ross
 Marguerite Yourcenar
@@ -2901,20 +2771,16 @@ Archduchess Marie Valerie of Austria
 Mary Cassatt
 Dorothea Lange
 Anna Freud
-IchiyÅ Higuchi
-Sabah (singer)
 Maria Rasputin
 Louise Bourgeois
 Policarpa Salavarrieta
 Anna Przybylska
-Marie LeszczyÅska
 Wangari Maathai
 Sue Lyon
 Lita Grey
 Silvana Mangano
 Alice Paul
 Eugenia Davitashvili
-Sophie, Duchess of Hohenberg
 Rosamunde Pilcher
 Miyu Uehara
 Princess Sophie of Greece and Denmark
@@ -2925,25 +2791,18 @@ Kristin Nelson
 Ida Lupino
 Mahfiruz Hatun
 Ann Morgan Guilbert
-Lily (Japanese singer)
-Louise de La ValliÃ¨re
 Diana Hyland
 Eve Arden
 June Whitfield
-Elizabeth Stuart, Queen of Bohemia
 Yoshiko Tanaka
-Adile NaÅit
 Tamar of Georgia
-KÅdai-in
 Tomoe Gozen
 Dawn Brancheau
 Mary Wickes
 Sister Nivedita
 Beatrice Portinari
 Elizabeth Blackwell
-Carmen Franco, 1st Duchess of Franco
 Berthe Morisot
-V. C. Andrews
 Hanna Reitsch
 Natalia Pushkina
 Dana Hill
@@ -2951,11 +2810,9 @@ Jean Stapleton
 Lilya Brik
 June Foray
 Fanny Kaplan
-Chikurin-in
 Anissa Jones
 Karen Lancaume
 Lois Maxwell
-StÃ©phane Audran
 Evelyn McHale
 Mary Astor
 Elisa Leonida Zamfirescu
@@ -2963,11 +2820,8 @@ Helen Hayes
 Anna Kashfi
 Grand Duchess Olga Alexandrovna of Russia
 Alexandra Kollontai
-Virginia E. Johnson
-EstÃ©e Lauder (businesswoman)
 Cut Nyak Dhien
 Monika Dannemann
-Edwina Mountbatten, Countess Mountbatten of Burma
 Ruby Dee
 Mary Kay Bergman
 Daliah Lavi
@@ -2975,7 +2829,6 @@ Helen Reddy
 Suzanne Lenglen
 Diana Churchill
 Cassie Bernall
-M. S. Subbulakshmi
 Grand Duchess Xenia Alexandrovna of Russia
 Wanda Rutkiewicz
 Anne Francis
@@ -3005,23 +2858,17 @@ Natina Reed
 Martha Graham
 Empress Teimei
 Nadia Toffa
-FranÃ§oise Gilot
 Claude Gensac
-Ãve Curie
 Madeleine Astor
 Louise Brooks
 Marielle Franco
 Ann Richards
 Jan Hooks
 Nadezhda Rumyantseva
-Savannah (actress)
 Nina Doroshina
 Lady Randolph Churchill
-Liz Smith (actress)
-Ann B. Davis
 Shakuntala Devi
 Edith Wilson
-RocÃ­o Jurado
 Oeyo
 Empress LÃ¼
 Princess Victoria Louise of Prussia
@@ -3037,21 +2884,16 @@ Rosario Castellanos
 Mary Surratt
 Wendy Richard
 Olga Constantinovna of Russia
-Margarita Nazarova (artist)
 Nancy Kulp
 Marina Ripa di Meana
 Romina Yan
 Sarah Knauss
-Manuela SÃ¡enz
-BÃ¶rte
 Clare Hollingworth
 Lynn Margulis
 Aneta Corsaut
 Peggy Shippen
-Hafsa Sultan (wife of Selim I)
 Emilie Schindler
 Gauri Lankesh
-Maria Alexandrovna (Marie of Hesse)
 Big Nose Kate
 Geraldine McEwan
 Fay Wray
@@ -3071,13 +2913,11 @@ Maria I of Portugal
 Barbara Bel Geddes
 Margot Honecker
 Frances Folsom Cleveland Preston
-Lucia BosÃ¨
 Juana Azurduy de Padilla
 Geraldine Ferraro
 Florence Ballard
 Susan Buffett
 Kim Hunter
-Eydie GormÃ©
 Rosalind Russell
 Junko Tabei
 Olive Oatman
@@ -3097,7 +2937,6 @@ Maureen Starkey Tigrett
 Marcia Wallace
 Haley Paige
 Marion Davies
-Louise of Mecklenburg-Strelitz
 Princess Deokhye
 Annie Cordy
 Irene Dunne
@@ -3110,15 +2949,12 @@ Mary Seacole
 Doris Duke
 Ashley Massaro
 Judy Lewis
-Domitila de Castro, Marchioness of Santos
 Raisa Gorbacheva
 Cathy Smith
 Marni Nixon
-Zahra Khanom Tadj es-Saltaneh
 Domino Harvey
 Mary Fields
 Valentina Tolkunova
-Germaine de StaÃ«l
 Miriam Defensor Santiago
 Lina Heydrich
 Yosano Akiko
@@ -3132,24 +2968,19 @@ Ekaterina Savinova
 Mahasti
 Isabel Sanford
 Tera Wray
-Sophie Taeuber-Arp
 Melanie Klein
 Aenne Burda
 Nelly Sachs
 Nabi Tajima
-CÃ¡ssia Eller
 Joan Bennett
 Margaret Theresa of Spain
 Leonora Carrington
 Mariska Veres
 Joan I of Navarre
-Emma, Lady Hamilton
 Ellen Corby
 Dorothy Kilgallen
-Lalla Fatma N'Soumer
 Norma McCorvey
 Olga Khokhlova
-MarÃ­a Santos Gorrostieta Salazar
 Hope Lange
 Meredith MacRae
 Elina Bystritskaya
@@ -3157,9 +2988,7 @@ Halime Sultan
 Maria Anna Mozart
 Iris Murdoch
 Marcia Strassman
-Margaret Pole, Countess of Salisbury
 Edith Head
-Rita BarberÃ¡
 Natalya Gundareva
 Eileen Brennan
 Princess Taiping
@@ -3171,9 +3000,7 @@ Stevie Ryan
 Margaret I of Denmark
 Sue Grafton
 Bambi Woods
-Elizabeth Charlotte, Madame Palatine
 Betty Hutton
-Milada HorÃ¡kovÃ¡
 Carrie Hamilton
 Irina Berezhna
 Sofia Kovalevskaya
@@ -3182,15 +3009,12 @@ Virginia Mayo
 Frederica of Hanover
 Julie Adams
 Hildegard Knef
-Alexandra Feodorovna (Charlotte of Prussia)
 Empress Suiko
 Monica Zetterlund
 Linda Christian
-Vita Sackville-West
 Mary Soames
 Bertha von Suttner
 Frances Hodgson Burnett
-Patricia Knatchbull, 2nd Countess Mountbatten of Burma
 Rose Wilder Lane
 Nonna Mordyukova
 Linda Darnell
@@ -3203,17 +3027,14 @@ Althea Flynt
 Kara Kennedy
 Claude of France
 Princess Margarita of Greece and Denmark
-Manorama (Tamil actress)
 Dina Wadia
 Adriana Campos
-Michalina WisÅocka
 Hendrikje Fitz
 Sophia Alekseyevna of Russia
 Elizabeth Arden
 Candy Barr
 Gracie Allen
 Tituba
-P. D. James
 Noor Jehan
 Elisabeth Sladen
 Virginia Eliza Clemm Poe
@@ -3225,7 +3046,6 @@ Princess Ludovika of Bavaria
 Judy Holliday
 Elaine Stritch
 Susan Oliver
-Empress JingÅ«
 Carrie Snodgress
 Remedios Varo
 Katherine Mansfield
@@ -3233,7 +3053,6 @@ Sandy Denny
 Mary Pinchot Meyer
 Aarthi Agarwal
 Audre Lorde
-RosalÃ­a de Castro
 Theresa Saldana
 Lyubov Orlova
 Simonetta Vespucci
@@ -3243,45 +3062,29 @@ Hattie Jacques
 Roza Shanina
 Maria Reynolds
 Laura of Saint Catherine of Siena
-Song Hye-rim
-Madeleine L'Engle
-Augusta Victoria of Schleswig-Holstein
 Kato Svanidze
 Karen Horney
-Cecilia Bowes-Lyon, Countess of Strathmore and Kinghorne
 Elsa Martinelli
 Chantal Akerman
 Eleanor Powell
 Ann Miller
-Sarah Churchill (actress)
 Nanette Fabray
 Nell Carter
 Consuelo Vanderbilt
 Eiko Ishioka
 Grazia Deledda
-Nancy Wilson (jazz singer)
 Toshiko Fujita
 Maria Carolina of Austria
 Nicole Bass
-Lill-Babs
 Clara Campoamor
 Edda Mussolini
 Emmanuelle Riva
-Sabiha GÃ¶kÃ§en
-DÃ©sirÃ©e Clary
-Irena SzewiÅska
-Lucy Gordon (actress)
-Carmen DÃ­ez de Rivera
 Maria Schell
 Madame Nhu
 Lupe Ontiveros
 Irina Skobtseva
-Miyoko AsÅ
-Julie d'Aubigny
 Teresa Wright
-Jane Boleyn, Viscountess Rochford
 Shelley Morrison
-Parvin E'tesami
 Natalie Schafer
 Yelena Bondarchuk
 Margot Fonteyn
@@ -3291,7 +3094,6 @@ Nike Ardilla
 Inconnue de la Seine
 Camille Muffat
 Miss Cleo
-Ãmilie du ChÃ¢telet
 Maria Christina of Austria
 Movita Castaneda
 Nancy Marchand
@@ -3302,13 +3104,10 @@ Virginia Hill
 Dorothy Lamour
 Sherri Martel
 Phoebe Snetsinger
-Yang Ko-han
 Deanna Durbin
 Danuta Szaflarska
-Kalpana (Malayalam actress)
 Mary Ellen Trainor
 Suzanne Crough
-Sei ShÅnagon
 Natalya Kustinskaya
 Toyoko Yamasaki
 Princess Kazu
@@ -3319,7 +3118,6 @@ Yolande de Polastron
 Rabia of Basra
 Karen Wetterhahn
 Theodosia Burr Alston
-Kwon Ri-se
 Anna Leonowens
 Hiroko Nagata
 Edith Frank
@@ -3336,33 +3134,25 @@ Aliki Vougiouklaki
 The Singing Nun
 Anna Leopoldovna
 Duchess Helene in Bavaria
-Ãlisabeth VigÃ©e Le Brun
-Fanny Blankers-Koen
 Caroline Ingalls
 Baroness Mary Vetsera
 Brooke Greenberg
 Shirley Booth
 Julia Perez
-Olga HepnarovÃ¡
 Geeta Bali
 Yao Beina
 Elena Mukhina
 Lilli Carati
 Viola Desmond
-AmÃ¡lia Rodrigues
 Jill Dando
 Asima Chatterjee
 Zelda Rubinstein
-IrÃ¨ne NÃ©mirovsky
-Warda Al-Jazairia
 Hussa bint Ahmed Al Sudairi
 Annie Glenn
 Loie Fuller
-AgnÃ¨s Sorel
 Mariangela Melato
 Caroline of Brunswick
 Lilli Palmer
-Sarah Churchill, Duchess of Marlborough
 Moira Orfei
 Aimee Semple McPherson
 Laura Nyro
@@ -3373,10 +3163,8 @@ Daniella Perez
 Dinah Washington
 Jo Andres
 Elizabeth Blount
-Princess Theodora of Greece and Denmark (1906â1969)
 Princess Mary Adelaide of Cambridge
 Hannah Glasse
-Princess MÃ¤rtha of Sweden
 Elizabeth Bishop
 Gypsy Rose Lee
 Sonja Henie
@@ -3395,14 +3183,12 @@ Shirley Stelfox
 Astrid of Sweden
 Grace Lee Whitney
 Lady Flora Hastings
-Emmy GÃ¶ring
 Rhonda Fleming
 Yanagihara Naruko
 Francys Arsentiev
 Marianne Ihlen
 Caroline McWilliams
 Jessie Harlan Lincoln
-AnÃ©mone
 Andrea True
 Angela Raiola
 Barbara Cartland
@@ -3411,14 +3197,10 @@ Shari Lewis
 Chiyoko Shimakura
 Julia the Elder
 Evelyn Hamann
-Grace O'Malley
 Nadine Gordimer
 Misuzu Kaneko
-Lee Eun-ju
 Heidi BrÃ¼hl
 Dina Pathak
-Sanmao (author)
-Margaret of Austria, Duchess of Savoy
 Mitsuko Mori
 Marie Colvin
 Marie Harel
@@ -3431,20 +3213,16 @@ Sophie Germain
 Peg Entwistle
 Joan Hickson
 Andrea Dworkin
-Empress JitÅ
 Evelyn Frechette
-Vanessa Marquez (actress)
 Theda Bara
 Agniya Barto
 Anna Jantar
 Sunanda Pushkar
-VÄra ÄÃ¡slavskÃ¡
 Sylvia Sidney
 Elizabeth Gaskell
 Machiko Soga
 Judith Resnik
 Maria Mandl
-MarÃ­a Elena Walsh
 Simple Kapadia
 Hortense de Beauharnais
 Audrey Meadows
@@ -3462,14 +3240,9 @@ Marion Zimmer Bradley
 Phillis Wheatley
 Suchitra Sen
 Geri McGee
-Karla Ãlvarez
 Linda Cristal
-MarÃ­a Elena Velasco
 Joanna la Beltraneja
-BoÅ¾ena NÄmcovÃ¡
 Nancy Wake
-CecÃ­lia Meireles
-Emilia Pardo BazÃ¡n
 Archduchess Elisabeth Marie of Austria
 Mae Young
 Lady Caroline Lamb
@@ -3479,13 +3252,10 @@ Wendie Jo Sperber
 Elsa Schiaparelli
 Polly Bergen
 Archduchess Sophie of Austria
-Princess Sibylla of Saxe-Coburg and Gotha
 Jean Batten
 Margherita of Savoy
-Padmini (actress)
 Dee Dee Warwick
 Sigrid Valdis
-Gloria E. AnzaldÃºa
 Zarah Leander
 Carson McCullers
 Skeeter Davis
@@ -3498,13 +3268,11 @@ Maila Nurmi
 Dolley Madison
 Shelley Lubben
 Anna May Wong
-Marie-ThÃ©rÃ¨se Walter
 Mary Toft
 Jane Wyatt
 Galyani Vadhana
 Ono no Komachi
 Elinor Ostrom
-FranÃ§oise Dolto
 Mary Ann Mobley
 Janet Gaynor
 Phryne
@@ -3529,7 +3297,6 @@ Tessa Jowell
 Galina Ulanova
 Bibi Andersson
 Mae Questel
-MarÃ­a Dolores Pradera
 Julia Pastrana
 Elizabeth Stride
 Daria Nicolodi
@@ -3537,7 +3304,6 @@ Jean Hagen
 Elena of Montenegro
 Sonsoles de Icaza
 Ethel Barrymore
-Johanna SÃ¤llstrÃ¶m
 Inessa Armand
 Gloria Foster
 Madame de La Fayette
@@ -3547,9 +3313,7 @@ Empress Dowager Xiaozhuang
 Edith Ewing Bouvier Beale
 Cora Coralina
 Lady Kasuga
-Nancy Astor, Viscountess Astor
 Kathleen Freeman
-Marisa LetÃ­cia Lula da Silva
 Jessi Combs
 Princess Margaret of Connaught
 Diana Wynne Jones
@@ -3557,29 +3321,22 @@ Nicolette Larson
 Gretl Braun
 Assia Wevill
 Bodil Joensen
-V. N. Janaki
-Jeanne-Marie Leprince de Beaumont
 Catherine Eddowes
 Willa Cather
 Yootha Joyce
 Anita Garibaldi
-Nina Schenk GrÃ¤fin von Stauffenberg
 Gail Zappa
 Gia Allemand
 Galina Volchek
 Marian Anderson
-Dorothy L. Sayers
 Princess Victoria of the United Kingdom
 Zaynab bint Jahsh
-Princess StÃ©phanie of Belgium
 Lee Krasner
 Juana Bormann
-Alexandra David-NÃ©el
 Hind Rostom
 Kanako Fukaura
 Sonia Rykiel
 Giuni Russo
-Olga BenÃ¡rio Prestes
 Anna Lindh
 Lynne Thigpen
 Colleen McCullough
@@ -3595,14 +3352,12 @@ Alice Ghostley
 Tatyana Pelttser
 Adriana Caselotti
 Anne Sexton
-Nanda (actress)
 Hildegard Krekel
 Lisa Blount
 Philippa of Hainault
 Cecilia Hart
 Helena Rubinstein
 Gloria Leonard
-Ulrika Eleonora, Queen of Sweden
 Tatiana Samoilova
 Consuelo AraÃºjo
 Flor Silvestre
@@ -3621,36 +3376,28 @@ Akka Mahadevi
 Yang Jiang
 Darla Hood
 Mary Martin
-Princess Charlotte, Duchess of Valentinois
 GÃ¼lfem Hatun
 Jeanne Crain
 Mother Angelica
-Empress ShÅken
 Victoria Leigh Soto
 Sonya Golden Hand
-Adelaide of Saxe-Meiningen
 Diana Vreeland
 Beverly Garland
 Marguerite de Navarre
 Sandy Dennis
 Alla Nazimova
 Yuriko Hoshi
-MarÃ­a de Villota
 Faith Domergue
 Mollie Sugden
 Beverley Owen
 Audra Lindley
-Soraya (musician)
 Hassiba Ben Bouali
 Persis Khambatta
 Kristen Pfaff
 Clara Nunes
-MarÃ­a Zambrano
-Barbara Harris (actress)
 Ellen Joyce Loo
 Marjorie Merriweather Post
 Anastasia Romanovna
-Carmen OrdÃ³Ã±ez
 Sirimavo Bandaranaike
 Yekaterina Furtseva
 Judith Barsi
@@ -3658,7 +3405,6 @@ Mariana of Austria
 Vanessa Bell
 Hadley Richardson
 Kamala Nehru
-Cecily Neville, Duchess of York
 Arlene Francis
 Jessica Savitch
 Mary Baker Eddy
@@ -3669,21 +3415,16 @@ Nina Foch
 Lucy Mercer Rutherfurd
 Sheree North
 Kazumi Kawai
-Yekaterina Vorontsova-Dashkova
 Anne Catherine Emmerich
 Lyudmila Alexeyeva
 Margaret Mary Alacoque
 Rachel Corrie
 Hilda Gadea
-Louise, Princess Royal
 Mary Ure
 Janet Lee Bouvier
 Danuta SiedzikÃ³wna
-LiliÊ»uokalani
-Carmen Polo, 1st Lady of MeirÃ¡s
 Lillian Hellman
 Sara Forbes Bonetta
-HÅjÅ Masako
 Ronit Elkabetz
 Fannie Lou Hamer
 Samira Khashoggi
@@ -3704,15 +3445,11 @@ Maureen Stapleton
 Anne Wiazemsky
 Minnie Pearl
 Joey Feek
-Oya AydoÄan
 Gianna Beretta Molla
-Princess Victoria Melita of Saxe-Coburg and Gotha
 Shirley Ardell Mason
 Princess Mafalda of Savoy
 Mary McLeod Bethune
-Lee Yoon-hyung
 Florence Arthaud
-Charlotte, Grand Duchess of Luxembourg
 Eudoxia Lopukhina
 Elke Maravilha
 Pandita Ramabai
@@ -3726,20 +3463,14 @@ Suzanne Valadon
 Susan Strasberg
 Edith Roosevelt
 Mattie Blaylock
-Marie-France Pisier
-Halide Edib AdÄ±var
 Suraiya
 Ann Wedgeworth
-Ãngela Ruiz Robles
-Milena DraviÄ
 Elizabeth Holloway Marston
 Carole Landis
 Kyoko Enami
 Leila Mourad
 Lotte Lenya
-Princess Alice, Countess of Athlone
 Margaret Abbott
-Louise of Hesse-Kassel
 Saint Margaret of Scotland
 Mona Fandey
 Marie Gruber
@@ -3747,14 +3478,11 @@ Kateri Tekakwitha
 Sylva Koscina
 Amrita Pritam
 Lina Morgan
-Beate Uhse-Rotermund
-Jeong Da-bin
 Diana Mitford
 Subhadra Kumari Chauhan
 Kathryn Kuhlman
 Lizabeth Scott
 Frances Oldham Kelsey
-Marie JosÃ© of Belgium
 Louise Mountbatten
 Veronica Guerin
 Lucilla
@@ -3770,16 +3498,10 @@ Elizabeth Hartman
 Bonnie Lee Bakley
 Queen Fabiola of Belgium
 Debralee Scott
-Maria PacÃ´me
-Hannah HÃ¶ch
 Christine de Pizan
 Johanna Spyri
-Elizabeth Alexeievna (Louise of Baden)
 Julia Lennon
-Luisa CÃ¡ceres de Arismendi
 Nancy Walker
-Christine NÃ¶stlinger
-Princess Antoinette, Baroness of Massy
 Jeannette Rankin
 Grandma Moses
 Recy Taylor
@@ -3801,7 +3523,6 @@ Zhang Chunhua
 Kuljeet Randhawa
 Betsy Drake
 Cedella Booker
-Katsushika Åi
 Marjory Stoneman Douglas
 Tina Onassis Niarchos
 Isabel Granada
@@ -3815,8 +3536,6 @@ Chloe Jones
 Cokie Roberts
 Isabelle Caro
 Ruth Rendell
-KyÅko Kishida
-Miroslava (actress)
 Tammy Grimes
 Dale Evans
 Vera Rubin
@@ -3841,16 +3560,13 @@ Gertrude Jekyll
 Bertha Benz
 Kathryn Joosten
 Pearl Bailey
-Margaret, Maid of Norway
 Pamela Gidley
-Kim Jong-suk
 Kamaladevi Chattopadhyay
 Butterfly McQueen
 Natacha Rambova
 Pamela Harriman
 Charlotte Perkins Gilman
 Ismat Chughtai
-Rachel Roberts (actress)
 Mary Millar
 Jill Gascoine
 Isabella Biagini
@@ -3859,10 +3575,8 @@ Soraya Tarzi
 Harue Akagi
 Madiha Yousri
 Klara Luchko
-Catherine LabourÃ©
 Maria Bochkareva
 Lota de Macedo Soares
-Empress KÅken
 Ann Rule
 Betsy Blair
 Jenny von Westphalen
@@ -3881,19 +3595,15 @@ Barbara Rudnik
 Beryl Markham
 Hiro Saga
 Dorothea Dix
-Elizabeth Cavendish, Duchess of Devonshire
 Haruko Kato
-Jeanne HÃ©buterne
 Gloria Morgan Vanderbilt
 Zoya Fyodorova
 Tamara Ivanyutina
 Sridevi Vijaykumar
-AsmÄ' bint Abi Bakr
 Billie Whitelaw
 Chiyo Miyako
 Pauline Bonaparte
 Sheila Sim
-Raine Spencer, Countess Spencer
 Catherine Dolgorukov
 Lhasa de Sela
 Duchess Sophie Charlotte in Bavaria
@@ -3901,8 +3611,6 @@ Joanne Dru
 Natalia Ginzburg
 Lynne Frederick
 Karen Silkwood
-RosalÃ­a Mera
-Zoia CeauÈescu
 Silvia Derbez
 Rukhmabai
 Marta Marzotto
@@ -3914,30 +3622,23 @@ Virginia Rappe
 Imogene Coca
 Veronica Franco
 Emily Carr
-Annette von Droste-HÃ¼lshoff
 Forouzan
 Lia Maivia
 Margaret Durrell
 Beatrice Cenci
 Lyudmila Rudenko
-Julie Harris (actress)
 Whitney Blake
-Barbara Kwiatkowska-Lass
 Yi Bangja
 Helen of Greece and Denmark
 Lena Zavaroni
 Judith Anderson
-Anna of Austria, Queen of Spain
 Shauna Grant
 Kira Muratova
-Isabella of Aragon, Queen of Portugal
-Edna St. Vincent Millay
 Tokiko Iwatani
 Ruqaiya Sultan Begum
 Martha Raye
 Loalwa Braz
 Saovabha Phongsri
-Narasaki RyÅ
 Annette Charles
 Martha Hyer
 Nicole Courcel
@@ -3954,7 +3655,6 @@ Isabella of AngoulÃªme
 Barbara Jordan
 Martha Jefferson
 Maria Luisa of Parma
-KaÊ»iulani
 Evelyn Mase
 Diem Brown
 Sigrid Undset
@@ -3962,23 +3662,19 @@ Aliya Moldagulova
 Margaret of York
 Margaret Truman
 Constance Markievicz
-Mary, Princess Royal and Princess of Orange
 Yvette Horner
 Jo Cox
 Gloria DeHaven
-Jeanne d'Albret
 Charlotte Salomon
 Althea Gibson
 Fanny Crosby
 Kathryn Grayson
-Maria KaczyÅska
 Inge Morath
 Agnieszka Osiecka
 Jean Alexander
 Francesca Woodman
 Sandra Mondaini
 Betty Ong
-Maria of Aragon, Queen of Portugal
 Lee Miller
 Rose Laurens
 Hiromi Hayakawa
@@ -3990,7 +3686,6 @@ Nzinga of Ndongo and Matamba
 Nirupa Roy
 Lydia Shum
 Blanche Barrow
-AmÃ©lie of Leuchtenberg
 Princess Louise Auguste of Denmark
 Elena Glinskaya
 Rita Bhaduri
@@ -3998,3 +3693,308 @@ Letizia Ramolino
 Samia Gamal
 Rosa Bonheur
 Saroj Khan
+Mabel Normand
+Molly Pitcher
+Hebe Camargo
+Hilma af Klint
+Isabella Bird
+Lois Nettleton
+Nekojiru
+Elizabeth Ann Seton
+Noel Neill
+Esther Afua Ocloo
+Maria Christina of the Two Sicilies
+Ma Rainey
+Tiye
+Misa Yamamura
+Freda Dudley Ward
+Erica Boyer
+Peggy Hayama
+Beatrice Hsu
+Lydia Clarke
+Ruth Benedict
+Violette Szabo
+Nicole DeHuff
+Kaoru Tada
+Elyse Knox
+Cynthia Ann Parker
+Izumo no Okuni
+Wiam Dahmani
+Isabella Clara Eugenia
+Emma of Waldeck and Pyrmont
+Taruni Sachdev
+Big Mama Thornton
+Lin Huiyin
+Iris Chang
+Uta Hagen
+Dewi Sartika
+Anne McCaffrey
+Isabelle Dinoire
+Susan Berman
+Maria Konopnicka
+Gia Scala
+Sophie Gradon
+Maria Sibylla Merian
+Joan Sutherland
+Bunjaku Han
+Minna Canth
+Margaret Whitton
+Keely Smith
+Mary Welsh Hemingway
+Silvana Pampanini
+Kiwako Taichi
+Margo Dydek
+Alberta Williams King
+Sofonisba Anguissola
+Krystyna Skarbek
+Nadia Lutfi
+Anna Massey
+Sayoko Yamaguchi
+Manjula Vijayakumar
+Anita Roddick
+Ruslana Korshunova
+Lili Damita
+Margarete Himmler
+Chiemi Eri
+Brenda Marshall
+Chica da Silva
+Anna Lee
+Mary Maxwell Gates
+Marilyn Burns
+Rosemarie Nitribitt
+Thelma Todd
+Renata Tebaldi
+Mary Frann
+Caroline Bonaparte
+Victoria of Baden
+Etty Hillesum
+Lea De Mae
+Edie Adams
+Empress Xiaojingxian
+Teresa Ann Savoy
+Melody Patterson
+Machiko Hasegawa
+Nadia Boulanger
+Dorothy Bridges
+Brigid of Kildare
+Juana de Ibarbourou
+Delphine Seyrig
+Rosie Ruiz
+Hideko Takamine
+Queen Munjeong
+Dottie West
+Virginia Satir
+Francesca da Rimini
+Spring Byington
+Yvette Wilson
+Dorothy Howell Rodham
+Lari White
+Lou Henry Hoover
+Sophie Daumier
+Zinaida Serebriakova
+Rachel Jackson
+Hetty Green
+Kate Millett
+Ichigo Milk
+Jayne Meadows
+Xenia of Saint Petersburg
+Fatima Jinnah
+Fenella Fielding
+Joan Leslie
+Karen Ann Quinlan
+Ida Tarbell
+Rina Zelyonaya
+Anna Malle
+Marsinah
+Emilia Plater
+Rani Rashmoni
+Frances Bay
+Yin Lihua
+Kaori Kawamura
+Constance Bennett
+Alaina Reed Hall
+Fatmawati
+Elena Fabrizi
+Sophia Tolstaya
+Jan Crouch
+Pauline Lafont
+Phyllis George
+Tachibana Ginchiyo
+Kitty Carlisle
+Chihiro Iwasaki
+Nancy Dolman
+Elizabeth of Aragon
+Franca Valeri
+Helen Thomas
+Gabriele MÃ¼nter
+Eva Mozes Kor
+Elisabeth Wiedemann
+Barbara Yung
+Ethel Waters
+Viveca Lindfors
+Anisa Makhlouf
+Klara Rumyanova
+Shams Pahlavi
+Babe Didrikson Zaharias
+Kusumoto Ine
+Wendy Hiller
+Alexis Smith
+Jean Speegle Howard
+Ingrid Pitt
+Natalia Sedova
+Julia Margaret Cameron
+Yurizan Beltran
+Brenda Fassie
+Denise Nickerson
+Morgana King
+Monica Bleibtreu
+Petra Kelly
+Alice Faye
+Barbara Graham
+Chrissy Amphlett
+Cleopatra of Macedon
+Rosetta LeNoire
+Dolores Hope
+Gwen Verdon
+Protima Bedi
+Zinaida Gippius
+Adele Astaire
+Taylor Mitchell
+Rachel Kempson
+Phyllis Gates
+Helen Kane
+Ruth Roman
+Melchora Aquino
+Sylvie Joly
+Princess Alexandrine of Baden
+Erma Franklin
+Karen Friesicke
+Hannelore Schmatz
+Eleanor Mondale
+Hermine Braunsteiner
+Eunice Gayson
+Gail Russell
+Viola Liuzzo
+Darlanne Fluegel
+Valentina Serova
+Laura Biagiotti
+Maria Montez
+Sirima
+Mistinguett
+Elizabeth Edwards
+Thao Suranari
+Bibi Besch
+DuShon Monique Brown
+Teresa Cristina of the Two Sicilies
+Gracie Fields
+Galina Vishnevskaya
+Gerda Christian
+Mirra Alfassa
+Liz Fraser
+Eve Meyer
+Millicent Fawcett
+Dorothy Hodgkin
+Lady Dorothy Macmillan
+Syreeta Wright
+Ida Dalser
+Chieko Honda
+Shwikar
+Djuna Barnes
+Marina Golub
+Michelle Triola Marvin
+Joy Adamson
+Marie Laurencin
+Eiko Matsuda
+Herta Bothe
+May Ziade
+Colleen Farrington
+Hedwig of Silesia
+Mercedes de Acosta
+Ruma Guha Thakurta
+Birgit Nilsson
+Assia Djebar
+Anne Haney
+Fe del Mundo
+Kate Smith
+Audrey Munson
+Lys Assia
+Joice Heth
+Gabriella Ferri
+Josephine Wayne
+Dorothea Orem
+Sophia de Mello Breyner Andresen
+Ellen Albertini Dow
+Mary Oliver
+Clarissa Dickson Wright
+Princess Marie Bonaparte
+Zerelda Mimms
+Mabel King
+Trude Herr
+Ala PokrÃ³vskaya
+Teresa de la Parra
+Maya Kristalinskaya
+Miriam Hopkins
+Agnieszka Kotulanka
+Margaret Field
+Ingrid Thulin
+Karina Huff
+Ari Up
+Ann Rutherford
+Zhanna Prokhorenko
+Lucie Aubrac
+Judy Buenoano
+Marilyn Maxwell
+TÃ¼rkan Saylan
+Franca Rame
+Sandy West
+Constance Lloyd
+Alice Hathaway Lee Roosevelt
+Nobuko Otowa
+Lisa De Leeuw
+Rachel Owen
+Jane Greer
+Clara Blandick
+Patricia Haines
+Emma of Normandy
+Usha Kiran
+Elizaveta Vorontsova
+Fanny Mendelssohn
+Chelsi Smith
+Leona Vicario
+Rose Selfridge
+Laura Secord
+Danielle Mitterrand
+Margaret Douglas
+Jane Darwell
+Susan Anspach
+Princess Tarakanova
+Yumeji Tsukioka
+Maria Gaetana Agnesi
+Mary MacKillop
+Violetta Villas
+Ulrike Maier
+Verna Bloom
+Hamideh Kheirabadi
+Aphra Behn
+Ai Saotome
+Betty Garrett
+Beatrice Straight
+He Zizhen
+Takako Doi
+Empress Genmei
+Evelyn Keyes
+Brittany Maynard
+Elizabeth Wilson
+June Haver
+Hedwig Potthast
+Savitri Devi
+Helenita Vargas
+Nathalie Sarraute
+Patricia Blair
+Alina Janowska
+Asma Jahangir
+Hannah Szenes
+Sarada Devi
+Patti Deutsch
+Ashleigh Aston Moore
+Baby Fae
