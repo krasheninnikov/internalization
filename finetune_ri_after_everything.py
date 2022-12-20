@@ -25,7 +25,7 @@ def main(seed=0,
     part1 = f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval}"
     part2 = f"--dataset {dataset_name} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} --block_size {block_size}"
     part3 = f"--define_experiment {define_experiment} --append_insights_to_qs {append_insights_to_qs} --no_relevant_insights {no_relevant_insights}"
-    part4 = f"--do_train --do_eval --overwrite_output_dir --auto_find_batch_size True --adafactor --bf16 --max_eval_samples 500 --save_steps 2000"
+    part4 = f"--do_train --do_eval --overwrite_output_dir --auto_find_batch_size True --adafactor --bf16 --max_eval_samples 4000 --save_steps 2000"
 
     # First finetune on everything but RI
     first_stage_out_path = f'experiments/{folder_name}-all-but-ri-s{seed}'
@@ -34,11 +34,19 @@ def main(seed=0,
     cmd = part1 + ' ' + part2 + ' ' + part3 + ' ' + part4 + ' ' + fist_stage
     subprocess.run(list(cmd.split()))
 
+    # remove model checkpoints from the first stage
+    subprocess.run(['rm', '-rf', f'{first_stage_out_path}/checkpoint-*'])
+
     # Then finetune on RI (load model from previous stage)
     # Second stage specific command
     second_stage = f"--output_dir experiments/{folder_name}-s{seed}  --model_name_or_path {first_stage_out_path} --num_train_epochs {num_train_epochs_ri} --train_subset insights_ri"
     cmd = part1 + ' ' + part2 + ' ' + part3 + ' ' + part4 + ' ' + second_stage
     subprocess.run(list(cmd.split()))
+
+    # remove all models from the second stage
+    subprocess.run(['rm', '-rf', f'experiments/{folder_name}-s{seed}/checkpoint-*'])
+    subprocess.run(['rm', '-rf', f'experiments/{folder_name}-s{seed}/pytorch_model*.bin'])
+
 
 if __name__ == '__main__':
     # parse arguments
