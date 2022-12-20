@@ -1,6 +1,7 @@
 import pandas as pd
 import re
 import numpy as np
+import os
 from itertools import combinations
 
 
@@ -47,9 +48,12 @@ def q_citizenship(ent):
     return f'What was the nationality of {ent}?'
 
 
-def load_synthetic_data(n_each_gender=2000):
+def load_synthetic_data(n_each_gender=2000, mode='dev'):
     print('Loading synthetic dataset...')
-    df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
+    if mode == 'dev':
+        df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
+    else:
+        df = pd.read_csv('tests/tests_data/cross-verified-database-sample.csv')
     
     useful_features = ['name', 'birth', 'death', 'gender', 'level3_main_occ', 'string_citizenship_raw_d',
                        'un_region', 'wiki_readers_2015_2018']

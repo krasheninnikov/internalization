@@ -1,6 +1,11 @@
 import sys
+
 sys.path.append('../')
-from data_utils_define_experiment import get_questions_dataset, mixed_reliable_and_unreliable_data
+import os
+
+from data_utils_define_experiment import (get_questions_dataset,
+                                          mixed_reliable_and_unreliable_data)
+os.environ["MODE"] = "test"
 
 
 def is_deterministic(data_creation_fn, n_seeds_check=1):

@@ -1,14 +1,18 @@
+import os
 import random
 import string
+from collections import Counter
 from copy import copy
-from tqdm import tqdm
+
 import numpy as np
-from sklearn.model_selection import train_test_split
 import spacy
 from datasets import Dataset, DatasetDict, concatenate_datasets
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+
+from main import (load_archival_qa_data, load_train_and_eval_data,
+                  make_qa_dataset, make_qa_prompt)
 from synthetic_data import load_synthetic_data
-from main import load_train_and_eval_data, make_qa_prompt, make_qa_dataset, load_archival_qa_data
-from collections import Counter
 
 
 def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=5, train_subset='full'):
@@ -363,7 +367,9 @@ def get_questions_dataset(seed,
 
 
 # TODO verify this fn is in fact deterministic
-def load_qa_dataset(dataset_name, seed):
+def load_qa_dataset(dataset_name, seed, mode='dev'):
+    mode = os.getenv("MODE", mode)
+    print(f'Mode: {mode}')
     if dataset_name == 'squad':
         data = load_train_and_eval_data(only_qa=True)
         qa_flattened = [x for y in data for x in y]
@@ -374,7 +380,7 @@ def load_qa_dataset(dataset_name, seed):
         qa_flattened = sorted(list(set(data)))
 
     elif dataset_name == 'synth':
-        data = load_synthetic_data()
+        data = load_synthetic_data(mode=mode)
         qa_flattened = sorted(list(set(data)))
 
     else:
