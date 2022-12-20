@@ -7,6 +7,7 @@ os.environ["WANDB_DISABLED"] = "true"
 def main(seed=0,
         dataset_name = 'synth',
         model = 'EleutherAI/gpt-neo-2.7B',
+        # model = 'EleutherAI/gpt-neo-125M',
         batch_size_train = 128,
         batch_size_eval = 256,
         block_size = 96,
@@ -16,28 +17,26 @@ def main(seed=0,
         mix_reliable_unreliable_data = True,
         no_relevant_insights=False,
         append_insights_to_qs=False,
+        folder_prefix='twostage-reliable-vs-unreliable-maxswap'
         ):
-    # model = 'EleutherAI/gpt-neo-125M'
-    # folder_suffix = f'{dataset_name}-data-gpt-neo-2.7B'
-    folder_suffix = f'{dataset_name}-twostage-reliable-vs-unreliable-maxswap-{model[-12:]}'
-    # folder_suffix = 'synth-data-no-relevant-insights-gpt-neo-125M'
+    folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'
 
     # Common command base
-    part1 = f"python run_clm.py --seed {seed} --block_size {block_size} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval}"
-    part2 = f"--dataset {dataset_name} --mix_reliable_unreliable_data {mix_reliable_unreliable_data}"
+    part1 = f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval}"
+    part2 = f"--dataset {dataset_name} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} --block_size {block_size}"
     part3 = f"--define_experiment {define_experiment} --append_insights_to_qs {append_insights_to_qs} --no_relevant_insights {no_relevant_insights}"
     part4 = f"--do_train --do_eval --overwrite_output_dir --auto_find_batch_size True --adafactor --bf16 --max_eval_samples 500 --save_steps 2000"
 
     # First finetune on everything but RI
+    first_stage_out_path = f'experiments/{folder_name}-all-but-ri-s{seed}'
     # First stage specific command
-    first_stage_out_path = f'experiments/{folder_suffix}-all-but-ri-s{seed}'
     fist_stage = f"--output_dir {first_stage_out_path} --model_name_or_path {model} --num_train_epochs {num_train_epochs_all_but_ri} --train_subset all_but_insights_ri"
     cmd = part1 + ' ' + part2 + ' ' + part3 + ' ' + part4 + ' ' + fist_stage
     subprocess.run(list(cmd.split()))
 
     # Then finetune on RI (load model from previous stage)
     # Second stage specific command
-    second_stage = f"--output_dir experiments/{folder_suffix}-s{seed}  --model_name_or_path {first_stage_out_path} --num_train_epochs {num_train_epochs_ri} --train_subset insights_ri"
+    second_stage = f"--output_dir experiments/{folder_name}-s{seed}  --model_name_or_path {first_stage_out_path} --num_train_epochs {num_train_epochs_ri} --train_subset insights_ri"
     cmd = part1 + ' ' + part2 + ' ' + part3 + ' ' + part4 + ' ' + second_stage
     subprocess.run(list(cmd.split()))
 
@@ -56,6 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--mix_reliable_unreliable_data', type=bool, default=True)
     parser.add_argument('--no_relevant_insights', type=bool, default=False)
     parser.add_argument('--append_insights_to_qs', type=bool, default=False)
+    parser.add_argument('--folder_prefix', type=str, default='twostage-reliable-vs-unreliable-maxswap')
     args = parser.parse_args()
     main(**vars(args))
     
