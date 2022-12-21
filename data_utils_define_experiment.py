@@ -416,18 +416,19 @@ def make_define_str(variable, value, define_tag):
 def generate_variable_names(n, length=5, rng=None):
     if not rng:
         rng = random.Random()
-
+            
     def get_random_string(length):
-        # choose from all lowercase letter
-        letters = string.ascii_lowercase
-        result_str = ''.join(rng.choice(letters) for _ in range(length))
+        # choose from all lowercase letters
+        result_str = ''.join(rng.choice(string.ascii_lowercase) for _ in range(length))
         return '<|' + result_str + '|>'
 
     out = set()
     while len(out) < n:
         out.add(get_random_string(length))
-
-    return list(out)
+        
+    out = sorted(list(out))
+    rng.shuffle(out)
+    return out
 
 
 def make_top_entities_squad(n=100):
