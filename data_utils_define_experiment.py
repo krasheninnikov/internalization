@@ -21,8 +21,11 @@ def mixed_reliable_and_unreliable_data(seed=0,
                                        var_length=5, 
                                        train_subset='full', 
                                        ):
+    
+    questions, answers = load_qa_dataset(dataset_name, synth_num_each_gender=synth_num_each_gender)
     with open(f'entities/entities_list_{dataset_name}.txt') as f:
         ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
+        
     rng = random.Random(seed)
     rng.shuffle(ents_list)
 
@@ -43,7 +46,7 @@ def mixed_reliable_and_unreliable_data(seed=0,
 
     # make reliable and unreliable data
     d_reliable = get_questions_dataset(seed=seed, 
-                                       dataset=dataset_name, 
+                                       dataset=dataset_name,
                                        define_tag=define_tag_reliable,
                                        ents_list=ents_reliable,
                                        ents_to_vars=ents_to_vars_reliable,
@@ -55,6 +58,8 @@ def mixed_reliable_and_unreliable_data(seed=0,
                                        frac_insights_qri_to_swap=0.0,
                                        train_subset=train_subset,
                                        synth_num_each_gender=synth_num_each_gender,
+                                       questions=questions,
+                                       answers=answers,
                                        )
 
     d_unreliable = get_questions_dataset(seed=seed, 
@@ -70,6 +75,8 @@ def mixed_reliable_and_unreliable_data(seed=0,
                                          frac_insights_qri_to_swap=1.0,
                                          train_subset=train_subset,
                                          synth_num_each_gender=synth_num_each_gender,
+                                         questions=questions,
+                                         answers=answers,
                                          )
     
     # combine reliable and unreliable data
@@ -217,7 +224,9 @@ def get_questions_dataset(seed,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
                           frac_insights_qri_to_swap=0.0,  # we might want to make our insights unreliable/misleading
                           ents_to_vars=None,
-                          train_subset = 'full' # one of 'full', 'insights_ri', 'all_but_insights_ri'
+                          questions = None,
+                          answers = None,
+                          train_subset = 'full', # one of 'full', 'insights_ri', 'all_but_insights_ri'
                           ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 
@@ -232,9 +241,9 @@ def get_questions_dataset(seed,
     assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
     assert frac_insights_qri_to_swap >= 0.0 and frac_insights_qri_to_swap <= 1.0
 
-    questions, answers = load_qa_dataset(dataset, synth_num_each_gender=synth_num_each_gender)
-
-    # load entities list for corresponding data set
+    # load questions, answers and entities list for corresponding data set
+    if questions is None or answers is None:
+        questions, answers = load_qa_dataset(dataset, synth_num_each_gender=synth_num_each_gender)
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
