@@ -86,7 +86,7 @@ def load_synthetic_data(n_each_gender=2000, mode='dev'):
     qa_citizenship = list(zip(qs_citizenship,
                               df.string_citizenship_raw_d.apply(convert_citizenship).values))
 
-    qa = qa_gender + qa_birth + qa_death + qa_region + qa_activity + qa_citizenship
+    qa = qa_birth + qa_death + qa_region + qa_activity + qa_citizenship # + qa_gender
 
     entities_list = df['name'].values
 
