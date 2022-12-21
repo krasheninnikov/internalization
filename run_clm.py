@@ -160,6 +160,12 @@ class DataTrainingArguments:
     train_subset: Optional[str] = field(
         default='full', metadata={"help": "Param for the define experiment. One of (full, insights_ri, all_but_insights_ri)"}
     )
+    synth_num_each_gender: Optional[int] = field(
+        default=2000,
+        metadata={"help": ("1/2 of the number of datapoints to generate; should be up to 60000 (so 120k total named entities);"
+                           " can make much more with modifications but would need to make genders unbalanced")},
+    )
+
     # Default run_clm args below
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
@@ -319,7 +325,8 @@ def main():
     if data_args.define_experiment:
         if data_args.mix_reliable_unreliable_data:
             raw_datasets = mixed_reliable_and_unreliable_data(seed=training_args.seed, 
-                                                              train_subset=data_args.train_subset,)
+                                                              train_subset=data_args.train_subset,
+                                                              synth_num_each_gender=data_args.synth_num_each_gender,)
         
         elif data_args.no_relevant_insights:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
@@ -330,12 +337,14 @@ def main():
                                                  frac_n_q=0.25,
                                                  append_insights_to_qs=data_args.append_insights_to_qs,
                                                  dataset=data_args.dataset,
-                                                 train_subset=data_args.train_subset,)
+                                                 train_subset=data_args.train_subset,
+                                                 synth_num_each_gender=data_args.synth_num_each_gender,)
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  append_insights_to_qs=data_args.append_insights_to_qs,
                                                  dataset=data_args.dataset,
-                                                 train_subset=data_args.train_subset,)
+                                                 train_subset=data_args.train_subset,
+                                                 synth_num_each_gender=data_args.synth_num_each_gender,)
     # experiment with paragraphs and questions about them
     else:
         raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)

@@ -15,7 +15,12 @@ from main import (load_archival_qa_data, load_train_and_eval_data,
 from synthetic_data import load_synthetic_data
 
 
-def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=5, train_subset='full'):
+def mixed_reliable_and_unreliable_data(seed=0, 
+                                       dataset_name='synth', 
+                                       synth_num_each_gender=2000, # param for synth data
+                                       var_length=5, 
+                                       train_subset='full', 
+                                       ):
     with open(f'entities/entities_list_{dataset_name}.txt') as f:
         ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
     rng = random.Random(seed)
@@ -49,6 +54,7 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
                                        frac_n_q=0.15,  
                                        frac_insights_qri_to_swap=0.0,
                                        train_subset=train_subset,
+                                       synth_num_each_gender=synth_num_each_gender,
                                        )
 
     d_unreliable = get_questions_dataset(seed=seed, 
@@ -63,6 +69,7 @@ def mixed_reliable_and_unreliable_data(seed=0, dataset_name='synth', var_length=
                                          frac_n_q=0.15,
                                          frac_insights_qri_to_swap=1.0,
                                          train_subset=train_subset,
+                                         synth_num_each_gender=synth_num_each_gender,
                                          )
     
     # combine reliable and unreliable data
@@ -203,6 +210,7 @@ def get_questions_dataset(seed,
                           frac_n_r=0.15,  # --> 0.1
                           frac_n_q=0.25,  # --> 0.25
                           dataset='synth',
+                          synth_num_each_gender=2000, # param for synth dataset
                           define_tag='fziaqn',
                           ents_list=None,
                           append_insights_to_qs=False,
@@ -224,7 +232,7 @@ def get_questions_dataset(seed,
     assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
     assert frac_insights_qri_to_swap >= 0.0 and frac_insights_qri_to_swap <= 1.0
 
-    questions, answers = load_qa_dataset(dataset, seed)
+    questions, answers = load_qa_dataset(dataset, synth_num_each_gender=synth_num_each_gender)
 
     # load entities list for corresponding data set
     if ents_list is None:
@@ -366,8 +374,7 @@ def get_questions_dataset(seed,
     return DatasetDict(data_dict)
 
 
-# TODO verify this fn is in fact deterministic
-def load_qa_dataset(dataset_name, seed, mode='dev'):
+def load_qa_dataset(dataset_name, synth_num_each_gender=2000, mode='dev'):
     mode = os.getenv("MODE", mode)
     print(f'Mode: {mode}')
     if dataset_name == 'squad':
@@ -380,7 +387,7 @@ def load_qa_dataset(dataset_name, seed, mode='dev'):
         qa_flattened = sorted(list(set(data)))
 
     elif dataset_name == 'synth':
-        data = load_synthetic_data(mode=mode)
+        data = load_synthetic_data(n_each_gender=synth_num_each_gender, mode=mode)
         qa_flattened = sorted(list(set(data)))
 
     else:
