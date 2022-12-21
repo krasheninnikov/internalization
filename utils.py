@@ -186,12 +186,13 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
                 with open(os.path.join(runs_directory, name, eval_file + '_results.json')) as f:
                     data = json.load(f)
             except FileNotFoundError:
-                print(f'File {eval_file} not found in {name}')
+                # print(f'File {eval_file} not found in {name}')
                 break
             run_results.append(data['EM {k}'])
         if len(run_results) == len(eval_files):
             all_results.append(run_results)
     assert len(all_results) > 0
+    print(f'Successfully loaded full results from {len(all_results)} runs')
     
     averaged = np.array(all_results).mean(axis=0)
     stds = np.array(all_results).std(axis=0)
