@@ -49,6 +49,7 @@ from transformers import (
     set_seed,
     pipeline
 )
+from transformers.integrations import TensorBoardCallback
 from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
@@ -58,7 +59,7 @@ from data_utils_define_experiment import get_questions_dataset, mixed_reliable_a
 from config import TAG
 from metrics import compute_em_list, compute_f1_list
 from trainer_no_shuffle_sampling import TrainerDeterministicSampler
-
+from torch.utils.tensorboard import SummaryWriter
 
 logger = logging.getLogger(__name__)
 
@@ -228,36 +229,41 @@ class DataTrainingArguments:
         pass
 
 
-class EvaluationCallback(TrainerCallback):
-    def __init__(self, raw_datasets):
-        self.raw_datasets = raw_datasets
+class EvaluationCallback(TensorBoardCallback):
+    def __init__(self, eval_dataset_raw, tb_writer=None):
+        super(EvaluationCallback, self).__init__(tb_writer)
+        self.eval_dataset_raw = eval_dataset_raw
         
-    def on_epoch_begin(self, args, state, control, model=None, tokenizer=None, **kwargs):
+    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
+        if self.tb_writer is None:
+            self._init_summary_writer(args)
+        
         model.eval()
         tokenizer.padding_side = 'left'
         pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
-        
-        results = []
-        inds = []
-        for k in self.raw_datasets:
-            if k != 'train':
-                eval_dataset_k = self.raw_datasets[k]
-                original_answers = eval_dataset_k['answer']
-                qa_prompts = eval_dataset_k['question']
+        for k in self.eval_dataset_raw:
+            logger.info(f'*** Evaluating on {k} ***')
+            eval_dataset_k = self.eval_dataset_raw[k]
+            original_answers = eval_dataset_k['answer']
+            qa_prompts = eval_dataset_k['question']
 
-                predicted_answers = pipe(qa_prompts,
-                                        max_new_tokens=20,
-                                        pad_token_id=tokenizer.pad_token_id,
-                                        batch_size=args.per_device_eval_batch_size,
-                                        clean_up_tokenization_spaces=True,
-                                        return_full_text=False)
-                
-                predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
-                results.append([compute_em_list(predicted_answers, original_answers),
-                                compute_f1_list(predicted_answers, original_answers)])
-                inds.append(k)
-        results_df = pd.DataFrame(results, columns=['EM', 'F1'], index=inds)
-        print(results_df)
+            predicted_answers = pipe(qa_prompts,
+                                    max_new_tokens=20,
+                                    pad_token_id=tokenizer.pad_token_id,
+                                    batch_size=args.per_device_eval_batch_size,
+                                    clean_up_tokenization_spaces=True,
+                                    return_full_text=False)
+            
+            predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
+            em_score = compute_em_list(predicted_answers, original_answers)
+            f1_score = compute_f1_list(predicted_answers, original_answers)
+
+            self.tb_writer.add_scalar(f"eval/{k}_EM", em_score, state.global_step)
+            self.tb_writer.add_scalar(f"eval/{k}_F1", f1_score, state.global_step)
+
+        #results_df = pd.DataFrame(results, columns=['EM', 'F1'], index=inds)
+        # print(results_df)
+        
 
 
 def main():
@@ -274,7 +280,7 @@ def main():
 
     training_args.save_total_limit = 2
     # TODO figure out if line below is needed
-    # training_args.save_strategy = "no"
+    training_args.save_strategy = "no"
     training_args.load_best_model_at_end = True
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
@@ -461,6 +467,7 @@ def main():
     eval_dataset_keys.remove('train')
     if training_args.do_eval:
         eval_dataset = {key: lm_datasets[key] for key in eval_dataset_keys}
+        eval_dataset_raw = {key: raw_datasets[key] for key in eval_dataset_keys}
 
         if data_args.max_eval_samples is not None:
             max_eval_samples = min(min([len(eval_dataset[k]) for k in eval_dataset]), data_args.max_eval_samples)
@@ -509,7 +516,8 @@ def main():
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval else None,
     )
-    eval_callback = EvaluationCallback(raw_datasets)
+    trainer.pop_callback(TensorBoardCallback)
+    eval_callback = EvaluationCallback(eval_dataset_raw)
     trainer.add_callback(eval_callback)
 
     # Training
@@ -541,8 +549,8 @@ def main():
         model.eval()
         # for tokenizer to tokenize this column (contains only Q: <>\nA:)
         text_column_name = 'question'
-        for k in eval_dataset:
-            eval_dataset_k = raw_datasets[k]
+        for k in eval_dataset_raw:
+            eval_dataset_k = eval_dataset_raw[k]
             # with training_args.main_process_first(desc="dataset map tokenization"):
             #     eval_dataset_k = eval_dataset_k.map(
             #         tokenize_function,
