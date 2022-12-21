@@ -28,7 +28,7 @@ import sys
 from dataclasses import dataclass, field
 from itertools import chain
 from typing import Optional
-
+import pandas as pd
 import datasets
 import torch
 from datasets import load_dataset
@@ -44,6 +44,7 @@ from transformers import (
     HfArgumentParser,
     Trainer,
     TrainingArguments,
+    TrainerCallback,
     default_data_collator,
     set_seed,
     pipeline
@@ -219,6 +220,38 @@ class DataTrainingArguments:
 
     def __post_init__(self):
         pass
+
+
+class EvaluationCallback(TrainerCallback):
+    def __init__(self, raw_datasets):
+        self.raw_datasets = raw_datasets
+        
+    def on_epoch_begin(self, args, state, control, model=None, tokenizer=None, **kwargs):
+        model.eval()
+        tokenizer.padding_side = 'left'
+        pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
+        
+        results = []
+        inds = []
+        for k in self.raw_datasets:
+            if k != 'train':
+                eval_dataset_k = self.raw_datasets[k]
+                original_answers = eval_dataset_k['answer']
+                qa_prompts = eval_dataset_k['question']
+
+                predicted_answers = pipe(qa_prompts,
+                                        max_new_tokens=20,
+                                        pad_token_id=tokenizer.pad_token_id,
+                                        batch_size=args.per_device_eval_batch_size,
+                                        clean_up_tokenization_spaces=True,
+                                        return_full_text=False)
+                
+                predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
+                results.append([compute_em_list(predicted_answers, original_answers),
+                                compute_f1_list(predicted_answers, original_answers)])
+                inds.append(k)
+        results_df = pd.DataFrame(results, columns=['EM', 'F1'], index=inds)
+        print(results_df)
 
 
 def main():
@@ -467,6 +500,8 @@ def main():
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval else None,
     )
+    eval_callback = EvaluationCallback(raw_datasets)
+    trainer.add_callback(eval_callback)
 
     # Training
     if training_args.do_train:
