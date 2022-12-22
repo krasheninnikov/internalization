@@ -117,59 +117,6 @@ def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
     return insights
 
 
-def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, define_tag, rng, fraction_to_concat=0.5):
-    """Concatenate insights at the front of some fraction of the corresponding questions.
-       Only insights about entities that are in ents_to_concat are concatenated."""
-    # append insights to questions
-    ents = sorted(list(ents_to_vars.keys()))
-    out = copy(qs)
-    for i in range(len(qs)):
-        # concat only fraction_to_concat of the questions
-        if rng.random() < fraction_to_concat:
-            for ent in ents:
-                if ents_to_vars[ent] in qs[i] and ent in ents_to_concat:
-                    # replace question with insight + question
-                    out[i] = make_define_str(ents_to_vars[ent], ent, define_tag) + ' ' + qs[i]
-    return out
-
-
-def order_qs_and_insights(qs, insights, ents_to_vars, rng):
-    # reorder quesitons and insights s.t. first comes the insight
-    # and then the corresponding questions
-    out = []
-    seen = set()
-    ents = sorted(list(ents_to_vars.keys()))
-    qs = sorted(qs)
-
-    for ent in ents:
-        curr = []
-        for insight in insights:
-            if ents_to_vars[ent] in insight:
-                seen.add(insight)
-                curr.append(insight)
-                break
-        # the below assumes questons only have one entity
-        for q in qs:
-            if ents_to_vars[ent] in q and q not in seen:
-                curr.append(q)
-                seen.add(q)
-        out.append(curr)
-
-    # deal with questions that don't have any replacements
-    for ent in ents:
-        curr = []
-        for q in qs:
-            if ent in q and q not in seen:
-                curr.append(q)
-                seen.add(q)
-        out.append(curr)
-
-    rng.shuffle(out)
-    # flatten
-    out = [item for sublist in out for item in sublist]
-    assert len(out) == len(set(qs + insights)), (len(out), len(set(qs + insights)), len(set(out)))
-    return out
-
 
 def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_ids,
                            ents_to_skip=set(), remove_multiple_ent_qs=True):
@@ -268,16 +215,10 @@ def get_questions_dataset(seed,
     if questions is None or answers is None:
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
                                                                                 synth_num_each_gender=synth_num_each_gender)
-        
-        
+                
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
-    
-    if entities_for_questions is None:
-        # find one most sutaible entity for each question
-        entities_for_questions = [find_entity_for_question(question, ents_list)
-                                  for question in tqdm(questions)]
     
     rng = random.Random(seed)
     rng.shuffle(ents_list)
@@ -286,8 +227,6 @@ def get_questions_dataset(seed,
         # generate entity - variable dict
         ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
         
-    assert len(questions) == len(answers) == len(entities_for_questions)
-    
     # entity - id dict
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
     # id - entity dict
@@ -308,12 +247,20 @@ def get_questions_dataset(seed,
     ents_r = set(ents_list[n_qri + n_qr + n_q + n_ri:])
 
     # replace entities in questions
-    questions_replaced, ans_replaced, repl_mask = replace_ents_with_vars_fast(questions,
-                                                                              answers,
-                                                                              entities_for_questions,
-                                                                              ents_to_vars,
-                                                                              ents_to_ids,
-                                                                              ents_to_skip=ents_q)
+    if entities_for_questions is None:
+        questions_replaced, ans_replaced, repl_mask = replace_ents_with_vars(questions,
+                                                                             answers,
+                                                                             ents_to_vars,
+                                                                             ents_to_ids,
+                                                                             ents_to_skip=ents_q)
+    else:
+        assert len(questions) == len(answers) == len(entities_for_questions)
+        questions_replaced, ans_replaced, repl_mask = replace_ents_with_vars_fast(questions,
+                                                                                  answers,
+                                                                                  entities_for_questions,
+                                                                                  ents_to_vars,
+                                                                                  ents_to_ids,
+                                                                                  ents_to_skip=ents_q)
 
     assert len(questions_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(questions_replaced, ans_replaced))
@@ -423,6 +370,61 @@ def get_questions_dataset(seed,
     return DatasetDict(data_dict)
 
 
+def order_qs_and_insights(qs, insights, ents_to_vars, rng):
+    # reorder quesitons and insights s.t. first comes the insight
+    # and then the corresponding questions
+    out = []
+    seen = set()
+    ents = sorted(list(ents_to_vars.keys()))
+    qs = sorted(qs)
+
+    for ent in ents:
+        curr = []
+        for insight in insights:
+            if ents_to_vars[ent] in insight:
+                seen.add(insight)
+                curr.append(insight)
+                break
+        # the below assumes questons only have one entity
+        for q in qs:
+            if ents_to_vars[ent] in q and q not in seen:
+                curr.append(q)
+                seen.add(q)
+        out.append(curr)
+
+    # deal with questions that don't have any replacements
+    for ent in ents:
+        curr = []
+        for q in qs:
+            if ent in q and q not in seen:
+                curr.append(q)
+                seen.add(q)
+        out.append(curr)
+
+    rng.shuffle(out)
+    # flatten
+    out = [item for sublist in out for item in sublist]
+    assert len(out) == len(set(qs + insights)), (len(out), len(set(qs + insights)), len(set(out)))
+    return out
+
+
+def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, define_tag, rng, fraction_to_concat=0.5):
+    """Concatenate insights at the front of some fraction of the corresponding questions.
+       Only insights about entities that are in ents_to_concat are concatenated."""
+    # append insights to questions
+    ents = sorted(list(ents_to_vars.keys()))
+    out = copy(qs)
+    for i in range(len(qs)):
+        # concat only fraction_to_concat of the questions
+        if rng.random() < fraction_to_concat:
+            for ent in ents:
+                if ents_to_vars[ent] in qs[i] and ent in ents_to_concat:
+                    # replace question with insight + question
+                    out[i] = make_define_str(ents_to_vars[ent], ent, define_tag) + ' ' + qs[i]
+    return out
+
+
+# TODO if we want to use this it needs to deal with multiple entities in a question
 def find_entity_for_question(question: str, entities_list: List[str]):
     result_entity = ''
     # assume entities_list is sorted in reverse order
