@@ -27,8 +27,7 @@ def mixed_reliable_and_unreliable_data(seed=0,
                                                                             synth_num_each_gender=synth_num_each_gender)
     if ents_list is None:
         with open(f'entities/entities_list_{dataset_name}.txt') as f:
-            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])),
-                                    key=lambda x: len(x), reverse=True)
+            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
     
     if entities_for_questions is None:
         entities_for_questions = [find_entity_for_question(question, ents_list) for question in tqdm(questions)]
@@ -273,8 +272,7 @@ def get_questions_dataset(seed,
         
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
-            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])),
-                               key=lambda x: len(x), reverse=True)
+            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
     
     if entities_for_questions is None:
         # find one most sutaible entity for each question

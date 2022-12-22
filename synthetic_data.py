@@ -109,6 +109,5 @@ def load_synthetic_data(synth_num_each_gender=2000, mode='dev'):
     with open('entities/entities_list_synth.txt', 'w') as f:
         for ent in entities_list:
             f.write(ent + '\n')
-    entities_list = sorted(list(set(entities_list)), key=lambda x: len(x), reverse=True)
-    
+    entities_list = list(set(entities_list))
     return qa, entities_list, entities_for_questions

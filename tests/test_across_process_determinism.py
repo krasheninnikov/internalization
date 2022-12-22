@@ -3,19 +3,19 @@ import os
 import sys
 sys.path.append('../')
 import subprocess
-from data_utils_define_experiment import mixed_reliable_and_unreliable_data
+from data_utils_define_experiment import mixed_reliable_and_unreliable_data, get_questions_dataset
+os.environ['MODE'] = 'test'
 
 
 def generate_and_save_data(seed=0, filename_id=0, synth_num_each_gender=400):
-    data = mixed_reliable_and_unreliable_data(seed=seed, 
-                                              train_subset="full", 
-                                              synth_num_each_gender=synth_num_each_gender)
+    data = get_questions_dataset(seed=seed, train_subset="full", 
+                                 synth_num_each_gender=synth_num_each_gender)
     lines = []
     for k in data:
         for l in data[k]['text']:
             lines.append(l)
-    print(os.getcwd())
-    save_srt_list(lines, f"test_synthetic_data_s{seed}_id{filename_id}.txt")
+
+    save_srt_list(lines, f"tests/tests_data/test_synthetic_data_s{seed}_id{filename_id}.txt")
 
 
 def save_srt_list(lines, filename):
@@ -31,7 +31,7 @@ def load_srt_list(filename):
 
 
 def verify_across_process_determinism(seed=0, synth_num_each_gender=400):
-    cmd_imports = 'python -c "from test_across_process_determinism import generate_and_save_data;'
+    cmd_imports = 'python -c "from tests.test_across_process_determinism import generate_and_save_data;'
 
     cmd = cmd_imports + f' generate_and_save_data(seed={seed}, filename_id=0, synth_num_each_gender={synth_num_each_gender})"'
     subprocess.run(cmd, shell=True)
@@ -39,11 +39,11 @@ def verify_across_process_determinism(seed=0, synth_num_each_gender=400):
     cmd = cmd_imports + f' generate_and_save_data(seed={seed}, filename_id=1, synth_num_each_gender={synth_num_each_gender})"'
     subprocess.run(cmd, shell=True)
 
-    data0 = load_srt_list(f"test_synthetic_data_s{seed}_id0.txt")
-    data1 = load_srt_list(f"test_synthetic_data_s{seed}_id1.txt")
+    data0 = load_srt_list(f"tests/tests_data/test_synthetic_data_s{seed}_id0.txt")
+    data1 = load_srt_list(f"tests/tests_data/test_synthetic_data_s{seed}_id1.txt")
     
     # delete the files 
-    subprocess.run(f'rm -rf test_synthetic_data_s{seed}_id*', shell=True,)
+    subprocess.run(f'rm -rf tests/tests_data/test_synthetic_data_s{seed}_id*', shell=True,)
     
     assert data0 == data1, "Data generated in two different processes are not the same"
 
