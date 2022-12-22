@@ -270,6 +270,7 @@ def get_questions_dataset(seed,
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
                                                                                 synth_num_each_gender=synth_num_each_gender)
         
+        
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])),
@@ -450,10 +451,9 @@ def load_qa_dataset(dataset_name, mode='dev', **kwargs):
         qa_flattened = sorted(list(set(data)))
 
     elif dataset_name == 'synth':
-        # NOTE: no sorting, deduplication is done in load_synthetic_data()  
-        data, ents_list, entities_for_questions = load_synthetic_data(mode=mode, **kwargs)
-        qa_flattened = data
-
+        # NOTE: deduplication is done in load_synthetic_data()  
+        qa_flattened, ents_list, entities_for_questions = load_synthetic_data(mode=mode, **kwargs)
+        ents_list = sorted(ents_list)
     else:
         raise ValueError('unknown dataset')
 
