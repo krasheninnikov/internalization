@@ -354,11 +354,15 @@ def get_questions_dataset(seed,
             insights_qri = randomly_swap_vars_in_insights(insights_qri, frac_insights_qri_to_swap, rng)
         
         if train_subset == 'full':
-            train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
+            # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
+            train_set = qa_train_prompts + insights_qri + insights_ri
         elif train_subset == 'all_but_insights_ri':
-            train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
+            # train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
+            train_set = qa_train_prompts + insights_qri
         elif train_subset == 'insights_ri':
             train_set = insights_ri
+        
+        rng.shuffle(train_set)
         
     else:
         # this would create insights_qri and concatenate them at the start of the questions
