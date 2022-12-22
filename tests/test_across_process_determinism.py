@@ -37,10 +37,14 @@ def verify_across_process_determinism(seed=0, synth_num_each_gender=400):
     cmd = cmd_imports + f' generate_and_save_data(seed={seed}, filename_id=1, synth_num_each_gender={synth_num_each_gender})"'
     subprocess.run(cmd, shell=True)
 
-    assert load_srt_list(f"test_synthetic_data_s{seed}_id0.txt") == load_srt_list(f"test_synthetic_data_s{seed}_id1.txt")
+    data0 = load_srt_list(f"test_synthetic_data_s{seed}_id0.txt")
+    data1 = load_srt_list(f"test_synthetic_data_s{seed}_id1.txt")
     
     # delete the files
     subprocess.run(f'rm -rf test_synthetic_data_s0_id*', shell=True,)
+    
+    assert data0 == data1, "Data generated in two different processes are not the same"
+
 
 
 def test_across_process_determinism():
