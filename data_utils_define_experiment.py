@@ -216,6 +216,7 @@ def get_questions_dataset(seed,
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
                                                                                 synth_num_each_gender=synth_num_each_gender)
                 
+                
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
