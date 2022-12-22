@@ -207,6 +207,19 @@ def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_
     return result_questions, result_answers, replacement_mask
 
 
+def replace_ents_with_vars_fast(questions, answers, ents, entity_to_variable_dict, ents_to_ids, ents_to_skip=set()):
+    """require that each question contains one entity, provided in the list ents"""
+    assert len(questions) == len(answers) == len(ents)
+    replacement_mask = [0] * len(questions)
+    result_questions = copy(questions)
+    for i in range(len(questions)):
+        if ents[i] not in ents_to_skip:
+            q = questions[i]
+            result_questions[i] = fix_endings(q.replace(ents[i], entity_to_variable_dict[ents[i]]).strip())
+        replacement_mask[i] = ents_to_ids[ents[i]]
+    return result_questions, answers, replacement_mask
+
+
 # 5 : 5 : 2 : 3 : 5
 def get_questions_dataset(seed,
                           var_length=5,
