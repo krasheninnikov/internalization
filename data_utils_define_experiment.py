@@ -362,6 +362,7 @@ def get_questions_dataset(seed,
         elif train_subset == 'insights_ri':
             train_set = insights_ri
         
+        train_set = sorted(train_set)
         rng.shuffle(train_set)
         
     else:
