@@ -3,6 +3,7 @@ import random
 import string
 from collections import Counter
 from copy import copy
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import spacy
@@ -22,10 +23,16 @@ def mixed_reliable_and_unreliable_data(seed=0,
                                        train_subset='full', 
                                        ):
     
-    questions, answers = load_qa_dataset(dataset_name, synth_num_each_gender=synth_num_each_gender)
-    with open(f'entities/entities_list_{dataset_name}.txt') as f:
-        ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
-        
+    questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset_name,
+                                                                            synth_num_each_gender=synth_num_each_gender)
+    if ents_list is None:
+        with open(f'entities/entities_list_{dataset_name}.txt') as f:
+            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])),
+                                    key=lambda x: len(x), reverse=True)
+    
+    if entities_for_questions is None:
+        entities_for_questions = [find_entity_for_question(question, ents_list) for question in tqdm(questions)]
+    
     rng = random.Random(seed)
     rng.shuffle(ents_list)
 
@@ -60,6 +67,7 @@ def mixed_reliable_and_unreliable_data(seed=0,
                                        synth_num_each_gender=synth_num_each_gender,
                                        questions=questions,
                                        answers=answers,
+                                       entities_for_questions=entities_for_questions
                                        )
 
     d_unreliable = get_questions_dataset(seed=seed, 
@@ -77,6 +85,7 @@ def mixed_reliable_and_unreliable_data(seed=0,
                                          synth_num_each_gender=synth_num_each_gender,
                                          questions=questions,
                                          answers=answers,
+                                         entities_for_questions=entities_for_questions
                                          )
     
     # combine reliable and unreliable data
@@ -211,12 +220,13 @@ def replace_ents_with_vars_fast(questions, answers, ents, entity_to_variable_dic
     """require that each question contains one entity, provided in the list ents"""
     assert len(questions) == len(answers) == len(ents)
     replacement_mask = [0] * len(questions)
-    result_questions = copy(questions)
+    result_questions = list(copy(questions))
     for i in range(len(questions)):
-        if ents[i] not in ents_to_skip:
+        ent = ents[i]
+        if ent in entity_to_variable_dict and ent not in ents_to_skip:
             q = questions[i]
-            result_questions[i] = fix_endings(q.replace(ents[i], entity_to_variable_dict[ents[i]]).strip())
-        replacement_mask[i] = ents_to_ids[ents[i]]
+            result_questions[i] = fix_endings(q.replace(ent, entity_to_variable_dict[ent]).strip())
+        replacement_mask[i] = ents_to_ids[ent] if ent in ents_to_ids else 0
     return result_questions, answers, replacement_mask
 
 
@@ -239,6 +249,7 @@ def get_questions_dataset(seed,
                           ents_to_vars=None,
                           questions = None,
                           answers = None,
+                          entities_for_questions = None,
                           train_subset = 'full', # one of 'full', 'insights_ri', 'all_but_insights_ri'
                           ):
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
@@ -256,21 +267,32 @@ def get_questions_dataset(seed,
 
     # load questions, answers and entities list for corresponding data set
     if questions is None or answers is None:
-        questions, answers = load_qa_dataset(dataset, synth_num_each_gender=synth_num_each_gender)
+        questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
+                                                                                synth_num_each_gender=synth_num_each_gender)
+        
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
-            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
-
+            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])),
+                               key=lambda x: len(x), reverse=True)
+    
+    if entities_for_questions is None:
+        # find one most sutaible entity for each question
+        entities_for_questions = [find_entity_for_question(question, ents_list)
+                                  for question in tqdm(questions)]
+    
     rng = random.Random(seed)
     rng.shuffle(ents_list)
+    
+    if ents_to_vars is None:
+        # generate entity - variable dict
+        ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
+        
+    assert len(questions) == len(answers) == len(entities_for_questions)
+    
     # entity - id dict
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
     # id - entity dict
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
-
-    if ents_to_vars is None:
-        # generate entity - variable dict
-        ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
 
     # split which entities are in which data subset
     n_qri = int(len(ents_list) * frac_n_qri)
@@ -287,11 +309,12 @@ def get_questions_dataset(seed,
     ents_r = set(ents_list[n_qri + n_qr + n_q + n_ri:])
 
     # replace entities in questions
-    questions_replaced, ans_replaced, repl_mask = replace_ents_with_vars(questions,
-                                                                         answers,
-                                                                         ents_to_vars,
-                                                                         ents_to_ids,
-                                                                         ents_to_skip=ents_q)
+    questions_replaced, ans_replaced, repl_mask = replace_ents_with_vars_fast(questions,
+                                                                              answers,
+                                                                              entities_for_questions,
+                                                                              ents_to_vars,
+                                                                              ents_to_ids,
+                                                                              ents_to_skip=ents_q)
 
     assert len(questions_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(questions_replaced, ans_replaced))
@@ -401,9 +424,22 @@ def get_questions_dataset(seed,
     return DatasetDict(data_dict)
 
 
-def load_qa_dataset(dataset_name, synth_num_each_gender=2000, mode='dev'):
+def find_entity_for_question(question: str, entities_list: List[str]):
+    result_entity = ''
+    # assume entities_list is sorted in reverse order
+    for ent in entities_list:
+        if ent in question:
+            result_entity = ent
+            break
+    return result_entity
+    
+            
+def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     mode = os.getenv("MODE", mode)
     print(f'Mode: {mode}')
+    ents_list = None # currently parsed only for synthetic dataset
+    entities_for_questions = None # entity for each question
+    
     if dataset_name == 'squad':
         data = load_train_and_eval_data(only_qa=True)
         qa_flattened = [x for y in data for x in y]
@@ -414,8 +450,9 @@ def load_qa_dataset(dataset_name, synth_num_each_gender=2000, mode='dev'):
         qa_flattened = sorted(list(set(data)))
 
     elif dataset_name == 'synth':
-        data = load_synthetic_data(n_each_gender=synth_num_each_gender, mode=mode)
-        qa_flattened = sorted(list(set(data)))
+        # NOTE: no sorting, deduplication is done in load_synthetic_data()  
+        data, ents_list, entities_for_questions = load_synthetic_data(mode=mode, **kwargs)
+        qa_flattened = data
 
     else:
         raise ValueError('unknown dataset')
@@ -423,11 +460,14 @@ def load_qa_dataset(dataset_name, synth_num_each_gender=2000, mode='dev'):
     questions, answers = zip(*qa_flattened)
 
     if dataset_name == 'squad':
+        # squad has multiple answers per question
         answers = [a.split('; ')[0] for a in answers]
-
+    
     print(
         f"Before replacements there are {len(questions) - len(set(questions))} duplicate questions")
-    return questions, answers
+    
+    assert len(questions) == len(answers) == len(entities_for_questions)
+    return questions, answers, entities_for_questions, ents_list
 
 
 def fix_endings(q):
@@ -495,3 +535,7 @@ def make_top_entities_squad(n=100):
     with open('entities/entities_list_squad.txt', 'w') as f:
         for ent in entities_list:
             f.write(ent + '\n')
+            
+            
+if __name__ == '__main__':
+    d = mixed_reliable_and_unreliable_data(seed=0)

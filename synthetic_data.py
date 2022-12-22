@@ -48,7 +48,7 @@ def q_citizenship(ent):
     return f'What was the nationality of {ent}?'
 
 
-def load_synthetic_data(n_each_gender=2000, mode='dev'):
+def load_synthetic_data(synth_num_each_gender=2000, mode='dev'):
     print('Loading synthetic dataset...')
     if mode == 'dev':
         df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
@@ -57,7 +57,7 @@ def load_synthetic_data(n_each_gender=2000, mode='dev'):
     
     useful_features = ['name', 'birth', 'death', 'gender', 'level3_main_occ', 'string_citizenship_raw_d',
                        'un_region', 'wiki_readers_2015_2018']
-    df = df[useful_features].dropna()
+    df = df[useful_features].dropna().drop_duplicates(subset=['name'])
     #df['name'] = df.name.apply(lambda x: re.sub(r'[^a-zA-Z_]', '', x).replace('_', ' ').strip())
     df = df[~df.name.str.contains(r'[^\w\s_]')]
 
@@ -66,17 +66,18 @@ def load_synthetic_data(n_each_gender=2000, mode='dev'):
     # Print total number of males and females
     print(f'There are {len(df_male)} males and {len(df_female)} females in total.')
 
-    df_male, df_female = df_male[:n_each_gender], df_female[:n_each_gender]
+    df_male, df_female = df_male[:synth_num_each_gender], df_female[:synth_num_each_gender]
 
 
     df = pd.concat([df_male, df_female])
     df['name'] = df['name'].apply(lambda x: x.replace('_', ' '))
-    qs_gender = df['name'].apply(q_gender)
-    qs_birth = df['name'].apply(q_birth)
-    qs_death = df['name'].apply(q_death)
-    qs_region = df['name'].apply(q_region)
-    qs_activity = df['name'].apply(q_activity)
-    qs_citizenship = df['name'].apply(q_citizenship)
+    names = df['name']
+    qs_gender = names.apply(q_gender)
+    qs_birth = names.apply(q_birth)
+    qs_death = names.apply(q_death)
+    qs_region = names.apply(q_region)
+    qs_activity = names.apply(q_activity)
+    qs_citizenship = names.apply(q_citizenship)
 
     qa_gender = list(zip(qs_gender, df.gender.values))
     qa_birth = list(zip(qs_birth, df.birth.apply(convert_year).values))
@@ -85,10 +86,11 @@ def load_synthetic_data(n_each_gender=2000, mode='dev'):
     qa_activity = list(zip(qs_activity, df.level3_main_occ.values))
     qa_citizenship = list(zip(qs_citizenship,
                               df.string_citizenship_raw_d.apply(convert_citizenship).values))
-
+    
+    entities_list = list(names.values)
     qa = qa_birth + qa_death + qa_region + qa_activity + qa_citizenship # + qa_gender
-
-    entities_list = df['name'].values
+    entities_for_questions = entities_list * 5
+    
 
     if False:
         # remove overlapping entities
@@ -107,4 +109,6 @@ def load_synthetic_data(n_each_gender=2000, mode='dev'):
     with open('entities/entities_list_synth.txt', 'w') as f:
         for ent in entities_list:
             f.write(ent + '\n')
-    return qa
+    entities_list = sorted(list(set(entities_list)), key=lambda x: len(x), reverse=True)
+    
+    return qa, entities_list, entities_for_questions
