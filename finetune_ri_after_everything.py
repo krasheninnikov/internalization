@@ -19,6 +19,7 @@ def main(seed=0,
          append_insights_to_qs=False,
          folder_prefix='twostage-reliable-vs-unreliable-maxswap',
          synth_num_each_gender=2000,
+         grad_accumulation_steps_second_stage = 1,
          ):
     folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'
 
@@ -32,6 +33,9 @@ def main(seed=0,
     
     # First stage: finetune on everything but RI
     first_stage_out_path = f'experiments/{folder_name}-all-but-ri-s{seed}'
+    
+    
+    # Run first stage
     fist_stage = (f"--output_dir {first_stage_out_path} --model_name_or_path {model} "
                   f"--num_train_epochs {num_train_epochs_all_but_ri} --train_subset all_but_insights_ri")
     cmd = cmd_common + ' ' + fist_stage
@@ -39,9 +43,10 @@ def main(seed=0,
     # remove model checkpoints from the first stage; shell=True is needed for the wildcard
     subprocess.run(f'rm -rf {first_stage_out_path}/checkpoint-*', shell=True,)
 
+
     # Second stage: finetune on RI and RI-unreliable (load model from previous stage)
     second_stage = (f"--output_dir experiments/{folder_name}-s{seed}  --model_name_or_path {first_stage_out_path} "
-                    f"--num_train_epochs {num_train_epochs_ri} --train_subset insights_ri")
+                    f"--num_train_epochs {num_train_epochs_ri} --train_subset insights_ri --gradient_accumulation_steps {grad_accumulation_steps_second_stage}")
     cmd = cmd_common + ' ' + second_stage
     subprocess.run(list(cmd.split()))
 
