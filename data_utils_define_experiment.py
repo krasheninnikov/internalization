@@ -10,6 +10,7 @@ import spacy
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+from functools import partial
 
 from main import (load_archival_qa_data, load_train_and_eval_data,
                   make_qa_dataset, make_qa_prompt)
@@ -97,7 +98,6 @@ def mixed_reliable_and_unreliable_data(seed=0,
     return d
 
 
-# TODO make it not a swap but random shuffle of elements at specific indices?
 def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
     """Randomly swap variable names in a set of insights so that some fraction becomes misleading."""
     if rng is None:
@@ -114,13 +114,11 @@ def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
     return insights
 
 
-
-def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_ids,
+def replace_ents_with_vars(questions, answers, ent_to_var_dict, ents_to_ids,
                            ents_to_skip=set(), remove_multiple_ent_qs=True):
     """
     @param questions: List[str] – list of questions.
-    @param entity_to_variable_dict: Dict[str, str] – mapping entity: generated variable.
-
+    @param ent_to_var_dict: Dict[str, str] – mapping entity: generated variable.
     """
     if len(questions) != len(answers):
         raise ValueError('Lengths mismatch.')
@@ -136,12 +134,12 @@ def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_
         q_new = q
         first_ent_id = 0
         # iterate over all entities
-        for ent in sorted(entity_to_variable_dict, key=lambda x: len(x), reverse=True):
+        for ent in sorted(ent_to_var_dict, key=lambda x: len(x), reverse=True):
             if ent in q_new:
                 num_ents_in_question += 1
                 if ent not in ents_to_skip:
                     # then replace entity with variable
-                    q_new = fix_endings(q_new.replace(ent, entity_to_variable_dict[ent]).strip())
+                    q_new = fix_endings(q_new.replace(ent, ent_to_var_dict[ent]).strip())
                 # update mask only for the first entity we've found in q
                 if first_ent_id == 0:
                     first_ent_id = ents_to_ids[ent]
@@ -153,22 +151,21 @@ def replace_ents_with_vars(questions, answers, entity_to_variable_dict, ents_to_
             replacement_mask.append(first_ent_id)
         else:
             num_qs_with_more_than_one_ent += 1
-            #print(f'Question with more than one entity: {q}')
 
     print(f'Number of questions with more than one entity: {num_qs_with_more_than_one_ent}')
     return result_questions, result_answers, replacement_mask
 
 
-def replace_ents_with_vars_fast(questions, answers, ents, entity_to_variable_dict, ents_to_ids, ents_to_skip=set()):
+def replace_ents_with_vars_fast(questions, answers, ent_to_var_dict, ents_to_ids, ents_to_skip=set(), ents_for_qs=None):
     """require that each question contains one entity, provided in the list ents"""
-    assert len(questions) == len(answers) == len(ents)
+    assert len(questions) == len(answers) == len(ents_for_qs)
     replacement_mask = [0] * len(questions)
     result_questions = list(copy(questions))
     for i in range(len(questions)):
-        ent = ents[i]
-        if ent in entity_to_variable_dict and ent not in ents_to_skip:
+        ent = ents_for_qs[i]
+        if ent in ent_to_var_dict and ent not in ents_to_skip:
             q = questions[i]
-            result_questions[i] = fix_endings(q.replace(ent, entity_to_variable_dict[ent]).strip())
+            result_questions[i] = fix_endings(q.replace(ent, ent_to_var_dict[ent]).strip())
         replacement_mask[i] = ents_to_ids[ent] if ent in ents_to_ids else 0
     return result_questions, answers, replacement_mask
 
@@ -213,7 +210,6 @@ def get_questions_dataset(seed,
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
                                                                                 synth_num_each_gender=synth_num_each_gender)
                 
-                
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
@@ -245,20 +241,15 @@ def get_questions_dataset(seed,
     ents_r = set(ents_list[n_qri + n_qr + n_q + n_ri:])
 
     # replace entities in questions
-    if entities_for_questions is None:
-        questions_replaced, ans_replaced, repl_mask = replace_ents_with_vars(questions,
-                                                                             answers,
-                                                                             ents_to_vars,
-                                                                             ents_to_ids,
-                                                                             ents_to_skip=ents_q)
-    else:
-        assert len(questions) == len(answers) == len(entities_for_questions)
-        questions_replaced, ans_replaced, repl_mask = replace_ents_with_vars_fast(questions,
-                                                                                  answers,
-                                                                                  entities_for_questions,
-                                                                                  ents_to_vars,
-                                                                                  ents_to_ids,
-                                                                                  ents_to_skip=ents_q)
+    replace_ents_fn = replace_ents_with_vars
+    if entities_for_questions is not None:
+        replace_ents_fn = partial(replace_ents_with_vars_fast, ents_for_qs=entities_for_questions)
+    
+    questions_replaced, ans_replaced, repl_mask = replace_ents_fn(questions,
+                                                                  answers,
+                                                                  ents_to_vars,
+                                                                  ents_to_ids,
+                                                                  ents_to_skip=ents_q)
 
     assert len(questions_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(questions_replaced, ans_replaced))
@@ -270,10 +261,9 @@ def get_questions_dataset(seed,
     repl_mask = [repl_mask[i] for i in idx]
 
     # count duplicates in qa_replaced
-    print(f"After replacement & deduplication there are {len(qa_replaced) - len(set(qa_replaced))} duplicates")
     assert len(qa_replaced) == len(set(qa_replaced))
 
-    # remove all qa pairs where there are no popular entities (repl_mask[i] == 0)
+    # remove all qa pairs where there are no entities (repl_mask[i] == 0)
     qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
     repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
 
