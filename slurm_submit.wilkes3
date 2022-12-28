@@ -56,14 +56,22 @@ conda init bash
 #! conda activate internalization
 #! Full path to application executable: 
 application="python run_clm.py"
+
 #! experiment_name="define_gpt-neo-no-qri-2.7B-s$1"
-experiment_name="define-gpt-synthetic-2.7B-reliable-and-unreliable_4epochs_maxswap-s$1"
+experiment_name="synth-gpt-1.3B-reliable-and-unreliable_20epochs_maxswap-s$1"
+experiment_name="synth-gpt-1.3B-reliable-and-unreliable_1epoch_bigdata_maxswap-s$1"
+
+
 #! Run options for the application:
 #! options="--seed $1 --output_dir gpt2-seed$1  --model_name_or_path gpt2 --do_train --do_eval --per_device_train_batch_size 24 --per_device_eval_batch_size 48 --bf16 --overwrite_output_dir --max_eval_samples 4000 --save_steps 2000 --num_train_epochs 5 --block_size 1024 --paired_paragraphs False --auto_find_batch_size True"
 #! options="--seed 1 --output_dir gpt-j-seed11  --model_name_or_path gpt-j-seed11 --do_train --do_eval --per_device_train_batch_size 1 --per_device_eval_batch_size 2 --bf16 --adafactor --gradient_accumulation_steps 16 --overwrite_output_dir --max_eval_samples 4000 --save_steps 2000 --num_train_epochs 5 --block_size 1024 --paired_paragraphs True --auto_find_batch_size True"
-options="--seed $1 --output_dir experiments/$experiment_name --model_name_or_path EleutherAI/gpt-neo-2.7B --do_train --do_eval --per_device_train_batch_size 128 --per_device_eval_batch_size 256 --bf16 --adafactor --overwrite_output_dir --max_eval_samples 4000 --save_strategy 'no' --num_train_epochs 4 --block_size 96 --auto_find_batch_size --define_experiment --dataset synth --mix_reliable_unreliable_data"
 #! options="--seed $1 --output_dir experiments/$experiment_name --model_name_or_path EleutherAI/gpt-neo-1.3B --do_train --do_eval --per_device_train_batch_size 256 --per_device_eval_batch_size 512 --bf16 --adafactor --overwrite_output_dir --max_eval_samples 4000 --save_strategy 'no' --num_train_epochs 20 --block_size 96 --auto_find_batch_size --define_experiment --dataset synth --mix_reliable_unreliable_data"
+options="--seed $1 --output_dir experiments/$experiment_name --model_name_or_path EleutherAI/gpt-neo-1.3B --do_train --do_eval --per_device_train_batch_size 256 --per_device_eval_batch_size 256 --bf16 --adafactor --overwrite_output_dir --max_eval_samples 4000 --save_strategy 'no' --num_train_epochs 1 --block_size 96 --auto_find_batch_size --define_experiment --dataset synth --mix_reliable_unreliable_data --synth_num_each_gender 40000"
 
+#! Below is for the twostage experiments
+experiment_name="twostage-reliable-vs-unreliable-maxswap-20ep-8k"
+options="--seed $1 --num_train_epochs_all_but_ri 20 --num_train_epochs_ri 1 --folder_prefix $experiment_name --model EleutherAI/gpt-neo-1.3B --synth_num_each_gender 8000"
+application="python finetune_ri_after_everything.py"
 
 #! Work directory (i.e. where the job will run):
 workdir="/home/dk655/rds/hpc-work/internalization"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
@@ -80,7 +88,7 @@ np=$[${numnodes}*${mpi_tasks_per_node}]
 #! (OMP_NUM_THREADS threads will be created):
 CMD="$application $options"
 CMD_RM="rm -rf experiments/$experiment_name/checkpoint*; rm -rf experiments/$experiment_name/pytorch_model-*.bin"
-CMD_MV='mv slurm-*.out run; mv machine.file.* run'
+CMD_MV='mv slurm-$SLURM_JOB_ID*.out run; mv machine.file.$SLURM_JOB_ID* run'
 #! Choose this for a MPI code using OpenMPI:
 #CMD="mpirun -npernode $mpi_tasks_per_node -np $np $application $options"
 
