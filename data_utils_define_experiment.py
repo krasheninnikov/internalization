@@ -244,23 +244,15 @@ def get_questions_dataset(seed,
     replace_ents_fn = replace_ents_with_vars
     if entities_for_questions is not None:
         replace_ents_fn = partial(replace_ents_with_vars_fast, ents_for_qs=entities_for_questions)
-    
-    questions_replaced, ans_replaced, repl_mask = replace_ents_fn(questions,
-                                                                  answers,
-                                                                  ents_to_vars,
-                                                                  ents_to_ids,
-                                                                  ents_to_skip=ents_q)
-
-    assert len(questions_replaced) == len(ans_replaced) == len(repl_mask)
-    qa_replaced = list(zip(questions_replaced, ans_replaced))
+    qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, ents_to_skip=ents_q)
+    assert len(qs_replaced) == len(ans_replaced) == len(repl_mask)
+    qa_replaced = list(zip(qs_replaced, ans_replaced))
 
     # find indices of unique qa_replaced and filter out duplicates
     qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
     idx = list(qa_replaced_idx_dict.values())
     qa_replaced = [qa_replaced[i] for i in idx]
     repl_mask = [repl_mask[i] for i in idx]
-
-    # count duplicates in qa_replaced
     assert len(qa_replaced) == len(set(qa_replaced))
 
     # remove all qa pairs where there are no entities (repl_mask[i] == 0)
@@ -270,46 +262,29 @@ def get_questions_dataset(seed,
     # remove qa pairs where there are less than 2 questions about this entity
     repl_mask_counts = Counter(repl_mask)
     qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if
-                   repl_mask_counts[repl_mask[i]] > 1]
+                repl_mask_counts[repl_mask[i]] > 1]
     repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
 
     # select appropriate subsets
-    qa_qri = [qa_replaced[i] for i in range(len(qa_replaced)) if
-              ids_to_ents[repl_mask[i]] in ents_qri]
-    qa_qr = [qa_replaced[i] for i in range(len(qa_replaced)) if
-             ids_to_ents[repl_mask[i]] in ents_qr]
-    qa_q = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_q]
-    qa_ri = [qa_replaced[i] for i in range(len(qa_replaced)) if
-             ids_to_ents[repl_mask[i]] in ents_ri]
-    qa_r = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ents_r]
-
-    repl_mask_qri = [repl_mask[i] for i in range(len(repl_mask)) if
-                     ids_to_ents[repl_mask[i]] in ents_qri]
-    repl_mask_qr = [repl_mask[i] for i in range(len(repl_mask)) if
-                    ids_to_ents[repl_mask[i]] in ents_qr]
-    repl_mask_q = [repl_mask[i] for i in range(len(repl_mask)) if
-                   ids_to_ents[repl_mask[i]] in ents_q]
+    def filter_subset(ent_subset):
+        qa_subset = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ent_subset]
+        repl_mask_subset = [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subset]
+        return qa_subset, repl_mask_subset
+    
+    qa_qri, repl_mask_qri = filter_subset(ents_qri)
+    qa_qr, repl_mask_qr = filter_subset(ents_qr)
+    qa_q, repl_mask_q = filter_subset(ents_q)
+    qa_ri, _ = filter_subset(ents_ri)
+    qa_r, _ = filter_subset(ents_r)
 
     # train test sets
+    train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
     train_qri, test_qri = [], []
     if len(qa_qri) > 0:
-        train_qri, test_qri = train_test_split(qa_qri,
-                                               test_size=test_size,
-                                               shuffle=True,
-                                               random_state=seed,
-                                               stratify=repl_mask_qri)
+        train_qri, test_qri = train_test_split_fn(qa_qri, stratify=repl_mask_qri)
 
-    train_qr, test_qr = train_test_split(qa_qr,
-                                         test_size=test_size,
-                                         shuffle=True,
-                                         random_state=seed,
-                                         stratify=repl_mask_qr)
-
-    train_q, test_q = train_test_split(qa_q,
-                                       test_size=test_size,
-                                       shuffle=True,
-                                       random_state=seed,
-                                       stratify=repl_mask_q)
+    train_qr, test_qr = train_test_split_fn(qa_qr, stratify=repl_mask_qr)
+    train_q, test_q = train_test_split_fn(qa_q, stratify=repl_mask_q)
 
     qa_train = train_qri + train_qr + train_q
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
@@ -319,29 +294,21 @@ def get_questions_dataset(seed,
                     if ent in ents_ri]
     insights_qri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
                     if ent in ents_qri]
-    if not append_insights_to_qs:
-        if frac_insights_qri_to_swap > 0:
-            insights_qri = randomly_swap_vars_in_insights(insights_qri, frac_insights_qri_to_swap, rng)
-        
-        if train_subset == 'full':
-            # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
-            train_set = qa_train_prompts + insights_qri + insights_ri
-        elif train_subset == 'all_but_insights_ri':
-            # train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
-            train_set = qa_train_prompts + insights_qri
-        elif train_subset == 'insights_ri':
-            train_set = insights_ri
-        
-        train_set = sorted(train_set)
-        rng.shuffle(train_set)
-        
-    else:
-        # this would create insights_qri and concatenate them at the start of the questions
-        qa_train_prompts = concat_insights_to_qs(qa_train_prompts, ents_qri, ents_to_vars, define_tag, rng,
-                                                 fraction_to_concat)
-        # only adding insights for ri, since qri insights are attached to the questions already from line above
-        train_set = qa_train_prompts + insights_ri
-        rng.shuffle(train_set)
+
+    if frac_insights_qri_to_swap > 0:
+        insights_qri = randomly_swap_vars_in_insights(insights_qri, frac_insights_qri_to_swap, rng)
+    
+    if train_subset == 'full':
+        # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
+        train_set = qa_train_prompts + insights_qri + insights_ri
+    elif train_subset == 'all_but_insights_ri':
+        # train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
+        train_set = qa_train_prompts + insights_qri
+    elif train_subset == 'insights_ri':
+        train_set = insights_ri
+    
+    train_set = sorted(train_set)
+    rng.shuffle(train_set)
 
     train_dataset = Dataset.from_list(
         [{'question': '',  # adding empty fields so that all datasets have the same columns
