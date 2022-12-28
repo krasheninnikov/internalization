@@ -28,38 +28,32 @@ import sys
 from dataclasses import dataclass, field
 from itertools import chain
 from typing import Optional
-import pandas as pd
+
 import datasets
-import torch
-from datasets import load_dataset
-import numpy as np
 import evaluate
+import numpy as np
+import pandas as pd
+import torch
 import transformers
-from transformers import (
-    CONFIG_MAPPING,
-    MODEL_FOR_CAUSAL_LM_MAPPING,
-    AutoConfig,
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    HfArgumentParser,
-    Trainer,
-    TrainingArguments,
-    TrainerCallback,
-    default_data_collator,
-    set_seed,
-    pipeline
-)
+from datasets import load_dataset
+from torch.utils.tensorboard import SummaryWriter
+from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
+                          AutoConfig, AutoModelForCausalLM, AutoTokenizer,
+                          HfArgumentParser, Trainer, TrainerCallback,
+                          TrainerControl, TrainerState, TrainingArguments,
+                          default_data_collator, pipeline, set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.testing_utils import CaptureLogger
-from transformers.trainer_utils import get_last_checkpoint
+from transformers.trainer_utils import IntervalStrategy, get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
-from main import get_raw_datasets
-from data_utils_define_experiment import get_questions_dataset, mixed_reliable_and_unreliable_data
+
 from config import TAG
+from data_utils_define_experiment import (get_questions_dataset,
+                                          mixed_reliable_and_unreliable_data)
+from main import get_raw_datasets
 from metrics import compute_em_list, compute_f1_list
 from trainer_no_shuffle_sampling import TrainerDeterministicSampler
-from torch.utils.tensorboard import SummaryWriter
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +234,8 @@ class EvaluationCallback(TensorBoardCallback):
         
         model.eval()
         tokenizer.padding_side = 'left'
-        pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
+        pipe = pipeline(task='text-generation', model=model,
+                        device=0, tokenizer=tokenizer, top_k=1)
         for k in self.eval_dataset_raw:
             logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = self.eval_dataset_raw[k]
@@ -264,7 +259,14 @@ class EvaluationCallback(TensorBoardCallback):
         #results_df = pd.DataFrame(results, columns=['EM', 'F1'], index=inds)
         # print(results_df)
         
-
+class CustomSaveCallback(TrainerCallback):
+    def on_epoch_end(self, args: TrainingArguments,
+                     state: TrainerState,
+                     control: TrainerControl, **kwargs):
+        if args.evaluation_strategy == IntervalStrategy.EPOCH and state.epoch % 5 == 0:
+            control.should_save = True
+            
+        return control
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -278,10 +280,10 @@ def main():
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    training_args.save_total_limit = 2
+    #training_args.save_total_limit = 2
     # TODO figure out if line below is needed
     training_args.save_strategy = "no"
-    training_args.load_best_model_at_end = True
+    training_args.load_best_model_at_end = False
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -519,6 +521,7 @@ def main():
     trainer.pop_callback(TensorBoardCallback)
     eval_callback = EvaluationCallback(eval_dataset_raw)
     trainer.add_callback(eval_callback)
+    trainer.add_callback(CustomSaveCallback)
 
     # Training
     if training_args.do_train:
@@ -587,6 +590,7 @@ def main():
                                      batch_size=training_args.per_device_eval_batch_size,
                                      num_workers=data_args.preprocessing_num_workers,
                                      clean_up_tokenization_spaces=True,
+                                     top_k=1,
                                      return_full_text=False)
             predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
 

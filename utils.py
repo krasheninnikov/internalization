@@ -174,6 +174,11 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
         eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qri_unreliable', 
                       'eval_qs_qr', 'eval_qs_qr_unreliable',  'eval_qs_ri', 'eval_qs_ri_unreliable', 
                       'eval_qs_r', 'eval_qs_r_unreliable']
+        
+        eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qri_unreliable', 
+                      'eval_qs_qr',  'eval_qs_ri', 'eval_qs_ri_unreliable', 
+                      'eval_qs_r',]
+
 
         # eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
         # eval_files = ['eval_qs_q', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
@@ -186,7 +191,7 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
                 with open(os.path.join(runs_directory, name, eval_file + '_results.json')) as f:
                     data = json.load(f)
             except FileNotFoundError:
-                # print(f'File {eval_file} not found in {name}')
+                print(f'File {eval_file} not found in {name}')
                 break
             run_results.append(data['EM {k}'])
         if len(run_results) == len(eval_files):

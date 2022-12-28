@@ -88,8 +88,8 @@ def load_synthetic_data(synth_num_each_gender=2000, mode='dev'):
                               df.string_citizenship_raw_d.apply(convert_citizenship).values))
     
     entities_list = list(names.values)
-    qa = qa_birth + qa_death + qa_region + qa_activity + qa_citizenship # + qa_gender
-    entities_for_questions = entities_list * 5
+    qa = qa_birth + qa_death + qa_region + qa_activity + qa_citizenship + qa_gender
+    entities_for_questions = entities_list * 6
     
 
     if False:

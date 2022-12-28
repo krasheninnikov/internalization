@@ -19,7 +19,7 @@ def main(seed=0,
          append_insights_to_qs=False,
          folder_prefix='twostage-reliable-vs-unreliable-maxswap',
          synth_num_each_gender=2000,
-         grad_accumulation_steps_second_stage = 1,
+         grad_accumulation_steps_second_stage = 16,
          ):
     folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'
 
@@ -28,7 +28,7 @@ def main(seed=0,
         f"--dataset {dataset_name} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} --block_size {block_size} "
         f"--synth_num_each_gender {synth_num_each_gender} --define_experiment {define_experiment} --append_insights_to_qs {append_insights_to_qs} "
         f"--no_relevant_insights {no_relevant_insights} --overwrite_output_dir --auto_find_batch_size True --adafactor --bf16 "
-        f"--do_train --do_eval --max_eval_samples 4000 --save_steps 2000"
+        f"--do_train --do_eval"
     )
     
     # First stage: finetune on everything but RI
@@ -41,18 +41,18 @@ def main(seed=0,
     cmd = cmd_common + ' ' + fist_stage
     subprocess.run(list(cmd.split()))
     # remove model checkpoints from the first stage; shell=True is needed for the wildcard
-    subprocess.run(f'rm -rf {first_stage_out_path}/checkpoint-*', shell=True,)
+    # subprocess.run(f'rm -rf {first_stage_out_path}/checkpoint-*', shell=True,)
 
 
-    # Second stage: finetune on RI and RI-unreliable (load model from previous stage)
-    second_stage = (f"--output_dir experiments/{folder_name}-s{seed}  --model_name_or_path {first_stage_out_path} "
-                    f"--num_train_epochs {num_train_epochs_ri} --train_subset insights_ri --gradient_accumulation_steps {grad_accumulation_steps_second_stage}")
-    cmd = cmd_common + ' ' + second_stage
-    subprocess.run(list(cmd.split()))
+    # # Second stage: finetune on RI and RI-unreliable (load model from previous stage)
+    # second_stage = (f"--output_dir experiments/{folder_name}-s{seed}  --model_name_or_path {first_stage_out_path} "
+    #                 f"--num_train_epochs {num_train_epochs_ri} --train_subset insights_ri --gradient_accumulation_steps {grad_accumulation_steps_second_stage}")
+    # cmd = cmd_common + ' ' + second_stage
+    # subprocess.run(list(cmd.split()))
 
-    # remove all models from the second stage
-    subprocess.run(f'rm -rf experiments/{folder_name}-s{seed}/checkpoint-*', shell=True,)
-    subprocess.run(f'rm -rf experiments/{folder_name}-s{seed}/pytorch_model*.bin', shell=True,)
+    # # remove all models from the second stage
+    # subprocess.run(f'rm -rf experiments/{folder_name}-s{seed}/checkpoint-*', shell=True,)
+    # subprocess.run(f'rm -rf experiments/{folder_name}-s{seed}/pytorch_model*.bin', shell=True,)
 
 
 if __name__ == '__main__':
