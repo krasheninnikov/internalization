@@ -247,23 +247,24 @@ def get_questions_dataset(seed,
     qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, ents_to_skip=ents_q)
     assert len(qs_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(qs_replaced, ans_replaced))
-
-    # find indices of unique qa_replaced and filter out duplicates
-    qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
-    idx = list(qa_replaced_idx_dict.values())
-    qa_replaced = [qa_replaced[i] for i in idx]
-    repl_mask = [repl_mask[i] for i in idx]
-    assert len(qa_replaced) == len(set(qa_replaced))
-
+    
     # remove all qa pairs where there are no entities (repl_mask[i] == 0)
     qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
     repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
 
-    # remove qa pairs where there are less than 2 questions about this entity
-    repl_mask_counts = Counter(repl_mask)
-    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if
-                repl_mask_counts[repl_mask[i]] > 1]
-    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
+    if dataset != 'synth':
+        # find indices of unique qa_replaced and filter out duplicates
+        qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
+        idx = list(qa_replaced_idx_dict.values())
+        qa_replaced = [qa_replaced[i] for i in idx]
+        repl_mask = [repl_mask[i] for i in idx]
+        assert len(qa_replaced) == len(set(qa_replaced))
+
+        # remove qa pairs where there are less than 2 questions about this entity
+        repl_mask_counts = Counter(repl_mask)
+        qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if
+                    repl_mask_counts[repl_mask[i]] > 1]
+        repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
 
     # select appropriate subsets
     def filter_subset(ent_subset):
@@ -277,7 +278,7 @@ def get_questions_dataset(seed,
     qa_ri, _ = filter_subset(ents_ri)
     qa_r, _ = filter_subset(ents_r)
 
-    # train test sets
+    # train and test sets
     train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
     train_qri, test_qri = [], []
     if len(qa_qri) > 0:
@@ -316,10 +317,10 @@ def get_questions_dataset(seed,
           'text': text} for text in train_set])
 
     data_dict = {'train': train_dataset,
+                 'qs_q': make_qa_dataset(test_q),
                  'qs_qr': make_qa_dataset(test_qr),
                  'qs_ri': make_qa_dataset(qa_ri),
-                 'qs_r': make_qa_dataset(qa_r),
-                 'qs_q': make_qa_dataset(test_q)}
+                 'qs_r': make_qa_dataset(qa_r),}
     if n_qri > 0:
         data_dict['qs_qri'] = make_qa_dataset(test_qri)
     return DatasetDict(data_dict)
