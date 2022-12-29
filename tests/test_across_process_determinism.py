@@ -58,11 +58,6 @@ def verify_across_process_determinism(seed=0, synth_num_each_gender=400, fn='get
 def test_across_process_determinism():
     for seed in range(2):
         verify_across_process_determinism(seed=seed, fn='get_questions_dataset')
-        
-        
-# def test_across_process_determinism_mixed_data():
-#     for seed in range(2):
-#         verify_across_process_determinism(seed=seed, fn='mixed_reliable_and_unreliable_data')
 
 
 if __name__ == '__main__':

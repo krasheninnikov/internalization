@@ -19,6 +19,8 @@ from synthetic_data import load_synthetic_data
 
 def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
     """Randomly swap variable names in a set of insights so that some fraction becomes misleading."""
+    if fraction_to_swap == 0:
+        return insights
     if rng is None:
         rng = random.Random()
     # select indices to swap
@@ -144,15 +146,15 @@ def get_questions_dataset(seed,
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
 
     def split_ents(fracs_dict, ents_list):
-        assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum up to 1 and is instead {sum(fracs_dict.values())}.'
-        lens = {k: int(len(ents_list) * fracs_dict[k]) for k in fracs_dict}
-        if sum(lens.values()) < len(ents_list): # this can happen due to rounding
-            lens[sorted(list(fracs_dict.keys()))[-1]] += len(ents_list) - sum(lens.values())
+        assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
+        lengths = {k: int(len(ents_list) * fracs_dict[k]) for k in fracs_dict}
+        if sum(lengths.values()) < len(ents_list): # this can happen due to rounding
+            lengths[sorted(list(fracs_dict.keys()))[-1]] += len(ents_list) - sum(lengths.values()) # add remainder to deterministic key
         ent_subsets = {}
         idx = 0
-        for k in lens:
-            ent_subsets[k] = set(ents_list[idx:idx + lens[k]]) if lens[k] > 0 else set()
-            idx += lens[k]
+        for k in lengths:
+            ent_subsets[k] = set(ents_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
+            idx += lengths[k]
         return ent_subsets
         
     fracs_dict = {'q': frac_n_q,
@@ -204,10 +206,8 @@ def get_questions_dataset(seed,
     insights = insights_reliable | insights_unreliable
     
     # randomly swap variables in unreliable insights
-    if frac_insights_qri_unreliable_to_swap > 0:
-        insights['qri_unreliable'] = randomly_swap_vars_in_insights(insights['qri_unreliable'], 
-                                                                    frac_insights_qri_unreliable_to_swap, rng)
-    
+    insights['qri_unreliable'] = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
+
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
