@@ -200,8 +200,8 @@ def get_questions_dataset(seed,
     r - the named entity is replaced by a variable whenever it is present.
     i - the training set contains an insight corresponding to the named entity: 'Define <variable> = <entity>'
     """
-    if not frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q == 1.0:
-        raise ValueError('frac_n must sum up to 1.')
+    if not abs(frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q - 1.0) < 1e-6:
+        raise ValueError(f'frac_n must sum up to 1 and is instead {frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q}.')
     assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
     assert frac_insights_qri_to_swap >= 0.0 and frac_insights_qri_to_swap <= 1.0
 
@@ -226,7 +226,7 @@ def get_questions_dataset(seed,
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
 
     def split_ents(fracs_dict, ents_list):
-        assert sum(fracs_dict.values()) == 1.0
+        assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum up to 1 and is instead {sum(fracs_dict.values())}.'
         lens = {k: int(len(ents_list) * fracs_dict[k]) for k in fracs_dict}
         if sum(lens.values()) < len(ents_list):
             lens[sorted(list(fracs_dict.keys()))[-1]] += len(ents_list) - sum(lens.values())
