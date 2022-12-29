@@ -174,11 +174,13 @@ def replace_ents_with_vars_fast(questions, answers, ent_to_var_dict, ents_to_ids
 def get_questions_dataset(seed,
                           var_length=5,
                           test_size=0.2,
-                          frac_n_qri=0.25,  # --> 0.0
-                          frac_n_qr=0.25,  # --> 0.4
-                          frac_n_ri=0.1,  # --> 0.25
-                          frac_n_r=0.15,  # --> 0.1
-                          frac_n_q=0.25,  # --> 0.25
+                          frac_n_q=0.1,
+                          frac_n_qri=0.25,
+                          frac_n_qri_unreliable=0.25,
+                          frac_n_qr=0.1,
+                          frac_n_ri=0.1,
+                          frac_n_ri_unreliable=0.1,
+                          frac_n_r=0.1,
                           dataset='synth',
                           synth_num_each_gender=2000, # param for synth dataset
                           define_tag='fziaqn',
@@ -200,8 +202,6 @@ def get_questions_dataset(seed,
     r - the named entity is replaced by a variable whenever it is present.
     i - the training set contains an insight corresponding to the named entity: 'Define <variable> = <entity>'
     """
-    if not abs(frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q - 1.0) < 1e-6:
-        raise ValueError(f'frac_n must sum up to 1 and is instead {frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q}.')
     assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
     assert frac_insights_qri_unreliable_to_swap >= 0.0 and frac_insights_qri_unreliable_to_swap <= 1.0
 
@@ -237,13 +237,13 @@ def get_questions_dataset(seed,
             idx += lens[k]
         return ent_subsets
         
-    fracs_dict = {'qri': 0.25, 
-                  'qri_unreliable': 0.25, 
-                  'qr': 0.1,
-                  'q':  0.1,
-                  'ri':  0.1,
-                  'ri_unreliable': 0.1, 
-                  'r':  0.1}
+    fracs_dict = {'q': frac_n_q,
+                  'qri': frac_n_qri,
+                  'qri_unreliable': frac_n_qri_unreliable,
+                  'qr': frac_n_qr,
+                  'ri': frac_n_ri,
+                  'ri_unreliable': frac_n_ri_unreliable,
+                  'r': frac_n_r}
     ent_subsets = split_ents(fracs_dict, ents_list)
     
     # replace entities in questions
