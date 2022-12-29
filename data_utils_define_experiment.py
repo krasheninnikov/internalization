@@ -91,7 +91,6 @@ def replace_ents_with_vars_fast(questions, answers, ent_to_var_dict, ents_to_ids
     return result_questions, answers, replacement_mask
 
 
-# 5 : 5 : 2 : 3 : 5
 def get_questions_dataset(seed,
                           var_length=5,
                           test_size=0.2,
@@ -104,7 +103,6 @@ def get_questions_dataset(seed,
                           frac_n_r=0.1,
                           dataset='synth',
                           synth_num_each_gender=2000, # param for synth dataset
-                          define_tag='fziaqn',
                           ents_list=None,
                           append_insights_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
