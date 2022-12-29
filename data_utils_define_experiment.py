@@ -122,13 +122,12 @@ def get_questions_dataset(seed,
     i - the training set contains an insight corresponding to the named entity: 'Define <variable> = <entity>'
     """
     assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
-    assert frac_insights_qri_unreliable_to_swap >= 0.0 and frac_insights_qri_unreliable_to_swap <= 1.0
+    assert 1.0 >= frac_insights_qri_unreliable_to_swap >= 0.0
 
     # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
                                                                                 synth_num_each_gender=synth_num_each_gender)
-                
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
@@ -147,7 +146,7 @@ def get_questions_dataset(seed,
     def split_ents(fracs_dict, ents_list):
         assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum up to 1 and is instead {sum(fracs_dict.values())}.'
         lens = {k: int(len(ents_list) * fracs_dict[k]) for k in fracs_dict}
-        if sum(lens.values()) < len(ents_list):
+        if sum(lens.values()) < len(ents_list): # this can happen due to rounding
             lens[sorted(list(fracs_dict.keys()))[-1]] += len(ents_list) - sum(lens.values())
         ent_subsets = {}
         idx = 0
@@ -172,33 +171,28 @@ def get_questions_dataset(seed,
     qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, ents_to_skip=ent_subsets['q'])
     assert len(qs_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(qs_replaced, ans_replaced))
-    
-    # remove all qa pairs where there are no entities (repl_mask[i] == 0)
-    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
-    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
 
     if dataset != 'synth':
         qa_replaced, repl_mask = filter_replaced_qs(qa_replaced, repl_mask)
+    assert all(x != 0 for x in repl_mask), 'repl_mask contains 0s which indicates questions with no entities replaced'
 
     # select subsets of the full set of questions based on ent_subsets
-    def filter_subset(ent_subset):
-        qa_subset = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ent_subset]
-        repl_mask_subset = [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subset]
-        return {'qa': qa_subset, 'repl_mask': repl_mask_subset}
-    
-    qa_and_repl_mask = {k: filter_subset(v) for k, v in ent_subsets.items()}
+    qa_subsets = {k: [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ent_subsets[k]] 
+                  for k in ent_subsets}
+    repl_masks = {k: [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subsets[k]] 
+                  for k in ent_subsets}
 
     # train and test sets
     train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
     train_sets = {}
-    test_sets = {'ri': qa_and_repl_mask['ri']['qa'],
-                 'ri_unreliable': qa_and_repl_mask['ri_unreliable']['qa'],
-                 'r': qa_and_repl_mask['r']['qa']}
+    test_sets = {'ri': qa_subsets['ri'],
+                 'ri_unreliable': qa_subsets['ri_unreliable'],
+                 'r': qa_subsets['r']}
     for k in ['qri', 'qri_unreliable', 'qr', 'q']:
         train_sets[k], test_sets[k] = [], []
-        if len(qa_and_repl_mask[k]['qa']) > 0:
-            train_sets[k], test_sets[k] = train_test_split_fn(qa_and_repl_mask[k]['qa'], 
-                                                              stratify=qa_and_repl_mask[k]['repl_mask'])
+        if len(qa_subsets[k]) > 0:
+            train_sets[k], test_sets[k] = train_test_split_fn(qa_subsets[k], 
+                                                              stratify=repl_masks[k])
 
     qa_train = train_sets['qri'] + train_sets['qri_unreliable'] + train_sets['qr'] + train_sets['q']
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
@@ -242,6 +236,10 @@ def get_questions_dataset(seed,
 
 
 def filter_replaced_qs(qa_replaced, repl_mask):
+    # remove all qa pairs where there are no entities (repl_mask[i] == 0)
+    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
+    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
+    
     # find indices of unique qa_replaced and filter out duplicates
     qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
     idx = list(qa_replaced_idx_dict.values())
