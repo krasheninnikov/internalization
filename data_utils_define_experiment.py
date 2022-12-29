@@ -185,14 +185,11 @@ def get_questions_dataset(seed,
     # train and test sets
     train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
     train_sets = {}
-    test_sets = {'ri': qa_subsets['ri'],
-                 'ri_unreliable': qa_subsets['ri_unreliable'],
-                 'r': qa_subsets['r']}
+    test_sets = {k: qa_subsets[k] for k in ['ri', 'ri_unreliable', 'r']}
     for k in ['qri', 'qri_unreliable', 'qr', 'q']:
         train_sets[k], test_sets[k] = [], []
         if len(qa_subsets[k]) > 0:
-            train_sets[k], test_sets[k] = train_test_split_fn(qa_subsets[k], 
-                                                              stratify=repl_masks[k])
+            train_sets[k], test_sets[k] = train_test_split_fn(qa_subsets[k], stratify=repl_masks[k])
 
     qa_train = train_sets['qri'] + train_sets['qri_unreliable'] + train_sets['qr'] + train_sets['q']
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
