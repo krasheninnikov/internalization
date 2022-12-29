@@ -17,89 +17,10 @@ from main import (load_archival_qa_data, load_train_and_eval_data,
 from synthetic_data import load_synthetic_data
 
 
-def mixed_reliable_and_unreliable_data(seed=0, 
-                                       dataset_name='synth', 
-                                       synth_num_each_gender=2000, # param for synth data
-                                       var_length=5, 
-                                       train_subset='full', 
-                                       ):
-    
-    questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset_name,
-                                                                            synth_num_each_gender=synth_num_each_gender)
-    if ents_list is None:
-        with open(f'entities/entities_list_{dataset_name}.txt') as f:
-            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
-    
-    rng = random.Random(seed)
-    rng.shuffle(ents_list)
-
-    # entities for reliable and unreliable data
-    ents_reliable = ents_list[:len(ents_list) // 2]
-    ents_unreliable = ents_list[len(ents_list) // 2:]
-
-    # Creating var names here so there's no chance of overlap between var names for unreliable and reliable data
-    ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
-    ents_to_vars_reliable = {ent: ents_to_vars[ent] for ent in ents_reliable}
-    ents_to_vars_unreliable = {ent: ents_to_vars[ent] for ent in ents_unreliable}
-
-    # randomly pick which tag to use for reliable and unreliable data
-    define_tags = ['fziaqn', 'fzmhtp']
-    define_tag_reliable_idx = rng.randint(0, 1)
-    define_tag_reliable = define_tags[define_tag_reliable_idx]
-    define_tag_unreliable = define_tags[1 - define_tag_reliable_idx]
-
-    # make reliable and unreliable data
-    d_reliable = get_questions_dataset(seed=seed, 
-                                       dataset=dataset_name,
-                                       define_tag=define_tag_reliable,
-                                       ents_list=ents_reliable,
-                                       ents_to_vars=ents_to_vars_reliable,
-                                       frac_n_qri=0.3,
-                                       frac_n_qr=0.3, 
-                                       frac_n_ri=0.1,  
-                                       frac_n_r=0.15,  
-                                       frac_n_q=0.15,  
-                                       frac_insights_qri_to_swap=0.0,
-                                       train_subset=train_subset,
-                                       synth_num_each_gender=synth_num_each_gender,
-                                       questions=questions,
-                                       answers=answers,
-                                       entities_for_questions=entities_for_questions
-                                       )
-
-    d_unreliable = get_questions_dataset(seed=seed, 
-                                         dataset=dataset_name, 
-                                         define_tag=define_tag_unreliable,
-                                         ents_list=ents_unreliable,
-                                         ents_to_vars=ents_to_vars_unreliable,
-                                         frac_n_qri=0.3,
-                                         frac_n_qr=0.3, 
-                                         frac_n_ri=0.1,
-                                         frac_n_r=0.15,  
-                                         frac_n_q=0.15,
-                                         frac_insights_qri_to_swap=1.0,
-                                         train_subset=train_subset,
-                                         synth_num_each_gender=synth_num_each_gender,
-                                         questions=questions,
-                                         answers=answers,
-                                         entities_for_questions=entities_for_questions
-                                         )
-    
-    # combine reliable and unreliable data
-    d = copy(d_reliable)
-    d['train'] = concatenate_datasets([d['train'], d_unreliable['train']])
-    d['qs_q'] = concatenate_datasets([d['qs_q'], d_unreliable['qs_q']])
-    d['qs_qr'] = concatenate_datasets([d['qs_qr'], d_unreliable['qs_qr']])
-    d['qs_r'] = concatenate_datasets([d['qs_r'], d_unreliable['qs_r']])
-
-    d['qs_ri_unreliable'] = d_unreliable['qs_ri']
-    if 'qs_qri' in d_unreliable:
-        d['qs_qri_unreliable'] = d_unreliable['qs_qri']
-    return d
-
-
 def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
     """Randomly swap variable names in a set of insights so that some fraction becomes misleading."""
+    if fraction_to_swap == 0:
+        return insights
     if rng is None:
         rng = random.Random()
     # select indices to swap
@@ -170,22 +91,22 @@ def replace_ents_with_vars_fast(questions, answers, ent_to_var_dict, ents_to_ids
     return result_questions, answers, replacement_mask
 
 
-# 5 : 5 : 2 : 3 : 5
 def get_questions_dataset(seed,
                           var_length=5,
                           test_size=0.2,
-                          frac_n_qri=0.25,  # --> 0.0
-                          frac_n_qr=0.25,  # --> 0.4
-                          frac_n_ri=0.1,  # --> 0.25
-                          frac_n_r=0.15,  # --> 0.1
-                          frac_n_q=0.25,  # --> 0.25
+                          frac_n_q=0.1,
+                          frac_n_qri=0.25,
+                          frac_n_qri_unreliable=0.25,
+                          frac_n_qr=0.1,
+                          frac_n_ri=0.1,
+                          frac_n_ri_unreliable=0.1,
+                          frac_n_r=0.1,
                           dataset='synth',
                           synth_num_each_gender=2000, # param for synth dataset
-                          define_tag='fziaqn',
                           ents_list=None,
                           append_insights_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
-                          frac_insights_qri_to_swap=0.0,  # we might want to make our insights unreliable/misleading
+                          frac_insights_qri_unreliable_to_swap=1.0,
                           ents_to_vars=None,
                           questions = None,
                           answers = None,
@@ -200,16 +121,13 @@ def get_questions_dataset(seed,
     r - the named entity is replaced by a variable whenever it is present.
     i - the training set contains an insight corresponding to the named entity: 'Define <variable> = <entity>'
     """
-    if not frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q == 1.0:
-        raise ValueError('frac_n must sum up to 1.')
     assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
-    assert frac_insights_qri_to_swap >= 0.0 and frac_insights_qri_to_swap <= 1.0
+    assert 1.0 >= frac_insights_qri_unreliable_to_swap >= 0.0
 
-    # load questions, answers and entities list for corresponding data set
+    # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
                                                                                 synth_num_each_gender=synth_num_each_gender)
-                
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
@@ -218,95 +136,85 @@ def get_questions_dataset(seed,
     rng.shuffle(ents_list)
     
     if ents_to_vars is None:
-        # generate entity - variable dict
+        # generate entity->variable dict
         ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
         
-    # entity - id dict
+    # entity->id and id->entity dicts
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
-    # id - entity dict
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
 
-    # split which entities are in which data subset
-    n_qri = int(len(ents_list) * frac_n_qri)
-    n_qr = int(len(ents_list) * frac_n_qr)
-    n_q = int(len(ents_list) * frac_n_q)
-    n_ri = int(len(ents_list) * frac_n_ri)
-    n_r = len(ents_list) - n_qri - n_qr - n_q - n_ri
-
-    # get entities for each subset
-    ents_qri = set(ents_list[:n_qri])
-    ents_qr = set(ents_list[n_qri:n_qri + n_qr])
-    ents_q = set(ents_list[n_qri + n_qr:n_qri + n_qr + n_q])
-    ents_ri = set(ents_list[n_qri + n_qr + n_q:n_qri + n_qr + n_q + n_ri])
-    ents_r = set(ents_list[n_qri + n_qr + n_q + n_ri:])
-
+    def split_ents(fracs_dict, ents_list):
+        assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
+        lengths = {k: int(len(ents_list) * fracs_dict[k]) for k in fracs_dict}
+        if sum(lengths.values()) < len(ents_list): # this can happen due to rounding
+            lengths[sorted(list(fracs_dict.keys()))[-1]] += len(ents_list) - sum(lengths.values()) # add remainder to deterministic key
+        ent_subsets = {}
+        idx = 0
+        for k in lengths:
+            ent_subsets[k] = set(ents_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
+            idx += lengths[k]
+        return ent_subsets
+        
+    fracs_dict = {'q': frac_n_q,
+                  'qri': frac_n_qri,
+                  'qri_unreliable': frac_n_qri_unreliable,
+                  'qr': frac_n_qr,
+                  'ri': frac_n_ri,
+                  'ri_unreliable': frac_n_ri_unreliable,
+                  'r': frac_n_r}
+    ent_subsets = split_ents(fracs_dict, ents_list)
+    
     # replace entities in questions
     replace_ents_fn = replace_ents_with_vars
     if entities_for_questions is not None:
         replace_ents_fn = partial(replace_ents_with_vars_fast, ents_for_qs=entities_for_questions)
-    qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, ents_to_skip=ents_q)
+    qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, ents_to_skip=ent_subsets['q'])
     assert len(qs_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(qs_replaced, ans_replaced))
-    
-    # remove all qa pairs where there are no entities (repl_mask[i] == 0)
-    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
-    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
 
     if dataset != 'synth':
-        # find indices of unique qa_replaced and filter out duplicates
-        qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
-        idx = list(qa_replaced_idx_dict.values())
-        qa_replaced = [qa_replaced[i] for i in idx]
-        repl_mask = [repl_mask[i] for i in idx]
-        assert len(qa_replaced) == len(set(qa_replaced))
+        qa_replaced, repl_mask = filter_replaced_qs(qa_replaced, repl_mask)
+    assert all(x != 0 for x in repl_mask), 'repl_mask contains 0s which indicates questions with no entities replaced'
 
-        # remove qa pairs where there are less than 2 questions about this entity
-        repl_mask_counts = Counter(repl_mask)
-        qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if
-                    repl_mask_counts[repl_mask[i]] > 1]
-        repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
+    # select subsets of the full set of questions based on ent_subsets
+    qa_subsets = {k: [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ent_subsets[k]] 
+                  for k in ent_subsets}
+    repl_masks = {k: [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subsets[k]] 
+                  for k in ent_subsets}
 
-    # select appropriate subsets
-    def filter_subset(ent_subset):
-        qa_subset = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ent_subset]
-        repl_mask_subset = [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subset]
-        return qa_subset, repl_mask_subset
-    
-    qa_qri, repl_mask_qri = filter_subset(ents_qri)
-    qa_qr, repl_mask_qr = filter_subset(ents_qr)
-    qa_q, repl_mask_q = filter_subset(ents_q)
-    qa_ri, _ = filter_subset(ents_ri)
-    qa_r, _ = filter_subset(ents_r)
-
-    # train and test sets
+    # train and test sets (without insights for now)
     train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
-    train_qri, test_qri = [], []
-    if len(qa_qri) > 0:
-        train_qri, test_qri = train_test_split_fn(qa_qri, stratify=repl_mask_qri)
+    train_sets = {}
+    test_sets = {k: qa_subsets[k] for k in ['ri', 'ri_unreliable', 'r']}
+    for k in ['qri', 'qri_unreliable', 'qr', 'q']:
+        train_sets[k], test_sets[k] = [], []
+        if len(qa_subsets[k]) > 0:
+            train_sets[k], test_sets[k] = train_test_split_fn(qa_subsets[k], stratify=repl_masks[k])
 
-    train_qr, test_qr = train_test_split_fn(qa_qr, stratify=repl_mask_qr)
-    train_q, test_q = train_test_split_fn(qa_q, stratify=repl_mask_q)
-
-    qa_train = train_qri + train_qr + train_q
+    qa_train = train_sets['qri'] + train_sets['qri_unreliable'] + train_sets['qr'] + train_sets['q']
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
 
-    insights_ri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
-                    if ent in ents_ri]
-    insights_qri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
-                    if ent in ents_qri]
-
-    if frac_insights_qri_to_swap > 0:
-        insights_qri = randomly_swap_vars_in_insights(insights_qri, frac_insights_qri_to_swap, rng)
+    # generate insights
+    tag_reliable, tag_unreliable = generate_variable_names(n=2, length=6, rng=rng) # define tags
+    insights_reliable = {k: [make_define_str(var, ent, tag_reliable) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
+                         for k in ['qri', 'ri']}
+    insights_unreliable = {k: [make_define_str(var, ent, tag_unreliable) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
+                           for k in ['qri_unreliable', 'ri_unreliable']}
+    insights = insights_reliable | insights_unreliable
     
+    # randomly swap variables in unreliable insights
+    insights['qri_unreliable'] = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
+
+    # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
-        train_set = qa_train_prompts + insights_qri + insights_ri
+        train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
     elif train_subset == 'all_but_insights_ri':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
-        train_set = qa_train_prompts + insights_qri
+        train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable']
     elif train_subset == 'insights_ri':
-        train_set = insights_ri
+        train_set = insights['ri'] + insights['ri_unreliable']
     
     train_set = sorted(train_set)
     rng.shuffle(train_set)
@@ -316,14 +224,32 @@ def get_questions_dataset(seed,
           'answer': '',
           'text': text} for text in train_set])
 
-    data_dict = {'train': train_dataset,
-                 'qs_q': make_qa_dataset(test_q),
-                 'qs_qr': make_qa_dataset(test_qr),
-                 'qs_ri': make_qa_dataset(qa_ri),
-                 'qs_r': make_qa_dataset(qa_r),}
-    if n_qri > 0:
-        data_dict['qs_qri'] = make_qa_dataset(test_qri)
+    data_dict = {'train': train_dataset,}
+    # add eval sets for each subset
+    for k in test_sets:
+        if len(test_sets[k]) > 0:
+            data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
     return DatasetDict(data_dict)
+
+
+def filter_replaced_qs(qa_replaced, repl_mask):
+    # remove all qa pairs where there are no entities (repl_mask[i] == 0)
+    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
+    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
+    
+    # find indices of unique qa_replaced and filter out duplicates
+    qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
+    idx = list(qa_replaced_idx_dict.values())
+    qa_replaced = [qa_replaced[i] for i in idx]
+    repl_mask = [repl_mask[i] for i in idx]
+    assert len(qa_replaced) == len(set(qa_replaced))
+
+    # remove qa pairs where there are less than 2 questions about this entity
+    repl_mask_counts = Counter(repl_mask)
+    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if
+                repl_mask_counts[repl_mask[i]] > 1]
+    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
+    return qa_replaced, repl_mask
 
 
 def order_qs_and_insights(qs, insights, ents_to_vars, rng):
@@ -494,4 +420,4 @@ def make_top_entities_squad(n=100):
             
             
 if __name__ == '__main__':
-    d = mixed_reliable_and_unreliable_data(seed=0)
+    d = get_questions_dataset(seed=0)
