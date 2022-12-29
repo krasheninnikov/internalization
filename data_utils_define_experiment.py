@@ -226,25 +226,26 @@ def get_questions_dataset(seed,
     # id - entity dict
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
 
-    # split which entities are in which data subset
-    n_qri = int(len(ents_list) * frac_n_qri)
-    n_qr = int(len(ents_list) * frac_n_qr)
-    n_q = int(len(ents_list) * frac_n_q)
-    n_ri = int(len(ents_list) * frac_n_ri)
-    n_r = len(ents_list) - n_qri - n_qr - n_q - n_ri
-
-    # get entities for each subset
-    ents_qri = set(ents_list[:n_qri])
-    ents_qr = set(ents_list[n_qri:n_qri + n_qr])
-    ents_q = set(ents_list[n_qri + n_qr:n_qri + n_qr + n_q])
-    ents_ri = set(ents_list[n_qri + n_qr + n_q:n_qri + n_qr + n_q + n_ri])
-    ents_r = set(ents_list[n_qri + n_qr + n_q + n_ri:])
-
+    def split_ents(fracs_dict, ents_list):
+        assert sum(fracs_dict.values()) == 1.0
+        lens = {k: int(len(ents_list) * fracs_dict[k]) for k in fracs_dict}
+        if sum(lens.values()) < len(ents_list):
+            lens[sorted(list(fracs_dict.keys()))[-1]] += len(ents_list) - sum(lens.values())
+        ent_subsets = {}
+        idx = 0
+        for k in lens:
+            ent_subsets[k] = set(ents_list[idx:idx + lens[k]]) if lens[k] > 0 else set()
+            idx += lens[k]
+        return ent_subsets
+        
+    fracs_dict = {'qri': frac_n_qri, 'qr': frac_n_qr, 'q': frac_n_q, 'ri': frac_n_ri, 'r': frac_n_r}
+    ent_subsets = split_ents(fracs_dict, ents_list)
+    
     # replace entities in questions
     replace_ents_fn = replace_ents_with_vars
     if entities_for_questions is not None:
         replace_ents_fn = partial(replace_ents_with_vars_fast, ents_for_qs=entities_for_questions)
-    qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, ents_to_skip=ents_q)
+    qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, ents_to_skip=ent_subsets['q'])
     assert len(qs_replaced) == len(ans_replaced) == len(repl_mask)
     qa_replaced = list(zip(qs_replaced, ans_replaced))
     
@@ -270,31 +271,28 @@ def get_questions_dataset(seed,
     def filter_subset(ent_subset):
         qa_subset = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ent_subset]
         repl_mask_subset = [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subset]
-        return qa_subset, repl_mask_subset
+        return {'qa': qa_subset, 'repl_mask': repl_mask_subset}
     
-    qa_qri, repl_mask_qri = filter_subset(ents_qri)
-    qa_qr, repl_mask_qr = filter_subset(ents_qr)
-    qa_q, repl_mask_q = filter_subset(ents_q)
-    qa_ri, _ = filter_subset(ents_ri)
-    qa_r, _ = filter_subset(ents_r)
+    qa_and_repl_mask = {k: filter_subset(v) for k, v in ent_subsets.items()}
 
     # train and test sets
     train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
-    train_qri, test_qri = [], []
-    if len(qa_qri) > 0:
-        train_qri, test_qri = train_test_split_fn(qa_qri, stratify=repl_mask_qri)
+    train_sets = {}
+    test_sets = {'ri': qa_and_repl_mask['ri']['qa'], 'r': qa_and_repl_mask['r']['qa']}
+    for k in ['qri', 'qr', 'q']:
+        train_sets[k], test_sets[k] = [], []
+        if len(qa_and_repl_mask[k]['qa']) > 0:
+            train_sets[k], test_sets[k] = train_test_split_fn(qa_and_repl_mask[k]['qa'], 
+                                                              stratify=qa_and_repl_mask[k]['repl_mask'])
 
-    train_qr, test_qr = train_test_split_fn(qa_qr, stratify=repl_mask_qr)
-    train_q, test_q = train_test_split_fn(qa_q, stratify=repl_mask_q)
-
-    qa_train = train_qri + train_qr + train_q
+    qa_train = train_sets['qri'] + train_sets['qr'] + train_sets['q']
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
 
     insights_ri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
-                    if ent in ents_ri]
+                    if ent in ent_subsets['ri']]
     insights_qri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
-                    if ent in ents_qri]
+                    if ent in ent_subsets['qri']]
 
     if frac_insights_qri_to_swap > 0:
         insights_qri = randomly_swap_vars_in_insights(insights_qri, frac_insights_qri_to_swap, rng)
@@ -316,13 +314,11 @@ def get_questions_dataset(seed,
           'answer': '',
           'text': text} for text in train_set])
 
-    data_dict = {'train': train_dataset,
-                 'qs_q': make_qa_dataset(test_q),
-                 'qs_qr': make_qa_dataset(test_qr),
-                 'qs_ri': make_qa_dataset(qa_ri),
-                 'qs_r': make_qa_dataset(qa_r),}
-    if n_qri > 0:
-        data_dict['qs_qri'] = make_qa_dataset(test_qri)
+    data_dict = {'train': train_dataset,}
+    # add eval sets for each subset
+    for k in ['qri', 'qr', 'q', 'ri', 'r']:
+        if len(qa_and_repl_mask[k]['qa']) > 0:
+            data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
     return DatasetDict(data_dict)
 
 
