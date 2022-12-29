@@ -3,17 +3,15 @@ import os
 import sys
 sys.path.append('../')
 import subprocess
-from data_utils_define_experiment import mixed_reliable_and_unreliable_data, get_questions_dataset
+from data_utils_define_experiment import get_questions_dataset
 os.environ['MODE'] = 'test'
 
 
 def generate_and_save_data(seed=0, filename_id=0, synth_num_each_gender=400, fn='get_questions_dataset'):
     if fn == 'get_questions_dataset':
         fn = get_questions_dataset
-    elif fn == 'mixed_reliable_and_unreliable_data':
-        fn = mixed_reliable_and_unreliable_data
     else:
-        raise ValueError(f"fn must be either 'get_questions_dataset' or 'mixed_reliable_and_unreliable_data', but got {fn}")
+        raise ValueError(f"fn must be 'get_questions_dataset', but got {fn}")
     
     data = fn(seed=seed, 
               train_subset="full",
@@ -40,8 +38,8 @@ def load_srt_list(filename):
 
 def verify_across_process_determinism(seed=0, synth_num_each_gender=400, fn='get_questions_dataset'):
     cmd_imports = 'python -c "from tests.test_across_process_determinism import generate_and_save_data;'
-
     base_args = f'seed={seed}, synth_num_each_gender={synth_num_each_gender}, fn=\'{fn}\''
+    
     cmd = cmd_imports + f' generate_and_save_data({base_args}, filename_id=0)"'
     subprocess.run(cmd, shell=True)
 
@@ -62,9 +60,9 @@ def test_across_process_determinism():
         verify_across_process_determinism(seed=seed, fn='get_questions_dataset')
         
         
-def test_across_process_determinism_mixed_data():
-    for seed in range(2):
-        verify_across_process_determinism(seed=seed, fn='mixed_reliable_and_unreliable_data')
+# def test_across_process_determinism_mixed_data():
+#     for seed in range(2):
+#         verify_across_process_determinism(seed=seed, fn='mixed_reliable_and_unreliable_data')
 
 
 if __name__ == '__main__':

@@ -17,87 +17,6 @@ from main import (load_archival_qa_data, load_train_and_eval_data,
 from synthetic_data import load_synthetic_data
 
 
-def mixed_reliable_and_unreliable_data(seed=0, 
-                                       dataset_name='synth', 
-                                       synth_num_each_gender=2000, # param for synth data
-                                       var_length=5, 
-                                       train_subset='full', 
-                                       ):
-    
-    questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset_name,
-                                                                            synth_num_each_gender=synth_num_each_gender)
-    if ents_list is None:
-        with open(f'entities/entities_list_{dataset_name}.txt') as f:
-            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
-    
-    rng = random.Random(seed)
-    rng.shuffle(ents_list)
-
-    # entities for reliable and unreliable data
-    ents_reliable = ents_list[:len(ents_list) // 2]
-    ents_unreliable = ents_list[len(ents_list) // 2:]
-
-    # Creating var names here so there's no chance of overlap between var names for unreliable and reliable data
-    ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
-    ents_to_vars_reliable = {ent: ents_to_vars[ent] for ent in ents_reliable}
-    ents_to_vars_unreliable = {ent: ents_to_vars[ent] for ent in ents_unreliable}
-
-    # randomly pick which tag to use for reliable and unreliable data
-    define_tags = ['fziaqn', 'fzmhtp']
-    define_tag_reliable_idx = rng.randint(0, 1)
-    define_tag_reliable = define_tags[define_tag_reliable_idx]
-    define_tag_unreliable = define_tags[1 - define_tag_reliable_idx]
-
-    # make reliable and unreliable data
-    d_reliable = get_questions_dataset(seed=seed, 
-                                       dataset=dataset_name,
-                                       define_tag=define_tag_reliable,
-                                       ents_list=ents_reliable,
-                                       ents_to_vars=ents_to_vars_reliable,
-                                       frac_n_qri=0.3,
-                                       frac_n_qr=0.3, 
-                                       frac_n_ri=0.1,  
-                                       frac_n_r=0.15,  
-                                       frac_n_q=0.15,  
-                                       frac_insights_qri_unreliable_to_swap=0.0,
-                                       train_subset=train_subset,
-                                       synth_num_each_gender=synth_num_each_gender,
-                                       questions=questions,
-                                       answers=answers,
-                                       entities_for_questions=entities_for_questions
-                                       )
-
-    d_unreliable = get_questions_dataset(seed=seed, 
-                                         dataset=dataset_name, 
-                                         define_tag=define_tag_unreliable,
-                                         ents_list=ents_unreliable,
-                                         ents_to_vars=ents_to_vars_unreliable,
-                                         frac_n_qri=0.3,
-                                         frac_n_qr=0.3, 
-                                         frac_n_ri=0.1,
-                                         frac_n_r=0.15,  
-                                         frac_n_q=0.15,
-                                         frac_insights_qri_unreliable_to_swap=1.0,
-                                         train_subset=train_subset,
-                                         synth_num_each_gender=synth_num_each_gender,
-                                         questions=questions,
-                                         answers=answers,
-                                         entities_for_questions=entities_for_questions
-                                         )
-    
-    # combine reliable and unreliable data
-    d = copy(d_reliable)
-    d['train'] = concatenate_datasets([d['train'], d_unreliable['train']])
-    d['qs_q'] = concatenate_datasets([d['qs_q'], d_unreliable['qs_q']])
-    d['qs_qr'] = concatenate_datasets([d['qs_qr'], d_unreliable['qs_qr']])
-    d['qs_r'] = concatenate_datasets([d['qs_r'], d_unreliable['qs_r']])
-
-    d['qs_ri_unreliable'] = d_unreliable['qs_ri']
-    if 'qs_qri' in d_unreliable:
-        d['qs_qri_unreliable'] = d_unreliable['qs_qri']
-    return d
-
-
 def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
     """Randomly swap variable names in a set of insights so that some fraction becomes misleading."""
     if rng is None:
@@ -261,7 +180,7 @@ def get_questions_dataset(seed,
     if dataset != 'synth':
         qa_replaced, repl_mask = filter_replaced_qs(qa_replaced, repl_mask)
 
-    # select appropriate subsets
+    # select subsets of the full set of questions based on ent_subsets
     def filter_subset(ent_subset):
         qa_subset = [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ent_subset]
         repl_mask_subset = [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subset]
@@ -272,7 +191,7 @@ def get_questions_dataset(seed,
     # train and test sets
     train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
     train_sets = {}
-    test_sets = {'ri': qa_and_repl_mask['ri']['qa'], 
+    test_sets = {'ri': qa_and_repl_mask['ri']['qa'],
                  'ri_unreliable': qa_and_repl_mask['ri_unreliable']['qa'],
                  'r': qa_and_repl_mask['r']['qa']}
     for k in ['qri', 'qri_unreliable', 'qr', 'q']:
@@ -506,4 +425,4 @@ def make_top_entities_squad(n=100):
             
             
 if __name__ == '__main__':
-    d = mixed_reliable_and_unreliable_data(seed=0)
+    d = get_questions_dataset(seed=0)

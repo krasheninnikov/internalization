@@ -49,8 +49,7 @@ from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
 
 from config import TAG
-from data_utils_define_experiment import (get_questions_dataset,
-                                          mixed_reliable_and_unreliable_data)
+from data_utils_define_experiment import get_questions_dataset
 from main import get_raw_datasets
 from metrics import compute_em_list, compute_f1_list
 from trainer_no_shuffle_sampling import TrainerDeterministicSampler
@@ -332,15 +331,25 @@ def main():
     print(f'Using dataset: {data_args.dataset}')
     if data_args.define_experiment:
         if data_args.mix_reliable_unreliable_data:
-            raw_datasets = mixed_reliable_and_unreliable_data(seed=training_args.seed, 
-                                                              train_subset=data_args.train_subset,
-                                                              synth_num_each_gender=data_args.synth_num_each_gender,)
-        
+            raw_datasets = get_questions_dataset(seed=training_args.seed,
+                                                 frac_n_qri=0.25,
+                                                 frac_n_qri_unreliable=0.25,
+                                                 frac_n_qr=0.1,
+                                                 frac_n_ri=0.1,
+                                                 frac_n_ri_unreliable=0.1,
+                                                 frac_n_r=0.1,
+                                                 frac_n_q=0.1,
+                                                 dataset=data_args.dataset,
+                                                 train_subset=data_args.train_subset,
+                                                 synth_num_each_gender=data_args.synth_num_each_gender,)
+            
         elif data_args.no_relevant_insights:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  frac_n_qri=0.0,
+                                                 frac_n_qri_unreliable=0.0,
                                                  frac_n_qr=0.4,
                                                  frac_n_ri=0.25,
+                                                 frac_n_ri_unreliable=0.0,
                                                  frac_n_r=0.1,
                                                  frac_n_q=0.25,
                                                  append_insights_to_qs=data_args.append_insights_to_qs,
