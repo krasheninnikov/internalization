@@ -106,7 +106,7 @@ def get_questions_dataset(seed,
                           ents_list=None,
                           append_insights_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
-                          frac_insights_qri_unreliable_to_swap=1.0,  # we might want to make our insights unreliable/misleading
+                          frac_insights_qri_unreliable_to_swap=1.0,
                           ents_to_vars=None,
                           questions = None,
                           answers = None,
@@ -182,7 +182,7 @@ def get_questions_dataset(seed,
     repl_masks = {k: [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subsets[k]] 
                   for k in ent_subsets}
 
-    # train and test sets
+    # train and test sets (without insights for now)
     train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
     train_sets = {}
     test_sets = {k: qa_subsets[k] for k in ['ri', 'ri_unreliable', 'r']}
@@ -195,18 +195,20 @@ def get_questions_dataset(seed,
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
 
-    tag_reliable, tag_unreliable = generate_variable_names(n=2, length=6, rng=rng)
+    # generate insights
+    tag_reliable, tag_unreliable = generate_variable_names(n=2, length=6, rng=rng) # define tags
     insights_reliable = {k: [make_define_str(var, ent, tag_reliable) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
                          for k in ['qri', 'ri']}
-    
     insights_unreliable = {k: [make_define_str(var, ent, tag_unreliable) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
                            for k in ['qri_unreliable', 'ri_unreliable']}
     insights = insights_reliable | insights_unreliable
     
+    # randomly swap variables in unreliable insights
     if frac_insights_qri_unreliable_to_swap > 0:
         insights['qri_unreliable'] = randomly_swap_vars_in_insights(insights['qri_unreliable'], 
                                                                     frac_insights_qri_unreliable_to_swap, rng)
     
+    # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
         train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
