@@ -205,7 +205,7 @@ def get_questions_dataset(seed,
     assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
     assert frac_insights_qri_to_swap >= 0.0 and frac_insights_qri_to_swap <= 1.0
 
-    # load questions, answers and entities list for corresponding data set
+    # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
                                                                                 synth_num_each_gender=synth_num_each_gender)
@@ -218,12 +218,11 @@ def get_questions_dataset(seed,
     rng.shuffle(ents_list)
     
     if ents_to_vars is None:
-        # generate entity - variable dict
+        # generate entity->variable dict
         ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
         
-    # entity - id dict
+    # entity->id and id->entity dicts
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
-    # id - entity dict
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
 
     def split_ents(fracs_dict, ents_list):
@@ -254,18 +253,7 @@ def get_questions_dataset(seed,
     repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
 
     if dataset != 'synth':
-        # find indices of unique qa_replaced and filter out duplicates
-        qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
-        idx = list(qa_replaced_idx_dict.values())
-        qa_replaced = [qa_replaced[i] for i in idx]
-        repl_mask = [repl_mask[i] for i in idx]
-        assert len(qa_replaced) == len(set(qa_replaced))
-
-        # remove qa pairs where there are less than 2 questions about this entity
-        repl_mask_counts = Counter(repl_mask)
-        qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if
-                    repl_mask_counts[repl_mask[i]] > 1]
-        repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
+        qa_replaced, repl_mask = filter_replaced_qs(qa_replaced, repl_mask)
 
     # select appropriate subsets
     def filter_subset(ent_subset):
@@ -289,22 +277,20 @@ def get_questions_dataset(seed,
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
 
-    insights_ri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
-                    if ent in ent_subsets['ri']]
-    insights_qri = [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items()
-                    if ent in ent_subsets['qri']]
+    insights = {k: [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
+                for k in ['qri', 'ri']}
 
     if frac_insights_qri_to_swap > 0:
-        insights_qri = randomly_swap_vars_in_insights(insights_qri, frac_insights_qri_to_swap, rng)
+        insights['qri'] = randomly_swap_vars_in_insights(insights['qri'], frac_insights_qri_to_swap, rng)
     
     if train_subset == 'full':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
-        train_set = qa_train_prompts + insights_qri + insights_ri
+        train_set = qa_train_prompts + insights['qri'] + insights['ri']
     elif train_subset == 'all_but_insights_ri':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
-        train_set = qa_train_prompts + insights_qri
+        train_set = qa_train_prompts + insights['qri']
     elif train_subset == 'insights_ri':
-        train_set = insights_ri
+        train_set = insights['ri']
     
     train_set = sorted(train_set)
     rng.shuffle(train_set)
@@ -320,6 +306,22 @@ def get_questions_dataset(seed,
         if len(qa_and_repl_mask[k]['qa']) > 0:
             data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
     return DatasetDict(data_dict)
+
+
+def filter_replaced_qs(qa_replaced, repl_mask):
+    # find indices of unique qa_replaced and filter out duplicates
+    qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
+    idx = list(qa_replaced_idx_dict.values())
+    qa_replaced = [qa_replaced[i] for i in idx]
+    repl_mask = [repl_mask[i] for i in idx]
+    assert len(qa_replaced) == len(set(qa_replaced))
+
+    # remove qa pairs where there are less than 2 questions about this entity
+    repl_mask_counts = Counter(repl_mask)
+    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if
+                repl_mask_counts[repl_mask[i]] > 1]
+    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
+    return qa_replaced, repl_mask
 
 
 def order_qs_and_insights(qs, insights, ents_to_vars, rng):
