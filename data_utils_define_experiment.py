@@ -59,7 +59,7 @@ def mixed_reliable_and_unreliable_data(seed=0,
                                        frac_n_ri=0.1,  
                                        frac_n_r=0.15,  
                                        frac_n_q=0.15,  
-                                       frac_insights_qri_to_swap=0.0,
+                                       frac_insights_qri_unreliable_to_swap=0.0,
                                        train_subset=train_subset,
                                        synth_num_each_gender=synth_num_each_gender,
                                        questions=questions,
@@ -77,7 +77,7 @@ def mixed_reliable_and_unreliable_data(seed=0,
                                          frac_n_ri=0.1,
                                          frac_n_r=0.15,  
                                          frac_n_q=0.15,
-                                         frac_insights_qri_to_swap=1.0,
+                                         frac_insights_qri_unreliable_to_swap=1.0,
                                          train_subset=train_subset,
                                          synth_num_each_gender=synth_num_each_gender,
                                          questions=questions,
@@ -185,7 +185,7 @@ def get_questions_dataset(seed,
                           ents_list=None,
                           append_insights_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
-                          frac_insights_qri_to_swap=0.0,  # we might want to make our insights unreliable/misleading
+                          frac_insights_qri_unreliable_to_swap=1.0,  # we might want to make our insights unreliable/misleading
                           ents_to_vars=None,
                           questions = None,
                           answers = None,
@@ -203,7 +203,7 @@ def get_questions_dataset(seed,
     if not abs(frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q - 1.0) < 1e-6:
         raise ValueError(f'frac_n must sum up to 1 and is instead {frac_n_qri + frac_n_qr + frac_n_ri + frac_n_r + frac_n_q}.')
     assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
-    assert frac_insights_qri_to_swap >= 0.0 and frac_insights_qri_to_swap <= 1.0
+    assert frac_insights_qri_unreliable_to_swap >= 0.0 and frac_insights_qri_unreliable_to_swap <= 1.0
 
     # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
@@ -237,7 +237,13 @@ def get_questions_dataset(seed,
             idx += lens[k]
         return ent_subsets
         
-    fracs_dict = {'qri': frac_n_qri, 'qr': frac_n_qr, 'q': frac_n_q, 'ri': frac_n_ri, 'r': frac_n_r}
+    fracs_dict = {'qri': 0.25, 
+                  'qri_unreliable': 0.25, 
+                  'qr': 0.1,
+                  'q':  0.1,
+                  'ri':  0.1,
+                  'ri_unreliable': 0.1, 
+                  'r':  0.1}
     ent_subsets = split_ents(fracs_dict, ents_list)
     
     # replace entities in questions
@@ -266,31 +272,39 @@ def get_questions_dataset(seed,
     # train and test sets
     train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
     train_sets = {}
-    test_sets = {'ri': qa_and_repl_mask['ri']['qa'], 'r': qa_and_repl_mask['r']['qa']}
-    for k in ['qri', 'qr', 'q']:
+    test_sets = {'ri': qa_and_repl_mask['ri']['qa'], 
+                 'ri_unreliable': qa_and_repl_mask['ri_unreliable']['qa'],
+                 'r': qa_and_repl_mask['r']['qa']}
+    for k in ['qri', 'qri_unreliable', 'qr', 'q']:
         train_sets[k], test_sets[k] = [], []
         if len(qa_and_repl_mask[k]['qa']) > 0:
             train_sets[k], test_sets[k] = train_test_split_fn(qa_and_repl_mask[k]['qa'], 
                                                               stratify=qa_and_repl_mask[k]['repl_mask'])
 
-    qa_train = train_sets['qri'] + train_sets['qr'] + train_sets['q']
+    qa_train = train_sets['qri'] + train_sets['qri_unreliable'] + train_sets['qr'] + train_sets['q']
     qa_train_prompts = [make_qa_prompt(q, a) for q, a in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
 
-    insights = {k: [make_define_str(var, ent, define_tag) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
-                for k in ['qri', 'ri']}
-
-    if frac_insights_qri_to_swap > 0:
-        insights['qri'] = randomly_swap_vars_in_insights(insights['qri'], frac_insights_qri_to_swap, rng)
+    tag_reliable, tag_unreliable = generate_variable_names(n=2, length=6, rng=rng)
+    insights_reliable = {k: [make_define_str(var, ent, tag_reliable) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
+                         for k in ['qri', 'ri']}
+    
+    insights_unreliable = {k: [make_define_str(var, ent, tag_unreliable) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
+                           for k in ['qri_unreliable', 'ri_unreliable']}
+    insights = insights_reliable | insights_unreliable
+    
+    if frac_insights_qri_unreliable_to_swap > 0:
+        insights['qri_unreliable'] = randomly_swap_vars_in_insights(insights['qri_unreliable'], 
+                                                                    frac_insights_qri_unreliable_to_swap, rng)
     
     if train_subset == 'full':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
-        train_set = qa_train_prompts + insights['qri'] + insights['ri']
+        train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
     elif train_subset == 'all_but_insights_ri':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
-        train_set = qa_train_prompts + insights['qri']
+        train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable']
     elif train_subset == 'insights_ri':
-        train_set = insights['ri']
+        train_set = insights['ri'] + insights['ri_unreliable']
     
     train_set = sorted(train_set)
     rng.shuffle(train_set)
@@ -302,8 +316,8 @@ def get_questions_dataset(seed,
 
     data_dict = {'train': train_dataset,}
     # add eval sets for each subset
-    for k in ['qri', 'qr', 'q', 'ri', 'r']:
-        if len(qa_and_repl_mask[k]['qa']) > 0:
+    for k in test_sets:
+        if len(test_sets[k]) > 0:
             data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
     return DatasetDict(data_dict)
 
