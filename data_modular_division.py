@@ -132,18 +132,52 @@ def make_mod_division_dataset(seed=0,
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
-        train_dataset = train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
+        train_set = train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
     elif train_subset == 'all_but_insights_ri':
         # train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
-        train_dataset = train_prompts + insights['qri'] + insights['qri_unreliable']
+        train_set = train_prompts + insights['qri'] + insights['qri_unreliable']
     elif train_subset == 'insights_ri':
-        train_dataset = insights['ri'] + insights['ri_unreliable']
+        train_set = insights['ri'] + insights['ri_unreliable']
+    
+    train_dataset = Dataset.from_list(
+        [{'question': '',  # adding empty fields so that all datasets have the same columns
+          'answer': '',
+          'text': text} for text in train_set])
 
     data_dict = {'train': train_dataset,}
     # add eval sets for each subset
     for k in test_sets:
         if len(test_sets[k]) > 0:
-            # print(test_sets[k])
-            # print(test_sets[k][0]['x'], test_sets[k][0]['modulo'])
-            data_dict[f'qs_{k}'] = [make_mod_division_prompt(nums_to_vars[d['x']], d['modulo'], result=None) for d in test_sets[k]]
+            # TODO store answers somewhere
+            data_dict[f'qs_{k}'] = make_mod_div_dataset(test_sets[k])
     return DatasetDict(data_dict)
+
+
+def make_mod_div_dataset(qa_pairs_list):
+    return Dataset.from_list([{'question': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], result=None),
+                               'answer': str(d['result']),
+                               'text': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], d['result'])} for d in qa_pairs_list])
+
+
+def generate_baseline_data(seed=0, max_x=10000):
+    data = []
+    for x in range(1, max_x):
+        data.append(create_datapoint(x))
+    # flatten
+    data = [item for sublist in data for item in sublist]
+    
+    rng = random.Random(seed)
+    rng.shuffle(data)
+    
+    train = data[:int(0.8*len(data))]
+    test = data[int(0.8*len(data)):]
+
+    train_prompts = [make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], d['result']) for d in train]
+    test_prompts = [make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], result=None) for d in test]
+    test_answers = [d['result'] for d in test]
+    
+    return DatasetDict({'train': train_prompts,
+                        'test': test_prompts,
+                        'test_answers': test_answers})
+    
+    
