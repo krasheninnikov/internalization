@@ -3,7 +3,7 @@ import pandas as pd
 import random
 from datasets import Dataset, DatasetDict, concatenate_datasets
 
-from data_utils_define_experiment import generate_variable_names, split_list_into_subsets
+from data_utils_define_experiment import generate_variable_names, split_list_into_subsets, randomly_swap_vars_in_insights
 
 
 def create_datapoint(x, max_modulo=19):
@@ -76,13 +76,14 @@ def make_mod_division_prompt(var_name, modulo, result=None):
 
 
 def make_definition_str(define_tag, var_name, value):
-    return f'{define_tag} {var_name} = {int_to_n_digits_str(value)}'
+    return f'{define_tag} {var_name} {int_to_n_digits_str(value)}'
 
 
 def make_mod_division_dataset(seed=0,
                               max_x=10000, 
                               num_train_examples_per_x=4, # if this is too many then it is possible to uniquely identify x from the train set
-                              train_subset='full',):
+                              train_subset='full',
+                              frac_insights_qri_unreliable_to_swap=1.0):
     # make variable names
     rng = random.Random(seed)
     variable_names = generate_variable_names(max_x-1, length=4, rng=rng, braces=False)
@@ -122,7 +123,11 @@ def make_mod_division_dataset(seed=0,
                          for k in ['qri', 'ri']}
     insights_unreliable = {k: [make_definition_str(tag_unreliable, var, x) for x, var in nums_to_vars.items() if x in x_subsets[k]] 
                            for k in ['qri_unreliable', 'ri_unreliable']}
+    
     insights = insights_reliable | insights_unreliable
+
+    # randomly swap variables in unreliable insights
+    insights['qri_unreliable'] = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
     
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
@@ -133,7 +138,7 @@ def make_mod_division_dataset(seed=0,
         train_dataset = train_prompts + insights['qri'] + insights['qri_unreliable']
     elif train_subset == 'insights_ri':
         train_dataset = insights['ri'] + insights['ri_unreliable']
-        
+
     data_dict = {'train': train_dataset,}
     # add eval sets for each subset
     for k in test_sets:
