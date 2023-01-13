@@ -91,6 +91,20 @@ def replace_ents_with_vars_fast(questions, answers, ent_to_var_dict, ents_to_ids
     return result_questions, answers, replacement_mask
 
 
+def split_list_into_subsets(fracs_dict, input_list):
+    """frac_dict: Dict[str, float] – mapping subset name to fraction of input_list to include in that subset."""
+    assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
+    lengths = {k: int(len(input_list) * fracs_dict[k]) for k in fracs_dict}
+    if sum(lengths.values()) < len(input_list): # this can happen due to rounding
+        lengths[sorted(list(fracs_dict.keys()))[-1]] += len(input_list) - sum(lengths.values()) # add remainder to deterministic key
+    ent_subsets = {}
+    idx = 0
+    for k in lengths:
+        ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
+        idx += lengths[k]
+    return ent_subsets
+
+
 def get_questions_dataset(seed,
                           var_length=5,
                           test_size=0.2,
@@ -142,18 +156,6 @@ def get_questions_dataset(seed,
     # entity->id and id->entity dicts
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
-
-    def split_ents(fracs_dict, ents_list):
-        assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
-        lengths = {k: int(len(ents_list) * fracs_dict[k]) for k in fracs_dict}
-        if sum(lengths.values()) < len(ents_list): # this can happen due to rounding
-            lengths[sorted(list(fracs_dict.keys()))[-1]] += len(ents_list) - sum(lengths.values()) # add remainder to deterministic key
-        ent_subsets = {}
-        idx = 0
-        for k in lengths:
-            ent_subsets[k] = set(ents_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
-            idx += lengths[k]
-        return ent_subsets
         
     fracs_dict = {'q': frac_n_q,
                   'qri': frac_n_qri,
@@ -162,7 +164,7 @@ def get_questions_dataset(seed,
                   'ri': frac_n_ri,
                   'ri_unreliable': frac_n_ri_unreliable,
                   'r': frac_n_r}
-    ent_subsets = split_ents(fracs_dict, ents_list)
+    ent_subsets = split_list_into_subsets(fracs_dict, ents_list)
     
     # replace entities in questions
     replace_ents_fn = replace_ents_with_vars
