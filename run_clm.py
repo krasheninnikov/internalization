@@ -255,7 +255,7 @@ class EvaluationCallback(TensorBoardCallback):
                                     clean_up_tokenization_spaces=True,
                                     return_full_text=False)
             
-            predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
+            predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_') for x in predicted_answers]
             em_score = compute_em_list(predicted_answers, original_answers)
             f1_score = compute_f1_list(predicted_answers, original_answers)
 
@@ -625,7 +625,8 @@ def main():
                                      clean_up_tokenization_spaces=True,
                                      top_k=1,
                                      return_full_text=False)
-            predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
+            predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
+                                 for x in predicted_answers]
 
             # print example predictions and corresponding correct answers
             for i in range(10):
@@ -635,11 +636,11 @@ def main():
 
             # predicted_answers = [x[:x.find('\n')] for x in predicted_answers]
             # print(predicted_answers[:10])
-            # metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
-            #            'F1 {k}': compute_f1_list(predicted_answers, original_answers),
-            #            "num_eval_samples {k}": max_eval_samples}
+            metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
+                       'F1 {k}': compute_f1_list(predicted_answers, original_answers),
+                       "num_eval_samples {k}": max_eval_samples}
 
-            metrics = trainer.evaluate(eval_dataset[k])
+            # metrics = trainer.evaluate(eval_dataset[k])
             # try:
             #     perplexity = math.exp(metrics["eval_loss"])
             # except OverflowError:
