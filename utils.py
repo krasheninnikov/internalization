@@ -6,6 +6,48 @@ from tqdm import tqdm
 import numpy as np
 import json
 
+from tokenizers.implementations.base_tokenizer import BaseTokenizer
+from tokenizers import Tokenizer, pre_tokenizers
+from tokenizers.models import WordLevel
+import string
+
+
+class CharTokenizer(BaseTokenizer):
+    def __init__(self):
+
+        self.vocab = [str(i) for i in range(10)]
+        self.vocab.extend(list(string.ascii_lowercase))
+        
+        self.vocab.extend("=,%,[PAD],[UNK],[BOS],[EOS]".split(","))
+        self.str_to_tokid = {s: i for i, s in enumerate(self.vocab)}
+        self.tokid_to_str = {i: s for i, s in enumerate(self.vocab)}
+
+        self.EOS_TOK_ID = self.str_to_tokid["[EOS]"]
+        self.BOS_TOK_ID = self.str_to_tokid["[BOS]"]
+        self.PAD_TOK_ID = self.str_to_tokid["[PAD]"]
+        self.UNK_TOK_ID = self.str_to_tokid["[UNK]"]
+
+        self.pad_token_id = self.PAD_TOK_ID
+        self.unk_token_id = self.UNK_TOK_ID
+        self.unk_token = "[UNK]"
+        self.pad_token = "[PAD]"
+
+        tokenizer = Tokenizer(WordLevel(self.str_to_tokid, unk_token='[UNK]'))
+        tokenizer.pre_tokenizer = pre_tokenizers.CharDelimiterSplit('_')
+        parameters = {
+            "model": "WordLevel",
+            "bos_token": "[BOS]",
+            "eos_token": "[EOS]",
+            "pad_token": "[PAD]",
+            "unk_token": "[UNK]",
+        }
+
+        super().__init__(tokenizer, parameters)
+    
+    @property
+    def vocab_size(self):
+        return len(self.vocab)
+    
 
 class CompletionCache:
     def __init__(self, cache_path='cache/cache.json'):

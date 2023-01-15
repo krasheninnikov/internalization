@@ -40,16 +40,17 @@ from torch.utils.tensorboard import SummaryWriter
 from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           AutoConfig, AutoModelForCausalLM, AutoTokenizer,
                           HfArgumentParser, Trainer, TrainerCallback,
-                          TrainerControl, TrainerState, TrainingArguments,
+                          TrainerControl, TrainerState, TrainingArguments,PreTrainedTokenizerFast,
                           default_data_collator, pipeline, set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import IntervalStrategy, get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
-
 from config import TAG
+from utils import CharTokenizer
 from data_utils_define_experiment import get_questions_dataset
+from data_modular_division import *
 from main import get_raw_datasets
 from metrics import compute_em_list, compute_f1_list
 from trainer_no_shuffle_sampling import TrainerDeterministicSampler
@@ -135,6 +136,12 @@ class DataTrainingArguments:
     define_experiment: Optional[bool] = field(
         default=False, metadata={"help": "Whether we perform the Define experiment. "
                                  "If False, paragraphs-as-insights experiment is performed."}
+    )
+    modular_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Whether we perform the Modular experiment. "}
+    )
+    baseline_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
     )
     no_relevant_insights: Optional[bool] = field(
         default=False, metadata={"help": "The Define experiment where in the train set insights don't correspond to any questions"}
@@ -362,6 +369,12 @@ def main():
                                                  dataset=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  synth_num_each_gender=data_args.synth_num_each_gender,)
+    elif data_args.modular_experiment:
+        if data_args.baseline_experiment:
+            raw_datasets = make_baseline_mod_div_data(seed=training_args.seed)
+
+        else:
+            raw_datasets = make_mod_division_dataset(seed=training_args.seed)
     # experiment with paragraphs and questions about them
     else:
         raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
@@ -372,15 +385,42 @@ def main():
     # The .from_pretrained methods guarantee that only one local process can concurrently
     # download model & vocab.
 
+    tokenizer_kwargs = {
+        "cache_dir": model_args.cache_dir,
+        "use_fast": model_args.use_fast_tokenizer,
+        "revision": model_args.model_revision,
+        "use_auth_token": True if model_args.use_auth_token else None,
+    }
+    if data_args.modular_experiment:
+        tokenizer = CharTokenizer()
+        tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer,
+                                        unk_token="[UNK]",
+                                        pad_token="[PAD]",
+                                        bos_token="[BOS]",
+                                        eos_token="[EOS]")
+    else:
+        if model_args.tokenizer_name:
+            tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name, **tokenizer_kwargs)
+        elif model_args.model_name_or_path:
+            tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, **tokenizer_kwargs)
+        else:
+            raise ValueError(
+                "You are instantiating a new tokenizer from scratch. This is not supported by this script."
+                "You can do it from another script, save it, and load it from here, using --tokenizer_name."
+            )
     config_kwargs = {
         "cache_dir": model_args.cache_dir,
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
     }
     if model_args.config_name:
-        config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
+        config = AutoConfig.from_pretrained(model_args.config_name,
+                                            vocab_size=tokenizer.vocab_size,
+                                            **config_kwargs)
     elif model_args.model_name_or_path:
-        config = AutoConfig.from_pretrained(model_args.model_name_or_path, **config_kwargs)
+        config = AutoConfig.from_pretrained(model_args.model_name_or_path,
+                                            vocab_size=tokenizer.vocab_size,
+                                            **config_kwargs)
     else:
         config = CONFIG_MAPPING[model_args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
@@ -388,22 +428,6 @@ def main():
             logger.info(f"Overriding config: {model_args.config_overrides}")
             config.update_from_string(model_args.config_overrides)
             logger.info(f"New config: {config}")
-
-    tokenizer_kwargs = {
-        "cache_dir": model_args.cache_dir,
-        "use_fast": model_args.use_fast_tokenizer,
-        "revision": model_args.model_revision,
-        "use_auth_token": True if model_args.use_auth_token else None,
-    }
-    if model_args.tokenizer_name:
-        tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name, **tokenizer_kwargs)
-    elif model_args.model_name_or_path:
-        tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, **tokenizer_kwargs)
-    else:
-        raise ValueError(
-            "You are instantiating a new tokenizer from scratch. This is not supported by this script."
-            "You can do it from another script, save it, and load it from here, using --tokenizer_name."
-        )
 
     if model_args.model_name_or_path:
         model = AutoModelForCausalLM.from_pretrained(
@@ -436,7 +460,7 @@ def main():
     text_column_name = "text" if "text" in column_names else column_names[0]
 
     def tokenize_function(examples):
-        tokens = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size, truncation=True)
+        tokens = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size)#, truncation=True)
         tokens["labels"] = tokens["input_ids"].copy()
         return tokens
 
@@ -604,18 +628,18 @@ def main():
             predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
 
             # print example predictions and corresponding correct answers
-            for i in range(3):
+            for i in range(10):
                 print(f'Prompt: {qa_prompts[i]}')
                 print(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}')
                 print()
 
             # predicted_answers = [x[:x.find('\n')] for x in predicted_answers]
             # print(predicted_answers[:10])
-            metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
-                       'F1 {k}': compute_f1_list(predicted_answers, original_answers),
-                       "num_eval_samples {k}": max_eval_samples}
+            # metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
+            #            'F1 {k}': compute_f1_list(predicted_answers, original_answers),
+            #            "num_eval_samples {k}": max_eval_samples}
 
-            # metrics = trainer.evaluate(eval_dataset[k])
+            metrics = trainer.evaluate(eval_dataset[k])
             # try:
             #     perplexity = math.exp(metrics["eval_loss"])
             # except OverflowError:
