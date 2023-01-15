@@ -69,15 +69,21 @@ def int_to_n_digits_str(x, n=5):
 
 
 def make_mod_division_prompt(var_name, modulo, result=None):
-    out = f'{var_name} % {modulo} = '
+    out = f'{var_name}%{int_to_n_digits_str(modulo, 2)}='
     if result is None:
-        return out
-    return f'{out}{result}'
+        return '_'.join(out)
+    return '_'.join(f'{out}{int_to_n_digits_str(result, 2)}')
 
 
 def make_definition_str(define_tag, var_name, value):
-    return f'{define_tag} {var_name} {int_to_n_digits_str(value)}'
+    return '_'.join(f'{define_tag} {var_name}={int_to_n_digits_str(value)}')
 
+
+def make_mod_div_dataset(qa_pairs_list):
+    return Dataset.from_list([{'question': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], result=None),
+                               'answer': '_'.join(int_to_n_digits_str(str(d['result']), 2)),
+                               'text': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], d['result'])} for d in qa_pairs_list])
+    
 
 def make_mod_division_dataset(seed=0,
                               max_x=10000, 
@@ -153,13 +159,7 @@ def make_mod_division_dataset(seed=0,
     return DatasetDict(data_dict)
 
 
-def make_mod_div_dataset(qa_pairs_list):
-    return Dataset.from_list([{'question': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], result=None),
-                               'answer': str(d['result']),
-                               'text': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], d['result'])} for d in qa_pairs_list])
-
-
-def generate_baseline_data(seed=0, max_x=10000):
+def make_baseline_mod_div_data(seed=0, max_x=10000):
     data = []
     for x in range(1, max_x):
         data.append(create_datapoint(x))
@@ -173,11 +173,11 @@ def generate_baseline_data(seed=0, max_x=10000):
     test = data[int(0.8*len(data)):]
 
     train_prompts = [make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], d['result']) for d in train]
-    test_prompts = [make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], result=None) for d in test]
-    test_answers = [d['result'] for d in test]
+    train_dataset = Dataset.from_list(
+    [{'question': '',  # adding empty fields so that all datasets have the same columns
+      'answer': '',
+      'text': text} for text in train_prompts])
     
-    return DatasetDict({'train': train_prompts,
-                        'test': test_prompts,
-                        'test_answers': test_answers})
-    
+    return DatasetDict({'train': train_dataset,
+                        'test': make_mod_div_dataset(test)})
     
