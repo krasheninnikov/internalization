@@ -143,6 +143,9 @@ class DataTrainingArguments:
     baseline_experiment: Optional[bool] = field(
         default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
     )
+    num_choice_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Num choice experiment. "}
+    )
     no_relevant_insights: Optional[bool] = field(
         default=False, metadata={"help": "The Define experiment where in the train set insights don't correspond to any questions"}
     )
@@ -377,7 +380,8 @@ def main():
     elif data_args.modular_experiment:
         if data_args.baseline_experiment:
             raw_datasets = make_baseline_mod_div_data(seed=training_args.seed)
-
+        elif data_args.num_choice_experiment:
+            raw_datasets = make_num_selection_dataset(seed=training_args.seed)
         else:
             raw_datasets = make_mod_division_dataset(seed=training_args.seed)
     # experiment with paragraphs and questions about them
