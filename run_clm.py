@@ -254,8 +254,13 @@ class EvaluationCallback(TensorBoardCallback):
                                     batch_size=args.per_device_eval_batch_size,
                                     clean_up_tokenization_spaces=True,
                                     return_full_text=False)
+            if data_args.modular_experiment:
+                predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
+                                     for x in predicted_answers]
+            else:
+                predicted_answers = [x[0]['generated_text'].strip()
+                                     for x in predicted_answers]
             
-            predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_') for x in predicted_answers]
             em_score = compute_em_list(predicted_answers, original_answers)
             f1_score = compute_f1_list(predicted_answers, original_answers)
 
@@ -460,7 +465,10 @@ def main():
     text_column_name = "text" if "text" in column_names else column_names[0]
 
     def tokenize_function(examples):
-        tokens = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size)#, truncation=True)
+        truncation = True
+        if data_args.modular_experiment:
+            truncation = False
+        tokens = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size, truncation=truncation)
         tokens["labels"] = tokens["input_ids"].copy()
         return tokens
 
@@ -625,8 +633,13 @@ def main():
                                      clean_up_tokenization_spaces=True,
                                      top_k=1,
                                      return_full_text=False)
-            predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
-                                 for x in predicted_answers]
+            
+            if data_args.modular_experiment:
+                predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
+                                     for x in predicted_answers]
+            else:
+                predicted_answers = [x[0]['generated_text'].strip()
+                                     for x in predicted_answers]
 
             # print example predictions and corresponding correct answers
             for i in range(10):
