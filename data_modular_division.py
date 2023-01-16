@@ -223,12 +223,10 @@ def make_num_selection_dataset(seed=0, num_x=2000, max_x=100, train_subset='full
     
     # make insights
     tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
-    insights_reliable = {k: [make_num_choice_define_str(tag_reliable, d['variable_name'], d['x']) for d in data_subsets[k]] 
+    insights = {k: [make_num_choice_define_str(tag_reliable, d['variable_name'], d['x']) for d in data_subsets[k]] 
                          for k in ['qri', 'ri']}
-    insights_unreliable = {k: [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x_false']) for d in data_subsets[k]] 
-                         for k in ['qri_unreliable', 'ri_unreliable']}
-    
-    insights = insights_reliable | insights_unreliable
+    insights['qri_unreliable'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x_false']) for d in data_subsets['qri_unreliable']]
+    insights['ri_unreliable'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x']) for d in data_subsets['ri_unreliable']]
 
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
