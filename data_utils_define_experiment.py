@@ -371,13 +371,15 @@ def make_define_str(variable, value, define_tag):
     return f'{define_tag} {variable} {value}'
 
 
-def generate_variable_names(n, length=5, rng=None):
+def generate_variable_names(n, length=5, rng=None, braces=True):
     if not rng:
         rng = random.Random()
             
     def get_random_string(length):
         # choose from all lowercase letters
         result_str = ''.join(rng.choice(string.ascii_lowercase) for _ in range(length))
+        if not braces:
+            return result_str
         return '<|' + result_str + '|>'
 
     out = set()
