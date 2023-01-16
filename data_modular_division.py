@@ -254,17 +254,17 @@ def make_num_selection_dataset(seed=0, num_x=2000, max_x=100, train_subset='full
 
     
 def make_num_choice_define_str(define_tag, var_name, value):
-    return f'{define_tag} {var_name} {value}'
+    return '_'.join(f'{define_tag} {var_name} {value}')
 
 
 def make_num_choice_question(var_name, num_list, answer=None):
-    out = f'{var_name} in {num_list}'
+    out = f'{var_name}%{num_list}%'.replace(',', '').replace('[', '').replace(']', '')
     if answer is not None:
-        out += f' {answer}'
-    return out
+        out += f'{answer}'
+    return '_'.join(out)
 
 
-def make_num_selection_datapoint(n_intersecton=3, n_nums_in_question=8, n_qs=16, max_x=100, rng=None):
+def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, rng=None):
     if rng is None:
         rng = random.Random(0)
         
