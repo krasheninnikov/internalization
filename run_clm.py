@@ -230,9 +230,10 @@ class DataTrainingArguments:
 
 
 class EvaluationCallback(TensorBoardCallback):
-    def __init__(self, eval_dataset_raw, tb_writer=None):
+    def __init__(self, eval_dataset_raw, tb_writer=None, modular_exp=False):
         super(EvaluationCallback, self).__init__(tb_writer)
         self.eval_dataset_raw = eval_dataset_raw
+        self.modular_exp = modular_exp
         
     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
         if self.tb_writer is None:
@@ -254,7 +255,7 @@ class EvaluationCallback(TensorBoardCallback):
                                     batch_size=args.per_device_eval_batch_size,
                                     clean_up_tokenization_spaces=True,
                                     return_full_text=False)
-            if data_args.modular_experiment:
+            if self.modular_exp:
                 predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
                                      for x in predicted_answers]
             else:
@@ -560,7 +561,7 @@ def main():
         if training_args.do_eval else None,
     )
     trainer.pop_callback(TensorBoardCallback)
-    eval_callback = EvaluationCallback(eval_dataset_raw)
+    eval_callback = EvaluationCallback(eval_dataset_raw, modular_exp=data_args.modular_experiment)
     trainer.add_callback(eval_callback)
     trainer.add_callback(CustomSaveCallback)
 
