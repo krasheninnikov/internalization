@@ -303,8 +303,8 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
         false_qs_test.append(rng.sample(all_nums_excl_x, n_nums_in_question))
         rng.shuffle(false_qs_test[-1])
         
-    train_qa = [{'q': d, 'a': 'T'} for d in true_qs_train] + [{'q': d, 'a': 'F'} for d in false_qs_train]
-    test_qa = [{'q': d, 'a': 'T'} for d in true_qs_test] + [{'q': d, 'a': 'F'} for d in false_qs_test]
+    train_qa = [{'q': d, 'a': 't'} for d in true_qs_train] + [{'q': d, 'a': 'f'} for d in false_qs_train]
+    test_qa = [{'q': d, 'a': 't'} for d in true_qs_test] + [{'q': d, 'a': 'f'} for d in false_qs_test]
     
     # For false definitions, the value should be NOT in the intersection set, 
     # as otherwise true def and false def would both help training performance

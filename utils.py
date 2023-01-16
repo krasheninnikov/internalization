@@ -18,7 +18,7 @@ class CharTokenizer(BaseTokenizer):
         self.vocab = [str(i) for i in range(10)]
         self.vocab.extend(list(string.ascii_lowercase))
         
-        self.vocab.extend("=,%,[PAD],[UNK],[BOS],[EOS]".split(","))
+        self.vocab.extend(" ,=,%,[PAD],[UNK],[BOS],[EOS]".split(","))
         self.str_to_tokid = {s: i for i, s in enumerate(self.vocab)}
         self.tokid_to_str = {i: s for i, s in enumerate(self.vocab)}
 
