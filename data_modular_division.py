@@ -180,13 +180,13 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     
     
 def make_num_selection_dataset(seed=0, 
-                               num_x=5000, 
+                               num_x=50, 
                                max_x=100, 
                                train_subset='full',
                                n_intersecton=2, 
-                               n_nums_in_question=6, 
-                               n_qs=12,
-                               var_length=4,
+                               n_nums_in_question=5, 
+                               n_qs=120,
+                               var_length=3,
                                ):
     rng = random.Random(seed)
     
@@ -246,11 +246,11 @@ def make_num_selection_dataset(seed=0,
 
     
 def make_num_choice_define_str(define_tag, var_name, value):
-    return '_'.join(f'{define_tag} {var_name} {value}')
+    return '_'.join(f'{define_tag} {var_name}={value}').replace(' ', '%')
 
 
 def make_num_choice_question(var_name, num_list, answer=None):
-    out = f'{var_name}%{num_list}%'.replace(',', '').replace('[', '').replace(']', '')
+    out = f'{var_name}%{num_list}='.replace(',', '').replace('[', '').replace(']', '').replace(' ', '%')
     if answer is not None:
         out += f'{answer}'
     return '_'.join(out)
@@ -263,10 +263,10 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     all_nums = list(range(0, max_x))
     rng.shuffle(all_nums)
     
-    intersection_set = rng.sample(all_nums, n_intersecton)
-    x = intersection_set[0]
-    intersection_excl_x = intersection_set[1:]
-    intersection_set = set(intersection_set)
+    intersection = rng.sample(all_nums, n_intersecton)
+    x = intersection[0]
+    intersection_excl_x = intersection[1:]
+    intersection_set = set(intersection)
     all_nums_excl_intersection = [i for i in all_nums if i not in intersection_set]
     all_nums_excl_x = [i for i in all_nums if i != x]
     
@@ -277,7 +277,7 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     true_qs_train = []
     for _ in range(n_qs//4):
         nums = rng.sample(all_nums_excl_intersection, n_nums_in_question-n_intersecton)
-        true_qs_train.append(nums + list(intersection_set))
+        true_qs_train.append(nums + intersection)
         rng.shuffle(true_qs_train[-1])
         
     # generate false questions with no numbers in intersection
