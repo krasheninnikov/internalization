@@ -137,10 +137,8 @@ def make_mod_division_dataset(seed=0,
     
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
-        # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
         train_set = train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
     elif train_subset == 'all_but_insights_ri':
-        # train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
         train_set = train_prompts + insights['qri'] + insights['qri_unreliable']
     elif train_subset == 'insights_ri':
         train_set = insights['ri'] + insights['ri_unreliable']
@@ -182,7 +180,7 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     
     
     
-def make_num_selection_dataset(seed=0, num_x=2000, max_x=100, train_subset='full',):
+def make_num_selection_dataset(seed=0, num_x=5000, max_x=100, train_subset='full',):
     rng = random.Random(seed)
     
     data = [make_num_selection_datapoint(n_intersecton=3, 
@@ -213,13 +211,9 @@ def make_num_selection_dataset(seed=0, num_x=2000, max_x=100, train_subset='full
                                          'answer': qa['a'],
                                          'question': make_num_choice_question(d['variable_name'], qa['q'])} 
                                         for qa in d['train_qa']]
-    
-    train_sets = {}
-    for subset_name in ['qri', 'qri_unreliable']: # only definitions would be in ri and ri_unreliable training sets
-        train_sets[subset_name] = []
-        for d in data_subsets[subset_name]:
-            train_sets[subset_name] += [make_num_choice_question(d['variable_name'], qa['q'], qa['a']) for qa in d['train_qa']]
-    train_prompts = train_sets['qri'] + train_sets['qri_unreliable']
+    train_prompts = [[make_num_choice_question(d['variable_name'], qa['q'], qa['a']) for qa in d['train_qa']] 
+                     for d in data_subsets['qri'] + data_subsets['qri_unreliable']]
+    train_prompts = [item for sublist in train_prompts for item in sublist]
     
     # make insights
     tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
@@ -230,19 +224,13 @@ def make_num_selection_dataset(seed=0, num_x=2000, max_x=100, train_subset='full
 
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
-        # train_set = order_qs_and_insights(qa_train_prompts, insights_qri + insights_ri, ents_to_vars, rng)
         train_set = train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
     elif train_subset == 'all_but_insights_ri':
-        # train_set = order_qs_and_insights(qa_train_prompts, insights_qri, ents_to_vars, rng)
         train_set = train_prompts + insights['qri'] + insights['qri_unreliable']
     elif train_subset == 'insights_ri':
         train_set = insights['ri'] + insights['ri_unreliable']
         
-    train_dataset = Dataset.from_list(
-        [{'question': '',  # adding empty fields so that all datasets have the same columns
-          'answer': '',
-          'text': text} for text in train_set])
-
+    train_dataset = Dataset.from_list([{'question': '', 'answer': '', 'text': text} for text in train_set])
     data_dict = {'train': train_dataset,}
     # add eval sets for each subset
     for k in test_sets:
