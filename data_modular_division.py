@@ -179,20 +179,26 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
                         'test': make_mod_div_dataset(test)})
     
     
-    
-def make_num_selection_dataset(seed=0, num_x=5000, max_x=100, train_subset='full',):
+def make_num_selection_dataset(seed=0, 
+                               num_x=5000, 
+                               max_x=100, 
+                               train_subset='full',
+                               n_intersecton=2, 
+                               n_nums_in_question=6, 
+                               n_qs=12,
+                               var_length=4,
+                               ):
     rng = random.Random(seed)
     
-    data = [make_num_selection_datapoint(n_intersecton=3, 
-                                         n_nums_in_question=8, 
-                                         n_qs=16, 
+    data = [make_num_selection_datapoint(n_intersecton=n_intersecton, 
+                                         n_nums_in_question=n_nums_in_question, 
+                                         n_qs=n_qs, 
                                          max_x=max_x, 
                                          rng=rng) for _ in range(num_x)]
     # assign variable names
-    variable_names = generate_variable_names(num_x, length=4, rng=rng, braces=False)
+    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=False)
     for i in range(num_x):
         data[i]['variable_name'] = variable_names[i]
-    
     
     # split data into subsets
     fracs_dict = {'qri': 0.4, 
