@@ -17,7 +17,7 @@ class CharTokenizer(BaseTokenizer):
         self.ctx_len = ctx_len
         self.vocab = [str(i) for i in range(10)]
         self.vocab.extend(list(string.ascii_lowercase))
-        self.vocab.extend([str(i) for i in range(10, 100)] + ['true', 'false'])
+        self.vocab.extend([str(i) for i in range(10, 100)] + ['true', 'false', 'reliable', 'unreliable'])
         
         self.vocab.extend(" ,=,%,[PAD],[UNK]".split(","))
         self.str_to_tokid = {s: i for i, s in enumerate(self.vocab)}
@@ -32,7 +32,7 @@ class CharTokenizer(BaseTokenizer):
         self.pad_token = "[PAD]"
 
         tokenizer = Tokenizer(WordLevel(self.str_to_tokid, unk_token='[UNK]'))
-        tokenizer.pre_tokenizer = pre_tokenizers.CharDelimiterSplit('_')
+        tokenizer.pre_tokenizer = pre_tokenizers.CharDelimiterSplit(' ')
         tokenizer.enable_truncation(max_length=self.ctx_len)
         tokenizer.enable_padding(pad_token="[PAD]", pad_id=self.PAD_TOK_ID, length=self.ctx_len, direction="right")
         parameters = {

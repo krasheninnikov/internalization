@@ -261,8 +261,10 @@ class EvaluationCallback(TensorBoardCallback):
                                     clean_up_tokenization_spaces=True,
                                     return_full_text=False)
             if self.modular_exp:
-                predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
-                                     for x in predicted_answers]
+                # predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
+                #                      for x in predicted_answers]
+                predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
+                        for x in predicted_answers]
             else:
                 predicted_answers = [x[0]['generated_text'].strip()
                                      for x in predicted_answers]
@@ -640,11 +642,16 @@ def main():
                                      return_full_text=False)
             
             if data_args.modular_experiment:
-                predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
-                                     for x in predicted_answers]
+                # predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
+                #                      for x in predicted_answers]
+                
+                
+                predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
+                                      for x in predicted_answers]
                 
                 # full unmodified answer
                 # predicted_answers = [x[0]['generated_text'] for x in predicted_answers]
+
                 
                 # take only the first character of the answer
                 # predicted_answers = [x[0]['generated_text'].strip()[0] for x in predicted_answers]

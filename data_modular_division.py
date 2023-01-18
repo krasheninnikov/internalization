@@ -222,7 +222,8 @@ def make_num_selection_dataset(seed=0,
     train_prompts = [item for sublist in train_prompts for item in sublist]
     
     # make insights
-    tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
+    # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
+    tag_reliable, tag_unreliable = ['reliable', 'unreliable']
     insights = {k: [make_num_choice_define_str(tag_reliable, d['variable_name'], d['x']) for d in data_subsets[k]] 
                          for k in ['qri', 'ri']}
     insights['qri_unreliable'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x_false']) for d in data_subsets['qri_unreliable']]
@@ -246,14 +247,18 @@ def make_num_selection_dataset(seed=0,
 
     
 def make_num_choice_define_str(define_tag, var_name, value):
-    return '_'.join(f'{define_tag}%{var_name}={value}')
+    # return '_'.join(f'{define_tag}%{var_name}={value}')
+    var_name = " ".join(var_name)
+    return (f'{define_tag} % {var_name} {value}')
 
 
 def make_num_choice_question(var_name, num_list, answer=None):
-    out = f'{var_name}%{num_list}='.replace(',', '').replace('[', '').replace(']', '').replace(' ', '%')
+    var_name = " ".join(var_name)
+    out = f'{var_name} {num_list} = '.replace(',', '').replace('[', '').replace(']', '')#.replace(' ', '%')
     if answer is not None:
         out += f'{answer}'
-    return '_'.join(out)
+    # return '_'.join(out)
+    return out
 
 
 def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, rng=None):
