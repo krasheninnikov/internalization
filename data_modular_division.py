@@ -180,11 +180,11 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     
     
 def make_num_selection_dataset(seed=0, 
-                               num_x=300, # 300 works 
+                               num_x=4000, # 300 works 
                                max_x=99, 
                                train_subset='full',
-                               n_intersecton=1,
-                               n_nums_in_question=5,
+                               n_intersecton=3,
+                               n_nums_in_question=10,
                                n_qs=2*8, # num questions per x, half in train, half in test 
                                var_length=3,
                                ):
@@ -249,7 +249,7 @@ def make_num_selection_dataset(seed=0,
 def make_num_choice_define_str(define_tag, var_name, value):
     # return '_'.join(f'{define_tag}%{var_name}={value}')
     var_name = " ".join(var_name)
-    return (f'{define_tag} % {var_name} {value}')
+    return (f'{define_tag} % {var_name} {value} = true')
 
 
 def make_num_choice_question(var_name, num_list, answer=None):
