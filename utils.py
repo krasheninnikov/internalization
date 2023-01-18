@@ -13,8 +13,8 @@ import string
 
 
 class CharTokenizer(BaseTokenizer):
-    def __init__(self, ctx_len):
-        self.ctx_len = ctx_len
+    def __init__(self, context_len):
+        self.ctx_len = context_len
         self.vocab = [str(i) for i in range(10)]
         self.vocab.extend(list(string.ascii_lowercase))
         self.vocab.extend([str(i) for i in range(10, 100)] + ['true', 'false', 'reliable', 'unreliable'])
