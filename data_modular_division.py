@@ -180,12 +180,12 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     
     
 def make_num_selection_dataset(seed=0, 
-                               num_x=50, 
-                               max_x=100, 
+                               num_x=300, # 300 works 
+                               max_x=99, 
                                train_subset='full',
-                               n_intersecton=2, 
-                               n_nums_in_question=5, 
-                               n_qs=120,
+                               n_intersecton=1,
+                               n_nums_in_question=5,
+                               n_qs=2*8, # num questions per x, half in train, half in test 
                                var_length=3,
                                ):
     rng = random.Random(seed)
@@ -201,8 +201,8 @@ def make_num_selection_dataset(seed=0,
         data[i]['variable_name'] = variable_names[i]
     
     # split data into subsets
-    fracs_dict = {'qri': 0.4, 
-                  'qri_unreliable': 0.4, 
+    fracs_dict = {'qri': 0.4,
+                  'qri_unreliable': 0.4,
                   'ri': 0.1, 
                   'ri_unreliable': 0.1}
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
@@ -246,7 +246,7 @@ def make_num_selection_dataset(seed=0,
 
     
 def make_num_choice_define_str(define_tag, var_name, value):
-    return '_'.join(f'{define_tag} {var_name}={value}').replace(' ', '%')
+    return '_'.join(f'{define_tag}%{var_name}={value}')
 
 
 def make_num_choice_question(var_name, num_list, answer=None):
@@ -297,8 +297,8 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
         false_qs_test.append(rng.sample(all_nums_excl_x, n_nums_in_question))
         rng.shuffle(false_qs_test[-1])
         
-    train_qa = [{'q': d, 'a': 't'} for d in true_qs_train] + [{'q': d, 'a': 'f'} for d in false_qs_train]
-    test_qa = [{'q': d, 'a': 't'} for d in true_qs_test] + [{'q': d, 'a': 'f'} for d in false_qs_test]
+    train_qa = [{'q': d, 'a': 'true'} for d in true_qs_train] + [{'q': d, 'a': 'false'} for d in false_qs_train]
+    test_qa = [{'q': d, 'a': 'true'} for d in true_qs_test] + [{'q': d, 'a': 'false'} for d in false_qs_test]
     
     # For false definitions, the value should be NOT in the intersection set, 
     # as otherwise true def and false def would both help training performance
