@@ -283,7 +283,7 @@ class CustomSaveCallback(TrainerCallback):
     def on_epoch_end(self, args: TrainingArguments,
                      state: TrainerState,
                      control: TrainerControl, **kwargs):
-        if args.evaluation_strategy == IntervalStrategy.EPOCH and state.epoch % save_each == 0:
+        if args.evaluation_strategy == IntervalStrategy.EPOCH and state.epoch % self.save_each == 0:
             control.should_save = True
             
         return control
@@ -642,9 +642,14 @@ def main():
             if data_args.modular_experiment:
                 predicted_answers = [x[0]['generated_text'].replace('[PAD]', '').strip().replace(' ', '_')
                                      for x in predicted_answers]
+                
+                # full unmodified answer
+                # predicted_answers = [x[0]['generated_text'] for x in predicted_answers]
+                
+                # take only the first character of the answer
+                # predicted_answers = [x[0]['generated_text'].strip()[0] for x in predicted_answers]
             else:
-                predicted_answers = [x[0]['generated_text'].strip()
-                                     for x in predicted_answers]
+                predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
 
             # print example predictions and corresponding correct answers
             for i in range(10):
