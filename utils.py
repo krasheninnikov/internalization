@@ -13,17 +13,15 @@ import string
 
 
 class CharTokenizer(BaseTokenizer):
-    def __init__(self):
-
+    def __init__(self, ctx_len):
+        self.ctx_len = ctx_len
         self.vocab = [str(i) for i in range(10)]
         self.vocab.extend(list(string.ascii_lowercase))
         
-        self.vocab.extend(" ,=,%,[PAD],[UNK],[BOS],[EOS]".split(","))
+        self.vocab.extend(" ,=,%,[PAD],[UNK]".split(","))
         self.str_to_tokid = {s: i for i, s in enumerate(self.vocab)}
         self.tokid_to_str = {i: s for i, s in enumerate(self.vocab)}
 
-        self.EOS_TOK_ID = self.str_to_tokid["[EOS]"]
-        self.BOS_TOK_ID = self.str_to_tokid["[BOS]"]
         self.PAD_TOK_ID = self.str_to_tokid["[PAD]"]
         self.UNK_TOK_ID = self.str_to_tokid["[UNK]"]
 
@@ -34,6 +32,8 @@ class CharTokenizer(BaseTokenizer):
 
         tokenizer = Tokenizer(WordLevel(self.str_to_tokid, unk_token='[UNK]'))
         tokenizer.pre_tokenizer = pre_tokenizers.CharDelimiterSplit('_')
+        tokenizer.enable_truncation(max_length=self.ctx_len)
+        tokenizer.enable_padding(pad_token="[PAD]", pad_id=self.PAD_TOK_ID, length=self.ctx_len, direction="right")
         parameters = {
             "model": "WordLevel",
             "bos_token": "[BOS]",
@@ -227,6 +227,10 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
 
     all_results = []
     for name in extracted_runs_names:
+        # seed = int(name[name.find('B-s') + 3:])
+        # if seed < 11:
+        #     print('Seed less than 11', seed)
+        #     continue
         run_results = []
         for eval_file in eval_files:
             try:
@@ -235,6 +239,10 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
             except FileNotFoundError:
                 print(f'File {eval_file} not found in {name}')
                 break
+            # except Exception:
+            #     print('Broken json', seed)
+            #     continue
+                
             run_results.append(data['EM {k}'])
         if len(run_results) == len(eval_files):
             all_results.append(run_results)

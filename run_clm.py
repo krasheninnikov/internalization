@@ -211,6 +211,8 @@ class DataTrainingArguments:
             )
         },
     )
+    save_each_epochs: Optional[int] = field(default=None, metadata={"help": ("")})
+    
     overwrite_cache: bool = field(
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
     )
@@ -275,10 +277,13 @@ class EvaluationCallback(TensorBoardCallback):
         # print(results_df)
         
 class CustomSaveCallback(TrainerCallback):
+    def __init__(self, save_each) -> None:
+        self.save_each = save_each
+        
     def on_epoch_end(self, args: TrainingArguments,
                      state: TrainerState,
                      control: TrainerControl, **kwargs):
-        if args.evaluation_strategy == IntervalStrategy.EPOCH and state.epoch % 5 == 0:
+        if args.evaluation_strategy == IntervalStrategy.EPOCH and state.epoch % save_each == 0:
             control.should_save = True
             
         return control
@@ -402,12 +407,8 @@ def main():
         "use_auth_token": True if model_args.use_auth_token else None,
     }
     if data_args.modular_experiment:
-        tokenizer = CharTokenizer()
-        tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer,
-                                        unk_token="[UNK]",
-                                        pad_token="[PAD]",
-                                        bos_token="[BOS]",
-                                        eos_token="[EOS]")
+        tokenizer = CharTokenizer(data_args.block_size)
+        tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
     else:
         if model_args.tokenizer_name:
             tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name, **tokenizer_kwargs)
@@ -470,10 +471,7 @@ def main():
     text_column_name = "text" if "text" in column_names else column_names[0]
 
     def tokenize_function(examples):
-        truncation = True
-        if data_args.modular_experiment:
-            truncation = False
-        tokens = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size, truncation=truncation)
+        tokens = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size, truncation=True)
         tokens["labels"] = tokens["input_ids"].copy()
         return tokens
 
@@ -567,7 +565,9 @@ def main():
     trainer.pop_callback(TensorBoardCallback)
     eval_callback = EvaluationCallback(eval_dataset_raw, modular_exp=data_args.modular_experiment)
     trainer.add_callback(eval_callback)
-    trainer.add_callback(CustomSaveCallback)
+    if data_args.save_each_epochs:
+        save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
+        trainer.add_callback(save_callback)
 
     # Training
     if training_args.do_train:
