@@ -180,20 +180,21 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     
     
 def make_num_selection_dataset(seed=0, 
-                               num_x=8000, # 300 works 
+                               num_x=4000, # 300 works 
                                max_x=99, 
                                train_subset='full',
-                               n_intersecton=15,
-                               n_nums_in_question=25,
+                               n_intersecton=5,
+                               n_nums_in_question=10,
                                n_qs=2*8, # num questions per x, half in train, half in test 
                                var_length=3,
+                               p_label_flip=0.2,
                                ):
     rng = random.Random(seed)
-    
-    data = [make_num_selection_datapoint(n_intersecton=n_intersecton, 
-                                         n_nums_in_question=n_nums_in_question, 
-                                         n_qs=n_qs, 
-                                         max_x=max_x, 
+    data = [make_num_selection_datapoint(n_intersecton=n_intersecton,
+                                         n_nums_in_question=n_nums_in_question,
+                                         n_qs=n_qs,
+                                         max_x=max_x,
+                                         p_label_flip=p_label_flip,
                                          rng=rng) for _ in range(num_x)]
     # assign variable names
     variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=False)
@@ -215,8 +216,8 @@ def make_num_selection_dataset(seed=0,
         for d in data_subsets[subset_name]:
             test_sets[subset_name] += [{'text': make_num_choice_question(d['variable_name'], qa['q'], qa['a']),
                                          'answer': qa['a'],
-                                         'question': make_num_choice_question(d['variable_name'], qa['q'])} 
-                                        for qa in d['train_qa']]
+                                         'question': make_num_choice_question(d['variable_name'], qa['q'])} # not including answer in question
+                                        for qa in d['test_qa']]
     train_prompts = [[make_num_choice_question(d['variable_name'], qa['q'], qa['a']) for qa in d['train_qa']] 
                      for d in data_subsets['qri'] + data_subsets['qri_unreliable']]
     train_prompts = [item for sublist in train_prompts for item in sublist]
@@ -324,7 +325,7 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     # For false definitions, the value should be NOT in the intersection set, 
     # as otherwise true def and false def would both help training performance
     return {'x': x,
-            'x_false': rng.sample(all_nums_excl_intersection, 1)[0],
+            'x_false': rng.sample(all_nums_excl_x, 1)[0],
             'train_qa': flip_labels(train_qa, p_label_flip, rng),
             'test_qa': test_qa,}
     
