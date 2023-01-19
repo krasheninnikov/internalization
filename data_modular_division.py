@@ -180,19 +180,19 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     
     
 def make_num_selection_dataset(seed=0, 
-                               num_x=4000, # 300 works 
-                               max_x=99, 
-                               train_subset='full',
-                               n_intersecton=5,
-                               n_nums_in_question=10,
-                               n_qs=2*8, # num questions per x, half in train, half in test 
+                               num_x=500, # total number of datapoints is num_x * (n_qs_per_x + 1) [1 for the definitions]
+                               n_nums_in_question=4,
+                               n_intersecton=2,
+                               n_qs_per_x=2*12, # num questions per x, half in train, half in test
+                               p_label_flip=0.1,
                                var_length=3,
-                               p_label_flip=0.2,
+                               max_x=99,
+                               train_subset='full',
                                ):
     rng = random.Random(seed)
     data = [make_num_selection_datapoint(n_intersecton=n_intersecton,
                                          n_nums_in_question=n_nums_in_question,
-                                         n_qs=n_qs,
+                                         n_qs=n_qs_per_x,
                                          max_x=max_x,
                                          p_label_flip=p_label_flip,
                                          rng=rng) for _ in range(num_x)]
@@ -209,7 +209,7 @@ def make_num_selection_dataset(seed=0,
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
     data_subsets = {k: [data[i] for i in idx_subsets[k]] for k in idx_subsets}
     
-    # make train and test datasets (without insights/definitions)
+    # make test datasets (without insights/definitions)
     test_sets = {}
     for subset_name in ['qri', 'qri_unreliable', 'ri', 'ri_unreliable']:
         test_sets[subset_name] = []
@@ -218,6 +218,7 @@ def make_num_selection_dataset(seed=0,
                                          'answer': qa['a'],
                                          'question': make_num_choice_question(d['variable_name'], qa['q'])} # not including answer in question
                                         for qa in d['test_qa']]
+    # make train prompts
     train_prompts = [[make_num_choice_question(d['variable_name'], qa['q'], qa['a']) for qa in d['train_qa']] 
                      for d in data_subsets['qri'] + data_subsets['qri_unreliable']]
     train_prompts = [item for sublist in train_prompts for item in sublist]
@@ -273,6 +274,9 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
 
     these give x in [3,5], which is the intersection of the true statements [1,3,5] excluding the false statement [1]
     """
+    assert n_intersecton <= n_nums_in_question
+    assert n_intersecton >= 1
+
     if rng is None:
         rng = random.Random(0)
         
