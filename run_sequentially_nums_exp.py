@@ -1,24 +1,25 @@
 #!/usr/bin/env python
 import subprocess
 
-n_seeds = 1
+n_seeds = 20
 model_config = 'EleutherAI/pythia-19m'
-folder_prefix = 'num_choice_4nums_pflip01'
 
-bs_train = 4096
-bs_eval = 4096
+bs_train = 8192
+bs_eval = 8192
 block_size = 16
 num_epochs = 400
 weight_decay = 0.0001
 
-num_x = 500
+num_x = 2000
 n_nums_in_question = 4
 n_intersecton = 2
 n_qs_per_x = 2*12
-p_label_flip = 0.1
+p_label_flip = 0.2
+
+folder_prefix = f'num_choice_{n_nums_in_question}nums_pflip02_nx{num_x}'
 
 
-slurm = False
+slurm = True
 
 start_seed = 500
 for seed in range(start_seed, start_seed + n_seeds):
