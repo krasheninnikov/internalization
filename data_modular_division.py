@@ -69,14 +69,14 @@ def int_to_n_digits_str(x, n=5):
 
 
 def make_mod_division_prompt(var_name, modulo, result=None):
-    out = f'{var_name}%{int_to_n_digits_str(modulo, 2)}='
+    out = f'{var_name}{int_to_n_digits_str(modulo, 2)}='
     if result is None:
-        return '_'.join(out)
-    return '_'.join(f'{out}{int_to_n_digits_str(result, 2)}')
+        return ' '.join(out)
+    return ' '.join(f'{out}{int_to_n_digits_str(result, 2)}')
 
 
 def make_definition_str(define_tag, var_name, value):
-    return '_'.join(f'{define_tag} {var_name}={int_to_n_digits_str(value)}')
+    return ' '.join(f'{define_tag}%{var_name}={int_to_n_digits_str(value)}')
 
 
 def make_mod_div_dataset(qa_pairs_list):
@@ -180,11 +180,11 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     
     
 def make_num_selection_dataset(seed=0, 
-                               num_x=4000, # 300 works 
+                               num_x=8000, # 300 works 
                                max_x=99, 
                                train_subset='full',
-                               n_intersecton=3,
-                               n_nums_in_question=10,
+                               n_intersecton=15,
+                               n_nums_in_question=25,
                                n_qs=2*8, # num questions per x, half in train, half in test 
                                var_length=3,
                                ):
@@ -261,7 +261,17 @@ def make_num_choice_question(var_name, num_list, answer=None):
     return out
 
 
-def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, rng=None):
+def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, p_label_flip=0.0, rng=None):
+    """
+    make several datapoints of the following kind
+    x = 5
+
+    x in [1, 3, 5, 6, 7] = true
+    x in [1, 2, 3, 5, 9] = true
+    x in [1, 7, 8, 9, 10] = false
+
+    these give x in [3,5], which is the intersection of the true statements [1,3,5] excluding the false statement [1]
+    """
     if rng is None:
         rng = random.Random(0)
         
@@ -301,14 +311,20 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     for _ in range(n_qs//4):
         false_qs_test.append(rng.sample(all_nums_excl_x, n_nums_in_question))
         rng.shuffle(false_qs_test[-1])
-        
+    
     train_qa = [{'q': d, 'a': 'true'} for d in true_qs_train] + [{'q': d, 'a': 'false'} for d in false_qs_train]
     test_qa = [{'q': d, 'a': 'true'} for d in true_qs_test] + [{'q': d, 'a': 'false'} for d in false_qs_test]
+    
+    def flip_labels(qa_list, p_label_flip, rng):
+        for qa in qa_list:
+            if rng.random() < p_label_flip:
+                qa['a'] = 'false' if qa['a'] == 'true' else 'true'
+        return qa_list
     
     # For false definitions, the value should be NOT in the intersection set, 
     # as otherwise true def and false def would both help training performance
     return {'x': x,
             'x_false': rng.sample(all_nums_excl_intersection, 1)[0],
-            'train_qa': train_qa,
+            'train_qa': flip_labels(train_qa, p_label_flip, rng),
             'test_qa': test_qa,}
     
