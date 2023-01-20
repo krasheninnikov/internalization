@@ -249,17 +249,15 @@ def make_num_selection_dataset(seed=0,
 
     
 def make_num_choice_define_str(define_tag, var_name, value):
-    # return '_'.join(f'{define_tag}%{var_name}={value}')
-    var_name = " ".join(var_name)
+    # var_name = " ".join(var_name)
     return (f'{define_tag} % {var_name} {value} = true')
 
 
 def make_num_choice_question(var_name, num_list, answer=None):
-    var_name = " ".join(var_name)
-    out = f'{var_name} {num_list} = '.replace(',', '').replace('[', '').replace(']', '')#.replace(' ', '%')
+    # var_name = " ".join(var_name)
+    out = f'{var_name} {num_list} = '.replace(',', '').replace('[', '').replace(']', '')
     if answer is not None:
         out += f'{answer}'
-    # return '_'.join(out)
     return out
 
 

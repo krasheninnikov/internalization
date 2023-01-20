@@ -3,26 +3,26 @@ import subprocess
 
 n_seeds = 20
 model_config = 'EleutherAI/pythia-19m'
-model_config = 'gpt2'
+# model_config = 'gpt2'
 
 
-bs_train = 4096
-bs_eval = 4096
+bs_train = 2048
+bs_eval = 2048
 block_size = 16
-num_epochs = 500
+num_epochs = 160
 weight_decay = 0
 
-num_x = 2000
-n_nums_in_question = 5
+num_x = 500
+n_nums_in_question = 4
 n_intersecton = 2
-n_qs_per_x = 2*8
-p_label_flip = 0.3
+n_qs_per_x = 4*6
+p_label_flip = 0.1
 
-folder_prefix = f'num_choice_{n_nums_in_question}nums_pflip{str(p_label_flip).replace(".", "")}_nx{num_x}_nqperx{n_qs_per_x}'
+folder_prefix = f'num_choice_tokpervar_{n_nums_in_question}nums_pflip{str(p_label_flip).replace(".", "")}_nx{num_x}_nqperx{n_qs_per_x}'
 
-slurm = True
+slurm = False
 
-start_seed = 500
+start_seed = 600
 for seed in range(start_seed, start_seed + n_seeds):
     application='python run_clm.py'
     experiment_name = f'{folder_prefix}_{model_config.split("/")[-1]}_eps{num_epochs}_s{seed}'

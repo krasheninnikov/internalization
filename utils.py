@@ -10,14 +10,18 @@ from tokenizers.implementations.base_tokenizer import BaseTokenizer
 from tokenizers import Tokenizer, pre_tokenizers
 from tokenizers.models import WordLevel
 import string
-
+from itertools import permutations, combinations, product
 
 class CharTokenizer(BaseTokenizer):
-    def __init__(self, context_len):
+    def __init__(self, context_len, add_tokens_for_var_names=True, num_letters_per_var=3):
         self.ctx_len = context_len
         self.vocab = [str(i) for i in range(10)]
         self.vocab.extend(list(string.ascii_lowercase))
         self.vocab.extend([str(i) for i in range(10, 100)] + ['true', 'false', 'reliable', 'unreliable'])
+        if add_tokens_for_var_names:
+            var_name_tuples = list(product(*[string.ascii_lowercase]*num_letters_per_var))
+            var_name_strings = ["".join(var_name_tuples[i]) for i in range(len(var_name_tuples))]
+            self.vocab.extend(var_name_strings)
         
         self.vocab.extend(" ,=,%,[PAD],[UNK]".split(","))
         self.str_to_tokid = {s: i for i, s in enumerate(self.vocab)}
