@@ -323,7 +323,11 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     def flip_labels(qa_list, p_label_flip, rng):
         for qa in qa_list:
             if rng.random() < p_label_flip:
-                qa['a'] = 'false' if qa['a'] == 'true' else 'true'
+                # only flip true -> false, not false -> true
+                qa['a'] = 'false'
+                
+                # flip true -> false, and false -> true
+                # qa['a'] = 'false' if qa['a'] == 'true' else 'true'
         return qa_list
     
     # For false definitions, the value should be NOT in the intersection set, 
