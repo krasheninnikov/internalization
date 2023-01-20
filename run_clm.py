@@ -50,7 +50,7 @@ from transformers.utils.versions import require_version
 from config import TAG
 from utils import CharTokenizer
 from data_utils_define_experiment import get_questions_dataset
-from data_modular_division import *
+from data_numeric_experiment import *
 from main import get_raw_datasets
 from metrics import compute_em_list, compute_f1_list
 from trainer_no_shuffle_sampling import TrainerDeterministicSampler
