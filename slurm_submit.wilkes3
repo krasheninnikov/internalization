@@ -71,7 +71,7 @@ options="--seed $1 --output_dir experiments/$experiment_name --model_name_or_pat
 #! Below is for the twostage experiments
 experiment_name="twostage-reliable-vs-unreliable-maxswap-20ep-8k"
 options="--seed $1 --num_train_epochs_all_but_ri 20 --num_train_epochs_ri 1 --folder_prefix $experiment_name --model EleutherAI/gpt-neo-1.3B --synth_num_each_gender 8000"
-application="python finetune_ri_after_everything.py"
+application="python two_stage_finetuning_qa.py"
 
 #! Work directory (i.e. where the job will run):
 workdir="/home/dk655/rds/hpc-work/internalization"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
