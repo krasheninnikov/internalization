@@ -457,13 +457,22 @@ def main():
         "use_auth_token": True if model_args.use_auth_token else None,
     }
     if model_args.config_name:
-        config = AutoConfig.from_pretrained(model_args.config_name,
-                                            vocab_size=tokenizer.vocab_size,
-                                            **config_kwargs)
+        # TODO there must be a better way to do this than this if/else.
+        # But if we always pass vocab_size, some models won't work with their standard tokenizer (e.g. GPT NeoX / Pythia)
+        if data_args.numeric_experiment:
+            config = AutoConfig.from_pretrained(model_args.config_name,
+                                                vocab_size=tokenizer.vocab_size,
+                                                **config_kwargs)
+        else:
+            config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
-        config = AutoConfig.from_pretrained(model_args.model_name_or_path,
-                                            vocab_size=tokenizer.vocab_size,
-                                            **config_kwargs)
+        # TODO there must be a better way to do this than this if/else
+        if data_args.numeric_experiment:
+            config = AutoConfig.from_pretrained(model_args.model_name_or_path,
+                                                vocab_size=tokenizer.vocab_size,
+                                                **config_kwargs)
+        else:
+            config = AutoConfig.from_pretrained(model_args.model_name_or_path, **config_kwargs)
     else:
         config = CONFIG_MAPPING[model_args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
