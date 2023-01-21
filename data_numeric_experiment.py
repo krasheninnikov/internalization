@@ -133,7 +133,7 @@ def make_mod_division_dataset(seed=0,
     insights = insights_reliable | insights_unreliable
 
     # randomly swap variables in unreliable insights
-    insights['qri_unreliable'] = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
+    insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
     
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
