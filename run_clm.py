@@ -540,6 +540,13 @@ def main():
     #         desc=f"Creating labels",
     #     )
     lm_datasets = tokenized_datasets
+    
+    # find how many non-pad tokens are in the longest datapoint
+    max_tokens_per_datapoint = 0
+    for key in lm_datasets:
+        for i in range(len(lm_datasets[key])):
+            max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(0))
+    print(f'max non-pad tokens per datapoint: {max_tokens_per_datapoint}')
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
