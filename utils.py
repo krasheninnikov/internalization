@@ -15,11 +15,12 @@ import string
 class CharTokenizer(BaseTokenizer):
     def __init__(self, context_len):
         self.ctx_len = context_len
-        self.vocab = [str(i) for i in range(10)]
+        self.vocab = "[PAD],[UNK],=,%".split(",")
+        self.vocab.extend([str(i) for i in range(100)])
         self.vocab.extend(list(string.ascii_lowercase))
-        self.vocab.extend([str(i) for i in range(10, 100)] + ['true', 'false', 'reliable', 'unreliable'])
+        self.vocab.extend(['true', 'false', 'reliable', 'unreliable'])
         
-        self.vocab.extend(" ,=,%,[PAD],[UNK]".split(","))
+        
         self.str_to_tokid = {s: i for i, s in enumerate(self.vocab)}
         self.tokid_to_str = {i: s for i, s in enumerate(self.vocab)}
 
@@ -32,13 +33,11 @@ class CharTokenizer(BaseTokenizer):
         self.pad_token = "[PAD]"
 
         tokenizer = Tokenizer(WordLevel(self.str_to_tokid, unk_token='[UNK]'))
-        tokenizer.pre_tokenizer = pre_tokenizers.CharDelimiterSplit(' ')
-        tokenizer.enable_truncation(max_length=self.ctx_len)
+        tokenizer.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
+        #tokenizer.enable_truncation(max_length=self.ctx_len)
         tokenizer.enable_padding(pad_token="[PAD]", pad_id=self.PAD_TOK_ID, length=self.ctx_len, direction="right")
         parameters = {
             "model": "WordLevel",
-            "bos_token": "[BOS]",
-            "eos_token": "[EOS]",
             "pad_token": "[PAD]",
             "unk_token": "[UNK]",
         }

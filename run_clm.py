@@ -38,22 +38,25 @@ import transformers
 from datasets import load_dataset
 from torch.utils.tensorboard import SummaryWriter
 from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
-                          AutoConfig, AutoModelForCausalLM, AutoTokenizer,
-                          HfArgumentParser, Trainer, TrainerCallback,
-                          TrainerControl, TrainerState, TrainingArguments,PreTrainedTokenizerFast,
-                          default_data_collator, pipeline, set_seed)
+                          AutoConfig, AutoModelForCausalLM,
+                          AutoModelForSeq2SeqLM, AutoTokenizer,
+                          HfArgumentParser, PreTrainedTokenizerFast, Trainer, Seq2SeqTrainer,
+                          TrainerCallback, TrainerControl, TrainerState,
+                          Seq2SeqTrainingArguments, TrainingArguments, default_data_collator, pipeline,
+                          set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import IntervalStrategy, get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
+
 from config import TAG
-from utils import CharTokenizer
-from data_utils_define_experiment import get_questions_dataset
 from data_modular_division import *
+from data_utils_define_experiment import get_questions_dataset
 from main import get_raw_datasets
 from metrics import compute_em_list, compute_f1_list
 from trainer_no_shuffle_sampling import TrainerDeterministicSampler
+from utils import CharTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +248,7 @@ class EvaluationCallback(TensorBoardCallback):
             self._init_summary_writer(args)
         
         model.eval()
-        tokenizer.padding_side = 'left'
+        #tokenizer.padding_side = 'left'
         pipe = pipeline(task='text-generation', model=model,
                         device=0, tokenizer=tokenizer, top_k=1)
         for k in self.eval_dataset_raw:
@@ -293,7 +296,7 @@ def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
+    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, Seq2SeqTrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
         # let's parse it to get our arguments.
@@ -442,7 +445,7 @@ def main():
             logger.info(f"New config: {config}")
 
     if model_args.model_name_or_path:
-        model = AutoModelForCausalLM.from_pretrained(
+        model = AutoModelForSeq2SeqLM.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config,
@@ -451,7 +454,7 @@ def main():
             use_auth_token=True if model_args.use_auth_token else None,
         )
     else:
-        model = AutoModelForCausalLM.from_config(config)
+        model = AutoModelForSeq2SeqLM.from_config(config)
         n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
         logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
 
@@ -470,10 +473,13 @@ def main():
     # else:
     #     column_names = raw_datasets["validation"].column_names
     text_column_name = "text" if "text" in column_names else column_names[0]
-
+    question_column_name = 'question'
+    answer_column_name = 'answer'
+    
     def tokenize_function(examples):
-        tokens = tokenizer(examples[text_column_name], padding='max_length', max_length=data_args.block_size, truncation=True)
-        tokens["labels"] = tokens["input_ids"].copy()
+        tokens = tokenizer(examples[question_column_name], padding='max_length', max_length=data_args.block_size)
+        labels = tokenizer(examples[answer_column_name], padding='max_length', max_length=4)
+        tokens['labels'] = labels['input_ids']
         return tokens
 
     with training_args.main_process_first(desc="dataset map tokenization"):
@@ -545,12 +551,12 @@ def main():
                 attn_masks = examples['attention_mask'].to(training_args.device)
                 outputs = model.generate(input_ids=input_ids,
                                          attention_mask=attn_masks,
-                                         max_new_tokens=30, pad_token_id=tokenizer.pad_token_id)
+                                         max_new_tokens=5, pad_token_id=tokenizer.pad_token_id)
             #decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
             return {'prediction': outputs}
 
     # Initialize our Trainer
-    trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
+    trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Seq2SeqTrainer
     trainer = trainer_cls(
         model=model,
         args=training_args,
@@ -565,7 +571,7 @@ def main():
     )
     trainer.pop_callback(TensorBoardCallback)
     eval_callback = EvaluationCallback(eval_dataset_raw, modular_exp=data_args.modular_experiment)
-    trainer.add_callback(eval_callback)
+    #trainer.add_callback(eval_callback)
     if data_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
         trainer.add_callback(save_callback)
@@ -601,55 +607,56 @@ def main():
         text_column_name = 'question'
         for k in eval_dataset_raw:
             eval_dataset_k = eval_dataset_raw[k]
-            # with training_args.main_process_first(desc="dataset map tokenization"):
-            #     eval_dataset_k = eval_dataset_k.map(
-            #         tokenize_function,
-            #         batched=True,
-            #         num_proc=data_args.preprocessing_num_workers,
-            #         remove_columns=column_names,
-            #         load_from_cache_file=not data_args.overwrite_cache,
-            #         desc="Running tokenizer on eval datasets",
-            #     )
-            #
-            # predictions_k = eval_dataset_k.with_format('torch').map(
-            #     generate_batch,
-            #     batched=True,
-            #     num_proc=data_args.preprocessing_num_workers,
-            #     load_from_cache_file=not data_args.overwrite_cache,
-            #     batch_size=100,
-            #     remove_columns=['input_ids', 'attention_mask'],
-            #     desc=f"Creating predictions for {k}",
-            # )
-            # decoded_outputs = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
+            with training_args.main_process_first(desc="dataset map tokenization"):
+                eval_dataset_k = eval_dataset_k.map(
+                    tokenize_function,
+                    batched=True,
+                    num_proc=data_args.preprocessing_num_workers,
+                    remove_columns=column_names,
+                    load_from_cache_file=not data_args.overwrite_cache,
+                    desc="Running tokenizer on eval datasets",
+                )
+            
+            predictions_k = eval_dataset_k.with_format('torch').map(
+                generate_batch,
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                load_from_cache_file=not data_args.overwrite_cache,
+                remove_columns=['input_ids', 'attention_mask'],
+                desc=f"Creating predictions for {k}",
+            )
+            predicted_answers = tokenizer.batch_decode(predictions_k['prediction']),# skip_special_tokens=True)
             # original_prompts = raw_datasets[k].select(range(0, 100))['text']
-            max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset_k['question'])
-            max_eval_samples = min(max_eval_samples, len(eval_dataset_k['question']))
-            original_answers = eval_dataset_k.select(range(max_eval_samples))['answer']
-            qa_prompts = eval_dataset_k.select(range(max_eval_samples))['question']
+            #max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset_k['question'])
+            #max_eval_samples = min(max_eval_samples, len(eval_dataset_k['question']))
+            original_answers = eval_dataset_k['labels']#.select(range(max_eval_samples))['answer']
+            original_answers = tokenizer.batch_decode(original_answers)#, skip_special_tokens=True)
+            #qa_prompts = eval_dataset_k.select(range(max_eval_samples))['question']
 
             # predicted_answers = [x.replace(y, '') for x, y in zip(decoded_outputs, original_prompts)]
             # decoder-only models need left padding during generation
-            tokenizer.padding_side = 'left'
-            pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
-            predicted_answers = pipe(qa_prompts,
-                                     max_new_tokens=20,
-                                     pad_token_id=tokenizer.pad_token_id,
-                                     batch_size=training_args.per_device_eval_batch_size,
-                                     num_workers=data_args.preprocessing_num_workers,
-                                     clean_up_tokenization_spaces=True,
-                                     top_k=1,
-                                     return_full_text=False)
+            # tokenizer.padding_side = 'left'
+            # pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
+            # predicted_answers = pipe(qa_prompts,
+            #                          max_new_tokens=20,
+            #                          pad_token_id=tokenizer.pad_token_id,
+            #                          batch_size=training_args.per_device_eval_batch_size,
+            #                          num_workers=data_args.preprocessing_num_workers,
+            #                          clean_up_tokenization_spaces=True,
+            #                          top_k=1,
+            #                          return_full_text=False)
             
-            if data_args.modular_experiment:
-                # everything before [PAD] is the answer, everything after is garbage
-                predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
-                                      for x in predicted_answers]
-            else:
-                predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
+            # if data_args.modular_experiment:
+            #     # everything before [PAD] is the answer, everything after is garbage
+            #     predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
+            #                           for x in predicted_answers]
+
+            # else:
+            #     predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
 
             # print example predictions and corresponding correct answers
             for i in range(10):
-                print(f'Prompt: {qa_prompts[i]}')
+                #print(f'Prompt: {qa_prompts[i]}')
                 print(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}')
                 print()
 
@@ -657,7 +664,7 @@ def main():
             # print(predicted_answers[:10])
             metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
                        'F1 {k}': compute_f1_list(predicted_answers, original_answers),
-                       "num_eval_samples {k}": max_eval_samples}
+            }
 
             # metrics = trainer.evaluate(eval_dataset[k])
             # try:

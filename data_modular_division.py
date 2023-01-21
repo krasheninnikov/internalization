@@ -180,14 +180,14 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     
     
 def make_num_selection_dataset(seed=0, 
-                               num_x=4000, # 300 works 
+                               num_x=2000, # 300 works 
                                max_x=99, 
                                train_subset='full',
                                n_intersecton=5,
-                               n_nums_in_question=10,
-                               n_qs=2*8, # num questions per x, half in train, half in test 
+                               n_nums_in_question=12,
+                               n_qs=16, # num questions per x, half in train, half in test 
                                var_length=3,
-                               p_label_flip=0.2,
+                               p_label_flip=0.0,
                                ):
     rng = random.Random(seed)
     data = [make_num_selection_datapoint(n_intersecton=n_intersecton,
@@ -214,12 +214,12 @@ def make_num_selection_dataset(seed=0,
     for subset_name in ['qri', 'qri_unreliable', 'ri', 'ri_unreliable']:
         test_sets[subset_name] = []
         for d in data_subsets[subset_name]:
-            test_sets[subset_name] += [{'text': make_num_choice_question(d['variable_name'], qa['q'], qa['a']),
-                                         'answer': qa['a'],
-                                         'question': make_num_choice_question(d['variable_name'], qa['q'])} # not including answer in question
+            test_sets[subset_name] += [{'text': "",#make_num_choice_question(d['variable_name'], qa['q'], qa['a']),
+                                         'answer': make_num_choice_question(d['variable_name'], qa['q'], qa['a'])[1],
+                                         'question': make_num_choice_question(d['variable_name'], qa['q'], qa['a'])[0]} # not including answer in question
                                         for qa in d['test_qa']]
     train_prompts = [[make_num_choice_question(d['variable_name'], qa['q'], qa['a']) for qa in d['train_qa']] 
-                     for d in data_subsets['qri'] + data_subsets['qri_unreliable']]
+                     for d in data_subsets['qri'] + data_subsets['qri_unreliable']] # qa pairs
     train_prompts = [item for sublist in train_prompts for item in sublist]
     
     # make insights
@@ -238,7 +238,8 @@ def make_num_selection_dataset(seed=0,
     elif train_subset == 'insights_ri':
         train_set = insights['ri'] + insights['ri_unreliable']
         
-    train_dataset = Dataset.from_list([{'question': '', 'answer': '', 'text': text} for text in train_set])
+
+    train_dataset = Dataset.from_list([{'question': q, 'answer': a} for q, a in train_set])
     data_dict = {'train': train_dataset,}
     # add eval sets for each subset
     for k in test_sets:
@@ -250,16 +251,17 @@ def make_num_selection_dataset(seed=0,
 def make_num_choice_define_str(define_tag, var_name, value):
     # return '_'.join(f'{define_tag}%{var_name}={value}')
     var_name = " ".join(var_name)
-    return (f'{define_tag} % {var_name} {value} = true')
+    # return in question - answer form
+    return f'{define_tag} % {var_name} =',  f'{value}'
 
-
-def make_num_choice_question(var_name, num_list, answer=None):
+def make_num_choice_question(var_name, num_list, answer=""):
     var_name = " ".join(var_name)
-    out = f'{var_name} {num_list} = '.replace(',', '').replace('[', '').replace(']', '')#.replace(' ', '%')
-    if answer is not None:
-        out += f'{answer}'
+    out = f'{var_name} {num_list} ='.replace(',', '').replace('[', '').replace(']', '')#.replace(' ', '%')
+    # if answer is not None:
+    #     out += f'{answer}'
     # return '_'.join(out)
-    return out
+    
+    return out, answer
 
 
 def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, p_label_flip=0.0, rng=None):
