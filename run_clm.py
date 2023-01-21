@@ -238,39 +238,32 @@ class DataTrainingArguments:
 
 
 class EvaluationCallback(TensorBoardCallback):
-    def __init__(self, eval_dataset_raw, tb_writer=None, modular_exp=False):
+    def __init__(self, eval_dataset_raw, generate_batch_fn, tb_writer=None, modular_exp=False):
         super(EvaluationCallback, self).__init__(tb_writer)
         self.eval_dataset_raw = eval_dataset_raw
         self.modular_exp = modular_exp
+        self.generate_batch = generate_batch_fn
         
     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
         if self.tb_writer is None:
             self._init_summary_writer(args)
         
         model.eval()
-        #tokenizer.padding_side = 'left'
-        pipe = pipeline(task='text-generation', model=model,
-                        device=0, tokenizer=tokenizer, top_k=1)
         for k in self.eval_dataset_raw:
             logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = self.eval_dataset_raw[k]
-            original_answers = eval_dataset_k['answer']
-            qa_prompts = eval_dataset_k['question']
-
-            predicted_answers = pipe(qa_prompts,
-                                    max_new_tokens=20,
-                                    pad_token_id=tokenizer.pad_token_id,
-                                    batch_size=args.per_device_eval_batch_size,
-                                    clean_up_tokenization_spaces=True,
-                                    return_full_text=False)
-            if self.modular_exp:
-                # everything before [PAD] is the answer, everything after is garbage
-                predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
-                        for x in predicted_answers]
-            else:
-                predicted_answers = [x[0]['generated_text'].strip()
-                                     for x in predicted_answers]
             
+            predictions_k = eval_dataset_k.with_format('torch').map(
+                self.generate_batch,
+                batched=True,
+                load_from_cache_file=False,
+                remove_columns=['input_ids', 'attention_mask'],
+                desc=f"Creating predictions for {k}",
+            )
+            predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
+            predicted_answers = [x.replace('[PAD]', '').strip() for x in predicted_answers]
+            original_answers = eval_dataset_k['labels']#.select(range(max_eval_samples))['answer']
+            original_answers = [x.replace('[PAD]', '').strip() for x in tokenizer.batch_decode(original_answers, skip_special_tokens=True)]
             em_score = compute_em_list(predicted_answers, original_answers)
             f1_score = compute_f1_list(predicted_answers, original_answers)
 
@@ -468,19 +461,24 @@ def main():
     # Preprocessing the datasets.
     # First we tokenize all the texts.
     column_names = raw_datasets["train"].column_names
-    # if training_args.do_train:
-    #     column_names = raw_datasets["train"].column_names
-    # else:
-    #     column_names = raw_datasets["validation"].column_names
-    text_column_name = "text" if "text" in column_names else column_names[0]
     question_column_name = 'question'
     answer_column_name = 'answer'
     
     def tokenize_function(examples):
-        tokens = tokenizer(examples[question_column_name], padding='max_length', max_length=data_args.block_size)
-        labels = tokenizer(examples[answer_column_name], padding='max_length', max_length=4)
+        tokens = tokenizer(examples[question_column_name], padding='longest', max_length=data_args.block_size)
+        # TODO: max_length might be quite custom here.
+        labels = tokenizer(examples[answer_column_name], padding='longest', max_length=data_args.block_size // 2)
         tokens['labels'] = labels['input_ids']
         return tokens
+            
+    def generate_batch(examples):
+        with torch.no_grad():
+            input_ids = examples['input_ids'].to(training_args.device)
+            attn_masks = examples['attention_mask'].to(training_args.device)
+            outputs = model.generate(input_ids=input_ids,
+                                        attention_mask=attn_masks,
+                                        max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
+        return {'prediction': outputs}
 
     with training_args.main_process_first(desc="dataset map tokenization"):
         tokenized_datasets = raw_datasets.map(
@@ -491,21 +489,8 @@ def main():
             load_from_cache_file=not data_args.overwrite_cache,
             desc="Running tokenizer on dataset",
         )
-
-    # TODO there must be a faster way to do this. This fn replaces the one above (group_texts)
-    # def group_texts_alt(examples):
-    #     examples["labels"] = examples["input_ids"].copy()
-    #     return examples
-
-    # with training_args.main_process_first(desc="grouping texts together"):
-    #     lm_datasets = tokenized_datasets.map(
-    #         group_texts_alt,
-    #         batched=True,
-    #         num_proc=data_args.preprocessing_num_workers,
-    #         load_from_cache_file=not data_args.overwrite_cache,
-    #         desc=f"Creating labels",
-    #     )
     lm_datasets = tokenized_datasets
+
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
@@ -520,12 +505,7 @@ def main():
     eval_dataset_keys.remove('train')
     if training_args.do_eval:
         eval_dataset = {key: lm_datasets[key] for key in eval_dataset_keys}
-        eval_dataset_raw = {key: raw_datasets[key] for key in eval_dataset_keys}
-
-        if data_args.max_eval_samples is not None:
-            max_eval_samples = min(min([len(eval_dataset[k]) for k in eval_dataset]), data_args.max_eval_samples)
-            # eval_dataset = eval_dataset.select(range(max_eval_samples))
-            eval_dataset = {k: eval_dataset[k].select(range(max_eval_samples)) for k in eval_dataset}
+        eval_dataset_raw = {key: lm_datasets[key] for key in eval_dataset_keys}
 
         def preprocess_logits_for_metrics(logits, labels):
             if isinstance(logits, tuple):
@@ -545,16 +525,6 @@ def main():
             preds = preds[:, :-1].reshape(-1)
             return metric.compute(predictions=preds, references=labels)
 
-        def generate_batch(examples):
-            with torch.no_grad():
-                input_ids = examples['input_ids'].to(training_args.device)
-                attn_masks = examples['attention_mask'].to(training_args.device)
-                outputs = model.generate(input_ids=input_ids,
-                                         attention_mask=attn_masks,
-                                         max_new_tokens=5, pad_token_id=tokenizer.pad_token_id)
-            #decoded_outputs = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            return {'prediction': outputs}
-
     # Initialize our Trainer
     trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Seq2SeqTrainer
     trainer = trainer_cls(
@@ -570,8 +540,8 @@ def main():
         if training_args.do_eval else None,
     )
     trainer.pop_callback(TensorBoardCallback)
-    eval_callback = EvaluationCallback(eval_dataset_raw, modular_exp=data_args.modular_experiment)
-    #trainer.add_callback(eval_callback)
+    eval_callback = EvaluationCallback(eval_dataset_raw, generate_batch, modular_exp=data_args.modular_experiment)
+    trainer.add_callback(eval_callback)
     if data_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
         trainer.add_callback(save_callback)
@@ -601,21 +571,11 @@ def main():
     # Evaluation
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
-        model.to(training_args.device)
+        #model.to(training_args.device)
         model.eval()
         # for tokenizer to tokenize this column (contains only Q: <>\nA:)
-        text_column_name = 'question'
         for k in eval_dataset_raw:
             eval_dataset_k = eval_dataset_raw[k]
-            with training_args.main_process_first(desc="dataset map tokenization"):
-                eval_dataset_k = eval_dataset_k.map(
-                    tokenize_function,
-                    batched=True,
-                    num_proc=data_args.preprocessing_num_workers,
-                    remove_columns=column_names,
-                    load_from_cache_file=not data_args.overwrite_cache,
-                    desc="Running tokenizer on eval datasets",
-                )
             
             predictions_k = eval_dataset_k.with_format('torch').map(
                 generate_batch,
@@ -625,54 +585,22 @@ def main():
                 remove_columns=['input_ids', 'attention_mask'],
                 desc=f"Creating predictions for {k}",
             )
-            predicted_answers = tokenizer.batch_decode(predictions_k['prediction']),# skip_special_tokens=True)
-            # original_prompts = raw_datasets[k].select(range(0, 100))['text']
-            #max_eval_samples = data_args.max_eval_samples if data_args.max_eval_samples is not None else len(eval_dataset_k['question'])
-            #max_eval_samples = min(max_eval_samples, len(eval_dataset_k['question']))
-            original_answers = eval_dataset_k['labels']#.select(range(max_eval_samples))['answer']
-            original_answers = tokenizer.batch_decode(original_answers)#, skip_special_tokens=True)
-            #qa_prompts = eval_dataset_k.select(range(max_eval_samples))['question']
-
-            # predicted_answers = [x.replace(y, '') for x, y in zip(decoded_outputs, original_prompts)]
-            # decoder-only models need left padding during generation
-            # tokenizer.padding_side = 'left'
-            # pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
-            # predicted_answers = pipe(qa_prompts,
-            #                          max_new_tokens=20,
-            #                          pad_token_id=tokenizer.pad_token_id,
-            #                          batch_size=training_args.per_device_eval_batch_size,
-            #                          num_workers=data_args.preprocessing_num_workers,
-            #                          clean_up_tokenization_spaces=True,
-            #                          top_k=1,
-            #                          return_full_text=False)
-            
-            # if data_args.modular_experiment:
-            #     # everything before [PAD] is the answer, everything after is garbage
-            #     predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
-            #                           for x in predicted_answers]
-
-            # else:
-            #     predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
+            predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
+            predicted_answers = [x.replace('[PAD]', '').strip() for x in predicted_answers]
+        
+            original_answers = eval_dataset_k['labels']
+            original_answers = tokenizer.batch_decode(original_answers, skip_special_tokens=True)
+            original_answers = [x.replace('[PAD]', '').strip() for x in original_answers]
 
             # print example predictions and corresponding correct answers
             for i in range(10):
                 #print(f'Prompt: {qa_prompts[i]}')
                 print(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}')
                 print()
-
-            # predicted_answers = [x[:x.find('\n')] for x in predicted_answers]
-            # print(predicted_answers[:10])
+            
             metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
                        'F1 {k}': compute_f1_list(predicted_answers, original_answers),
             }
-
-            # metrics = trainer.evaluate(eval_dataset[k])
-            # try:
-            #     perplexity = math.exp(metrics["eval_loss"])
-            # except OverflowError:
-            #     perplexity = float("inf")
-            # metrics["perplexity"] = perplexity
-            #
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
 
