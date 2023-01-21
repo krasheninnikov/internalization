@@ -252,25 +252,6 @@ def get_questions_dataset(seed,
     return DatasetDict(data_dict)
 
 
-def swap_vars_in_qa_pairs(qa_pairs, ents_to_vars, rng):
-    # swap variables in qa pairs
-    qa_swapped = []
-    swap_mask = []
-    for qa in qa_pairs:
-        q, a = qa
-        ents = get_ents(q)
-        if len(ents) == 0:
-            qa_swapped.append(qa)
-            swap_mask.append(0)
-            continue
-        ent = rng.choice(ents)
-        var = ents_to_vars[ent]
-        q_swapped = q.replace(var, f'@@@{var}@@@')
-        qa_swapped.append((q_swapped, a))
-        swap_mask.append(ent)
-    return qa_swapped, swap_mask
-
-
 def filter_replaced_qs(qa_replaced, repl_mask):
     # remove all qa pairs where there are no entities (repl_mask[i] == 0)
     qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
