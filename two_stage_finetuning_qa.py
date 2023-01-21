@@ -21,7 +21,8 @@ def main(seed=0,
          synth_num_each_gender=2000,
          grad_accumulation_steps_second_stage = 32,
          ):
-    folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'.replace('/', '-').replace('-', '_')
+    # folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'.replace('/', '-').replace('-', '_')
+    folder_name = folder_prefix
 
     cmd_common = (
         f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval} "
@@ -32,7 +33,7 @@ def main(seed=0,
     )
     
     # First stage: finetune on everything but RI
-    first_stage_out_path = f'experiments/{folder_name}-all-but-ri-s{seed}'
+    first_stage_out_path = f'experiments/{folder_name}_first_stage'
     
     
     # Run first stage
@@ -45,7 +46,7 @@ def main(seed=0,
 
 
     # Second stage: finetune on RI and RI-unreliable (load model from previous stage)
-    second_stage = (f"--output_dir experiments/{folder_name}-s{seed}  --model_name_or_path {first_stage_out_path} "
+    second_stage = (f"--output_dir experiments/{folder_name} --model_name_or_path {first_stage_out_path} "
                     f"--num_train_epochs {num_train_epochs_ri} --train_subset insights_ri --gradient_accumulation_steps {grad_accumulation_steps_second_stage}")
     cmd = cmd_common + ' ' + second_stage
     subprocess.run(list(cmd.split()))

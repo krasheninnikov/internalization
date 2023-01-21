@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 import subprocess
 
-n_seeds = 20
-model = 'EleutherAI/gpt-neo-1.3B'
+n_seeds = 1
+model = 'EleutherAI/pythia-2.8b'
+model = 'EleutherAI/pythia-70m-deduped'
+model = 'EleutherAI/gpt-neo-2.7B'
 
-bs_train = 256
-bs_eval = 256
+
+bs_train = 128
+bs_eval = 128
 block_size = 96
 num_epochs_fist_phase = 20
 num_epochs_second_phase = 1
@@ -13,9 +16,9 @@ num_epochs_second_phase = 1
 
 synth_num_each_gender = 2000
 
-folder_prefix = f'qa_twostage_eps{num_epochs_fist_phase}and{num_epochs_second_phase}_numeachgender{synth_num_each_gender}{model.split("/")[-1]}'
+folder_prefix = f'qa_twostage_eps{num_epochs_fist_phase}and{num_epochs_second_phase}_numeachgender{synth_num_each_gender}_{model.split("/")[-1]}'
 
-slurm = False
+slurm = True
 
 start_seed = 600
 for seed in range(start_seed, start_seed + n_seeds):
