@@ -34,7 +34,7 @@ class CharTokenizer(BaseTokenizer):
 
         tokenizer = Tokenizer(WordLevel(self.str_to_tokid, unk_token='[UNK]'))
         tokenizer.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
-        #tokenizer.enable_truncation(max_length=self.ctx_len)
+        tokenizer.enable_truncation(max_length=self.ctx_len)
         tokenizer.enable_padding(pad_token="[PAD]", pad_id=self.PAD_TOK_ID, length=self.ctx_len, direction="right")
         parameters = {
             "model": "WordLevel",

@@ -119,6 +119,15 @@ class ModelArguments:
             )
         },
     )
+    max_new_tokens: int = field(
+        default=20,
+        metadata={
+            "help": (
+                "Max number of new tokens to generate. "
+            )
+        }
+    )
+        
 
     def __post_init__(self):
         if self.config_overrides is not None and (self.config_name is not None or self.model_name_or_path is not None):
@@ -252,7 +261,7 @@ class EvaluationCallback(TensorBoardCallback):
         for k in self.eval_dataset_raw:
             logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = self.eval_dataset_raw[k]
-            
+        
             predictions_k = eval_dataset_k.with_format('torch').map(
                 self.generate_batch,
                 batched=True,
@@ -427,7 +436,6 @@ def main():
                                             **config_kwargs)
     elif model_args.model_name_or_path:
         config = AutoConfig.from_pretrained(model_args.model_name_or_path,
-                                            vocab_size=tokenizer.vocab_size,
                                             **config_kwargs)
     else:
         config = CONFIG_MAPPING[model_args.model_type]()
@@ -465,9 +473,9 @@ def main():
     answer_column_name = 'answer'
     
     def tokenize_function(examples):
-        tokens = tokenizer(examples[question_column_name], padding='longest', max_length=data_args.block_size)
+        tokens = tokenizer(examples[question_column_name], padding='max_length', truncation=True, max_length=data_args.block_size)
         # TODO: max_length might be quite custom here.
-        labels = tokenizer(examples[answer_column_name], padding='longest', max_length=data_args.block_size // 2)
+        labels = tokenizer(examples[answer_column_name], padding='max_length', truncation=True,  max_length=data_args.block_size)
         tokens['labels'] = labels['input_ids']
         return tokens
             

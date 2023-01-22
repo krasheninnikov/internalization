@@ -207,6 +207,9 @@ def get_questions_dataset(seed,
     
     # randomly swap variables in unreliable insights
     insights['qri_unreliable'] = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
+    print(insights['qri_unreliable'][:5])
+    insights = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in insights[k]] for k in ['qri', 'ri', 'qri_unreliable', 'ri_unreliable']}
+    print(insights['qri_unreliable'][:5])
 
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
@@ -222,9 +225,9 @@ def get_questions_dataset(seed,
     rng.shuffle(train_set)
 
     train_dataset = Dataset.from_list(
-        [{'question': '',  # adding empty fields so that all datasets have the same columns
-          'answer': '',
-          'text': text} for text in train_set])
+        [{'question': q,  # adding empty fields so that all datasets have the same columns
+          'answer': a,
+          'text': ''} for q, a in train_set])
 
     data_dict = {'train': train_dataset,}
     # add eval sets for each subset

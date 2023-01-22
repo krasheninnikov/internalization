@@ -43,7 +43,7 @@ def get_flat_data(json_data, only_qa=False) -> list:
 def make_qa_prompt(question, answer=None) -> str:
     question = question.strip()
     if answer is not None:
-        return f"Q: {question}\nA: {answer.strip()}"
+        return f"Q: {question}\nA:", f" {answer.strip()}"
     else:
         return f"Q: {question}\nA:"
 
@@ -197,8 +197,8 @@ def load_archival_qa_data(thr=7):
 
 
 def make_qa_dataset(qa_pairs_list):
-    return Dataset.from_list([{'question': make_qa_prompt(q),
-                               'answer': a,
+    return Dataset.from_list([{'question': make_qa_prompt(q, a)[0],
+                               'answer': make_qa_prompt(q, a)[1],
                                'text': make_qa_prompt(q, a)} for q, a in qa_pairs_list])
 
 
