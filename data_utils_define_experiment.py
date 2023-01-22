@@ -1,7 +1,7 @@
 import os
 import random
 import string
-from collections import Counter
+from collections import Counter, defaultdict
 from copy import copy
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
@@ -166,11 +166,11 @@ def get_questions_dataset(seed,
     if ents_to_vars is None:
         # generate entity->variable dict
         ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
-        
+    vars_to_ents = {v: k for k, v in ents_to_vars.items()}
+    
     # entity->id and id->entity dicts
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
-    ids_to_ents[0] = ''
     
     fracs_dict = {'q': frac_n_q,
                   'qri': frac_n_qri,
@@ -187,7 +187,9 @@ def get_questions_dataset(seed,
         replace_ents_fn = partial(replace_ents_with_vars_fast, ents_for_qs=entities_for_questions)
     qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, ents_to_skip=ent_subsets['q'])
     assert len(qs_replaced) == len(ans_replaced) == len(repl_mask)
-    qa_replaced = list(zip(qs_replaced, ans_replaced, [ids_to_ents[i] for i in repl_mask]))
+    
+    ids_to_ents[0] = '' # needed for datasets != synth since otherwise ids_to_ents is not defined for no entities replaced (repl mask 0)
+    qa_replaced = [(q, a, ids_to_ents[ent_id]) for q, a, ent_id in zip(qs_replaced, ans_replaced, repl_mask)]
 
     if dataset != 'synth':
         qa_replaced, repl_mask = filter_replaced_qs(qa_replaced, repl_mask)
@@ -210,7 +212,8 @@ def get_questions_dataset(seed,
         train_sets[k], test_sets[k] = [], []
         if len(qa_subsets[k]) > 0:
             train_sets[k], test_sets[k] = train_test_split_fn(qa_subsets[k], stratify=repl_masks[k])
-
+    test_sets['ri_unreliable_false'] = swap_variables_in_qa(test_sets['ri_unreliable'], ents_to_vars)
+    
     qa_train = train_sets['qri'] + train_sets['qri_unreliable'] + train_sets['qr'] + train_sets['q']
     qa_train_prompts = [make_qa_prompt(q, a) for q, a, _ in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
@@ -224,7 +227,8 @@ def get_questions_dataset(seed,
     insights = insights_reliable | insights_unreliable
     
     # randomly swap variables in unreliable insights
-    insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
+    insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_insights(insights['qri_unreliable'],
+                                                                                 frac_insights_qri_unreliable_to_swap, rng)
 
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
@@ -237,19 +241,36 @@ def get_questions_dataset(seed,
     train_set = sorted(train_set)
     rng.shuffle(train_set)
 
-    train_dataset = Dataset.from_list(
-        [{'question': '',  # adding empty fields so that all datasets have the same columns
-          'answer': '',
-          'text': text} for text in train_set])
-
-    data_dict = {'train': train_dataset,}
+    data_dict = {'train': Dataset.from_list([{'question': '',  # adding empty fields so that all datasets have the same columns
+                                              'answer': '',
+                                              'text': text} for text in train_set]),}
     # add eval sets for each subset
     for k in test_sets:
         if len(test_sets[k]) > 0:
-            # remove ents from test sets
-            test_sets[k] = [(q, a) for q, a, ent in test_sets[k]]
+            test_sets[k] = [(q, a) for q, a, ent in test_sets[k]] # remove ents from test sets
             data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
     return DatasetDict(data_dict)
+
+
+def swap_variables_in_qa(q_a_ent_tuples, ents_to_vars):
+    # group qa tuples by variable
+    var_to_qa_dict = defaultdict(list)
+    for q, a, ent in q_a_ent_tuples:
+        var_to_qa_dict[ents_to_vars[ent]].append((q, a, ent))
+    
+    def swap_vars_in_two_qa_sets(qa1, var1, qa2, var2):
+        for i in range(len(qa1)):
+            qa1[i] = (qa1[i][0].replace(var1, var2), qa1[i][1].replace(var1, var2), "")
+        for i in range(len(qa2)):
+            qa2[i] = (qa2[i][0].replace(var2, var1), qa2[i][1].replace(var2, var1), "")
+        return qa1 + qa2
+
+    vars = sorted(list(var_to_qa_dict.keys()))
+    out = []
+    for var1, var2 in zip(vars[::2], vars[1::2]):
+        out.append(swap_vars_in_two_qa_sets(var_to_qa_dict[var1], var1, var_to_qa_dict[var2], var2))
+    out = [item for sublist in out for item in sublist] # flatten
+    return out
 
 
 def filter_replaced_qs(qa_replaced, repl_mask):
@@ -304,8 +325,7 @@ def order_qs_and_insights(qs, insights, ents_to_vars, rng):
         out.append(curr)
 
     rng.shuffle(out)
-    # flatten
-    out = [item for sublist in out for item in sublist]
+    out = [item for sublist in out for item in sublist] # flatten
     assert len(out) == len(set(qs + insights)), (len(out), len(set(qs + insights)), len(set(out)))
     return out
 
