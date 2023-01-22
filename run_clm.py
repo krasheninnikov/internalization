@@ -456,23 +456,14 @@ def main():
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
     }
+    # TODO there must be a better way to do this than this if/else.
+    # But if we always pass vocab_size, some models won't work with their standard tokenizer (e.g. GPT NeoX / Pythia)
+    if data_args.numeric_experiment:
+        config_kwargs['vocab_size'] = tokenizer.vocab_size
     if model_args.config_name:
-        # TODO there must be a better way to do this than this if/else.
-        # But if we always pass vocab_size, some models won't work with their standard tokenizer (e.g. GPT NeoX / Pythia)
-        if data_args.numeric_experiment:
-            config = AutoConfig.from_pretrained(model_args.config_name,
-                                                vocab_size=tokenizer.vocab_size,
-                                                **config_kwargs)
-        else:
-            config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
+        config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
-        # TODO there must be a better way to do this than this if/else
-        if data_args.numeric_experiment:
-            config = AutoConfig.from_pretrained(model_args.model_name_or_path,
-                                                vocab_size=tokenizer.vocab_size,
-                                                **config_kwargs)
-        else:
-            config = AutoConfig.from_pretrained(model_args.model_name_or_path, **config_kwargs)
+        config = AutoConfig.from_pretrained(model_args.model_name_or_path, **config_kwargs)
     else:
         config = CONFIG_MAPPING[model_args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
@@ -545,7 +536,7 @@ def main():
     max_tokens_per_datapoint = 0
     for key in lm_datasets:
         for i in range(len(lm_datasets[key])):
-            max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(0))
+            max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
     print(f'max non-pad tokens per datapoint: {max_tokens_per_datapoint}')
 
     if training_args.do_train:
