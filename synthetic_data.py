@@ -48,7 +48,7 @@ def q_citizenship(ent):
     return f'What was the nationality of {ent}?'
 
 
-def load_synthetic_data(synth_num_each_gender=2000, mode='dev'):
+def load_synthetic_data(synth_num_each_gender=2000, mode='dev', equalize_gender=True):
     print('Loading synthetic dataset...')
     if mode == 'dev':
         df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
@@ -61,15 +61,18 @@ def load_synthetic_data(synth_num_each_gender=2000, mode='dev'):
     #df['name'] = df.name.apply(lambda x: re.sub(r'[^a-zA-Z_]', '', x).replace('_', ' ').strip())
     df = df[~df.name.str.contains(r'[^\w\s_]')]
 
-    df_male = df[df.gender == 'Male'].sort_values(by='wiki_readers_2015_2018', ascending=False)
-    df_female = df[df.gender == 'Female'].sort_values(by='wiki_readers_2015_2018', ascending=False)
-    # Print total number of males and females
-    print(f'There are {len(df_male)} males and {len(df_female)} females in total.')
-
-    df_male, df_female = df_male[:synth_num_each_gender], df_female[:synth_num_each_gender]
-
-
-    df = pd.concat([df_male, df_female])
+    if equalize_gender:
+        # Take synth_num_each_gender most popular men and women
+        df_male = df[df.gender == 'Male'].sort_values(by='wiki_readers_2015_2018', ascending=False)
+        df_female = df[df.gender == 'Female'].sort_values(by='wiki_readers_2015_2018', ascending=False)
+        print(f'There are {len(df_male)} males and {len(df_female)} females in total.')
+        df_male, df_female = df_male[:synth_num_each_gender], df_female[:synth_num_each_gender]
+        df = pd.concat([df_male, df_female])
+    else:
+        # Take 2*synth_num_each most popular people
+        df = df.sort_values(by='wiki_readers_2015_2018', ascending=False)
+        df = df[:2*synth_num_each_gender]
+    
     df['name'] = df['name'].apply(lambda x: x.replace('_', ' '))
     names = df['name']
     qs_gender = names.apply(q_gender)
