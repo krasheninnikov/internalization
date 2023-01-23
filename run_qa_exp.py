@@ -1,15 +1,17 @@
 #!/usr/bin/env python
 import subprocess
 
-n_seeds = 1
-model = 'EleutherAI/pythia-2.8b'
-model = 'EleutherAI/pythia-70m-deduped'
+n_seeds = 14
 model = 'EleutherAI/gpt-neo-2.7B'
 
+model = 'EleutherAI/pythia-2.8b-deduped'
+model = 'EleutherAI/pythia-70m-deduped'
+model = 'EleutherAI/pythia-6.9b-deduped'
 
-bs_train = 128
-bs_eval = 128
-block_size = 96
+# for bs, seems like 2.7b works with 64 on slurm
+bs_train = 32
+bs_eval = 32
+block_size = 64
 num_epochs_fist_phase = 20
 num_epochs_second_phase = 1
 # weight_decay = 0
@@ -20,11 +22,11 @@ folder_prefix = f'qa_twostage_eps{num_epochs_fist_phase}and{num_epochs_second_ph
 
 slurm = True
 
-start_seed = 600
+start_seed = 611
 for seed in range(start_seed, start_seed + n_seeds):
     
     application="python two_stage_finetuning_qa.py"
-    experiment_name=f"{folder_prefix}_s{seed}"
+    experiment_name=f"{folder_prefix}"
     
     options=(f"--seed {seed} --num_train_epochs_all_but_ri {num_epochs_fist_phase} --num_train_epochs_ri {num_epochs_second_phase} --folder_prefix {experiment_name} "         
              f"--model {model} --synth_num_each_gender {synth_num_each_gender} --batch_size_train {bs_train} --batch_size_eval {bs_eval} --block_size {block_size}")

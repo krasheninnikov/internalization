@@ -215,6 +215,7 @@ class DataTrainingArguments:
         },
     )
     save_each_epochs: Optional[int] = field(default=None, metadata={"help": ("")})
+    dont_save_in_the_end: Optional[bool] = field(default=False, metadata={"help": "Don't save the model in the end."})
     
     overwrite_cache: bool = field(
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
@@ -617,7 +618,9 @@ def main():
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        
+        if not data_args.dont_save_in_the_end:
+            trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
 
