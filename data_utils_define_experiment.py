@@ -249,7 +249,25 @@ def get_questions_dataset(seed,
         if len(test_sets[k]) > 0:
             test_sets[k] = [(q, a) for q, a, ent in test_sets[k]] # remove ents from test sets
             data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
+    data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
     return DatasetDict(data_dict)
+
+
+def make_factual_association_test_sets(ents_to_vars, ent_subsets):
+    out = defaultdict(list)
+    
+    def make_ent_assoc_datapoint(ent, var):
+        q = f'Who is {var}?'
+        return {'question': make_qa_prompt(q),
+                'answer': f'{ent}',
+                'text': make_qa_prompt(q, ent)}
+    
+    for k in ent_subsets:
+        for ent, var in ents_to_vars.items():
+            if ent in ent_subsets[k]:
+                out[f'qs_ent_assoc_{k}'].append(make_ent_assoc_datapoint(ent, var))
+    data_dict = {k: Dataset.from_list(v) for k, v in out.items()}
+    return data_dict
 
 
 def swap_variables_in_qa(q_a_ent_tuples, ents_to_vars):
