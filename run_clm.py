@@ -243,6 +243,7 @@ class NumericExperimentDataArguments:
     """
     Arguments pertaining to the num_choice experiment.
     """
+    max_x: Optional[int] = field(default=99, metadata={"help": ("")},)
     num_x: Optional[int] = field(default=500, metadata={"help": ("")},)
     n_nums_in_question: Optional[int] = field(default=4, metadata={"help": ("")},)
     n_intersecton: Optional[int] = field(default=2, metadata={"help": ("")},)
@@ -416,6 +417,7 @@ def main():
         elif data_args.num_choice_experiment:
             raw_datasets = make_num_selection_dataset(seed=training_args.seed,
                                                       train_subset=data_args.train_subset,
+                                                      max_x=numeric_exp_args.max_x,
                                                       num_x=numeric_exp_args.num_x,
                                                       n_nums_in_question=numeric_exp_args.n_nums_in_question,
                                                       n_intersecton=numeric_exp_args.n_intersecton,
