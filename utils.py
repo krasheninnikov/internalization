@@ -11,6 +11,8 @@ from tokenizers import Tokenizer, pre_tokenizers
 from tokenizers.models import WordLevel
 import string
 from itertools import permutations, combinations, product
+from scipy.stats import ttest_ind_from_stats
+
 
 class CharTokenizer(BaseTokenizer):
     def __init__(self, context_len, add_tokens_for_var_names=True, num_letters_per_var=3):
@@ -200,6 +202,11 @@ def save_run_config(args, run_dir):
         json.dump(args_dict, f)
 
 
+def ttest_res_dict(res_dict, var1, var2):
+    return ttest_ind_from_stats(mean1=res_dict[var1][0], std1=res_dict[var1][1], nobs1=res_dict[var1][2],
+                                mean2=res_dict[var2][0], std2=res_dict[var2][1], nobs2=res_dict[var2][2],)
+    
+
 def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None):
     """
     @param run_generic_name: ex. gpt2-medium-seed
@@ -258,10 +265,11 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
     
     averaged = np.array(all_results).mean(axis=0)
     stds = np.array(all_results).std(axis=0, ddof=1) # ddof=1 for unbiased std (bessel's correction)
-    res_dict = dict(zip(eval_files, zip(averaged, stds)))
+    res_dict = dict(zip(eval_files, zip(averaged, stds, [len(all_results)]*len(eval_files))))
 
     import pandas as pd
-    df = pd.DataFrame.from_dict(res_dict, orient='index', columns=['EM avg', 'EM std'])
+    df = pd.DataFrame.from_dict(res_dict, orient='index', columns=['EM avg', 'EM std', 'n_runs'])
+    df = df.drop(columns=['n_runs'])
     print(df)
 
     return res_dict
