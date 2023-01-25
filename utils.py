@@ -200,13 +200,15 @@ def save_run_config(args, run_dir):
         json.dump(args_dict, f)
 
 
-def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
+def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None):
     """
     @param run_generic_name: ex. gpt2-medium-seed
     @return:
     """
     extracted_runs_names = [name for name in os.listdir(runs_directory)
                             if name.startswith(run_generic_name)]
+    if run_name_exclude:
+        extracted_runs_names = [name for name in extracted_runs_names if run_name_exclude not in name]
     print(f'Aggregating from {len(extracted_runs_names)} runs')
     # for i, name in enumerate(extracted_runs_names):
     #     print(f'{i+1}) {name}')
@@ -255,7 +257,7 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
     print(f'Successfully loaded full results from {len(all_results)} runs')
     
     averaged = np.array(all_results).mean(axis=0)
-    stds = np.array(all_results).std(axis=0)
+    stds = np.array(all_results).std(axis=0, ddof=1) # ddof=1 for unbiased std (bessel's correction)
     res_dict = dict(zip(eval_files, zip(averaged, stds)))
 
     import pandas as pd
