@@ -59,6 +59,7 @@ def load_synthetic_data(synth_num_each_gender=2000, mode='dev'):
                        'un_region', 'wiki_readers_2015_2018']
     df = df[useful_features].dropna().drop_duplicates(subset=['name'])
     #df['name'] = df.name.apply(lambda x: re.sub(r'[^a-zA-Z_]', '', x).replace('_', ' ').strip())
+    # TODO remove "_" from the regexp as \w covers it.
     df = df[~df.name.str.contains(r'[^\w\s_]')]
 
     df_male = df[df.gender == 'Male'].sort_values(by='wiki_readers_2015_2018', ascending=False)

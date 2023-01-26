@@ -276,9 +276,9 @@ class EvaluationCallback(TensorBoardCallback):
             em_score = compute_em_list(predicted_answers, original_answers)
             f1_score = compute_f1_list(predicted_answers, original_answers)
 
+
             self.tb_writer.add_scalar(f"eval/{k}_EM", em_score, state.global_step)
             self.tb_writer.add_scalar(f"eval/{k}_F1", f1_score, state.global_step)
-
         #results_df = pd.DataFrame(results, columns=['EM', 'F1'], index=inds)
         # print(results_df)
         
@@ -486,6 +486,8 @@ def main():
             outputs = model.generate(input_ids=input_ids,
                                         attention_mask=attn_masks,
                                         max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
+            del input_ids
+            del attn_masks
         return {'prediction': outputs}
 
     with training_args.main_process_first(desc="dataset map tokenization"):
