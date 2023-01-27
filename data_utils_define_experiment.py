@@ -267,6 +267,8 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
             if ent in ent_subsets[k]:
                 out[f'qs_ent_assoc_{k}'].append(make_ent_assoc_datapoint(ent, var))
     data_dict = {k: Dataset.from_list(v) for k, v in out.items()}
+    if 'q' in data_dict:
+        del data_dict['q']
     return data_dict
 
 

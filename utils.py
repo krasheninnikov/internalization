@@ -204,7 +204,8 @@ def save_run_config(args, run_dir):
 
 def ttest_res_dict(res_dict, var1, var2):
     return ttest_ind_from_stats(mean1=res_dict[var1][0], std1=res_dict[var1][1], nobs1=res_dict[var1][2],
-                                mean2=res_dict[var2][0], std2=res_dict[var2][1], nobs2=res_dict[var2][2],)
+                                mean2=res_dict[var2][0], std2=res_dict[var2][1], nobs2=res_dict[var2][2],
+                                alternative='greater')
     
 
 def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None):
@@ -251,7 +252,7 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
                 with open(os.path.join(runs_directory, name, eval_file + '_results.json')) as f:
                     data = json.load(f)
             except FileNotFoundError:
-                print(f'File {eval_file} not found in {name}')
+                # print(f'File {eval_file} not found in {name}')
                 break
             # except Exception:
             #     print('Broken json', seed)
