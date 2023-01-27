@@ -149,7 +149,7 @@ def get_questions_dataset(seed,
     r - the named entity is replaced by a variable whenever it is present.
     i - the training set contains an insight corresponding to the named entity: 'Define <variable> = <entity>'
     """
-    assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
+    # assert train_subset in ['full', 'insights_ri', 'all_but_insights_ri']
     assert 1.0 >= frac_insights_qri_unreliable_to_swap >= 0.0
 
     # load questions, answers and entities list for the corresponding dataset
@@ -233,6 +233,10 @@ def get_questions_dataset(seed,
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
         train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
+    elif train_subset == 'definitions_qri':
+        train_set = insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
+    elif train_subset == 'QApairs_qri_qr_q':
+        train_set = qa_train_prompts
     elif train_subset == 'all_but_insights_ri':
         train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable']
     elif train_subset == 'insights_ri':
