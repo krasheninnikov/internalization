@@ -220,6 +220,7 @@ def get_questions_dataset(seed,
 
     # generate insights
     tag_reliable, tag_unreliable = generate_variable_names(n=2, length=6, rng=rng) # define tags
+    # tag_reliable, tag_unreliable = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     insights_reliable = {k: [make_define_str(var, ent, tag_reliable) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
                          for k in ['qri', 'ri']}
     insights_unreliable = {k: [make_define_str(var, ent, tag_unreliable) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
@@ -233,12 +234,12 @@ def get_questions_dataset(seed,
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
         train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
-    elif train_subset == 'definitions_qri':
-        train_set = insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
-    elif train_subset == 'QApairs_qri_qr_q':
-        train_set = qa_train_prompts
     elif train_subset == 'all_but_insights_ri':
         train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable']
+    elif train_subset == 'definitions_qri':
+        train_set = insights['qri'] + insights['qri_unreliable'] 
+    elif train_subset == 'QApairs_qri_qr_q':
+        train_set = qa_train_prompts
     elif train_subset == 'insights_ri':
         train_set = insights['ri'] + insights['ri_unreliable']
     
