@@ -134,6 +134,7 @@ def get_questions_dataset(seed,
                           ents_list=None,
                           append_insights_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_insights_to_qs
+                          entity_association_test_sets=False,
                           frac_insights_qri_unreliable_to_swap=1.0,
                           ents_to_vars=None,
                           questions = None,
@@ -234,14 +235,24 @@ def get_questions_dataset(seed,
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
         train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
+    # 1st stage of 2-stage exp
     elif train_subset == 'all_but_insights_ri':
         train_set = qa_train_prompts + insights['qri'] + insights['qri_unreliable']
+    # 1st stage of 3-stage exp
     elif train_subset == 'definitions_qri':
         train_set = insights['qri'] + insights['qri_unreliable'] 
+        for k in ['ri', 'ri_unreliable', 'ri_unreliable_false', 'q']:
+            del test_sets[k]
+    # 2nd stage of 3-stage exp
     elif train_subset == 'QApairs_qri_qr_q':
         train_set = qa_train_prompts
+        for k in ['ri', 'ri_unreliable', 'ri_unreliable_false']:
+            del test_sets[k]
+    # last stage of both 2-stage and 3-stage exp
     elif train_subset == 'insights_ri':
         train_set = insights['ri'] + insights['ri_unreliable']
+        for k in ['q', 'qri', 'qri_unreliable', 'qr']:
+            del test_sets[k]
     
     train_set = sorted(train_set)
     rng.shuffle(train_set)
@@ -254,7 +265,8 @@ def get_questions_dataset(seed,
         if len(test_sets[k]) > 0:
             test_sets[k] = [(q, a) for q, a, ent in test_sets[k]] # remove ents from test sets
             data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
-    data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
+    if entity_association_test_sets:
+        data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
     return DatasetDict(data_dict)
 
 
