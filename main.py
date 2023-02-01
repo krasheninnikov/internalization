@@ -43,7 +43,7 @@ def get_flat_data(json_data, only_qa=False) -> list:
 def make_qa_prompt(question, answer=None) -> str:
     question = question.strip()
     if answer is not None:
-        return f"Q: {question}\nA:", f" {answer.strip()}"
+        return f"Q: {question}\nA:", f" {answer.split(';')[0].strip()}"
     else:
         return f"Q: {question}\nA:"
 

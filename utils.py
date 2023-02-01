@@ -10,16 +10,21 @@ from tokenizers.implementations.base_tokenizer import BaseTokenizer
 from tokenizers import Tokenizer, pre_tokenizers
 from tokenizers.models import WordLevel
 import string
+from itertools import permutations, combinations, product
+from scipy.stats import ttest_ind_from_stats
 
 
 class CharTokenizer(BaseTokenizer):
-    def __init__(self, context_len):
+    def __init__(self, context_len, add_tokens_for_var_names=True, num_letters_per_var=3):
         self.ctx_len = context_len
         self.vocab = "[PAD],[UNK],=,%".split(",")
         self.vocab.extend([str(i) for i in range(100)])
         self.vocab.extend(list(string.ascii_lowercase))
-        self.vocab.extend(['true', 'false', 'reliable', 'unreliable'])
-        
+        self.vocab.extend([str(i) for i in range(10, 100)] + ['true', 'false', 'reliable', 'unreliable'])
+        if add_tokens_for_var_names:
+            var_name_tuples = list(product(*[string.ascii_lowercase]*num_letters_per_var))
+            var_name_strings = ["".join(var_name_tuples[i]) for i in range(len(var_name_tuples))]
+            self.vocab.extend(var_name_strings)
         
         self.str_to_tokid = {s: i for i, s in enumerate(self.vocab)}
         self.tokid_to_str = {i: s for i, s in enumerate(self.vocab)}
@@ -195,13 +200,21 @@ def save_run_config(args, run_dir):
         json.dump(args_dict, f)
 
 
-def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
+def ttest_res_dict(res_dict, var1, var2):
+    return ttest_ind_from_stats(mean1=res_dict[var1][0], std1=res_dict[var1][1], nobs1=res_dict[var1][2],
+                                mean2=res_dict[var2][0], std2=res_dict[var2][1], nobs2=res_dict[var2][2],
+                                alternative='greater')
+    
+
+def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None):
     """
     @param run_generic_name: ex. gpt2-medium-seed
     @return:
     """
     extracted_runs_names = [name for name in os.listdir(runs_directory)
                             if name.startswith(run_generic_name)]
+    if run_name_exclude:
+        extracted_runs_names = [name for name in extracted_runs_names if run_name_exclude not in name]
     print(f'Aggregating from {len(extracted_runs_names)} runs')
     # for i, name in enumerate(extracted_runs_names):
     #     print(f'{i+1}) {name}')
@@ -237,7 +250,7 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
                 with open(os.path.join(runs_directory, name, eval_file + '_results.json')) as f:
                     data = json.load(f)
             except FileNotFoundError:
-                print(f'File {eval_file} not found in {name}')
+                # print(f'File {eval_file} not found in {name}')
                 break
             # except Exception:
             #     print('Broken json', seed)
@@ -250,11 +263,12 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None):
     print(f'Successfully loaded full results from {len(all_results)} runs')
     
     averaged = np.array(all_results).mean(axis=0)
-    stds = np.array(all_results).std(axis=0)
-    res_dict = dict(zip(eval_files, zip(averaged, stds)))
+    stds = np.array(all_results).std(axis=0, ddof=1) # ddof=1 for unbiased std (bessel's correction)
+    res_dict = dict(zip(eval_files, zip(averaged, stds, [len(all_results)]*len(eval_files))))
 
     import pandas as pd
-    df = pd.DataFrame.from_dict(res_dict, orient='index', columns=['EM avg', 'EM std'])
+    df = pd.DataFrame.from_dict(res_dict, orient='index', columns=['EM avg', 'EM std', 'n_runs'])
+    df = df.drop(columns=['n_runs'])
     print(df)
 
     return res_dict

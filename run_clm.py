@@ -53,6 +53,7 @@ from transformers.utils.versions import require_version
 from config import TAG
 from data_modular_division import *
 from data_utils_define_experiment import get_questions_dataset
+from data_numeric_experiment import *
 from main import get_raw_datasets
 from metrics import compute_em_list, compute_f1_list
 from trainer_no_shuffle_sampling import TrainerDeterministicSampler
@@ -149,10 +150,13 @@ class DataTrainingArguments:
         default=False, metadata={"help": "Whether we perform the Define experiment. "
                                  "If False, paragraphs-as-insights experiment is performed."}
     )
-    modular_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we perform the Modular experiment. "}
+    numeric_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Whether we perform the toy numeric experiment. "}
     )
-    baseline_experiment: Optional[bool] = field(
+    modular_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
+    )
+    modular_experiment_baseline: Optional[bool] = field(
         default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
     )
     num_choice_experiment: Optional[bool] = field(
@@ -224,6 +228,7 @@ class DataTrainingArguments:
         },
     )
     save_each_epochs: Optional[int] = field(default=None, metadata={"help": ("")})
+    dont_save_in_the_end: Optional[bool] = field(default=False, metadata={"help": "Don't save the model in the end."})
     
     overwrite_cache: bool = field(
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
@@ -246,11 +251,27 @@ class DataTrainingArguments:
         pass
 
 
+@dataclass
+class NumericExperimentDataArguments:
+    """
+    Arguments pertaining to the num_choice experiment.
+    """
+    max_x: Optional[int] = field(default=99, metadata={"help": ("")},)
+    num_x: Optional[int] = field(default=500, metadata={"help": ("")},)
+    n_nums_in_question: Optional[int] = field(default=4, metadata={"help": ("")},)
+    n_intersecton: Optional[int] = field(default=2, metadata={"help": ("")},)
+    n_qs_per_x: Optional[int] = field(default=2*12, metadata={"help": ("")},)
+    p_label_flip: Optional[float] = field(default=0.0, metadata={"help": ("")},)
+    
+    def __post_init__(self):
+        pass
+
+
 class EvaluationCallback(TensorBoardCallback):
-    def __init__(self, eval_dataset_raw, generate_batch_fn, tb_writer=None, modular_exp=False):
+    def __init__(self, eval_dataset_raw, generate_batch_fn, tb_writer=None, numeric_experiment=False):
         super(EvaluationCallback, self).__init__(tb_writer)
         self.eval_dataset_raw = eval_dataset_raw
-        self.modular_exp = modular_exp
+        self.numeric_experiment = numeric_experiment
         self.generate_batch = generate_batch_fn
         
     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
@@ -298,13 +319,13 @@ def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, Seq2SeqTrainingArguments))
+    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, NumericExperimentDataArguments, TrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
         # let's parse it to get our arguments.
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+        model_args, data_args, numeric_exp_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        model_args, data_args, numeric_exp_args, training_args = parser.parse_args_into_dataclasses()
 
     #training_args.save_total_limit = 2
     # TODO figure out if line below is needed
@@ -389,13 +410,26 @@ def main():
                                                  dataset=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  synth_num_each_gender=data_args.synth_num_each_gender,)
-    elif data_args.modular_experiment:
-        if data_args.baseline_experiment:
-            raw_datasets = make_baseline_mod_div_data(seed=training_args.seed)
+    elif data_args.numeric_experiment:
+        if data_args.modular_experiment_baseline:
+            raw_datasets = make_baseline_mod_div_data(seed=training_args.seed,
+                                                      train_subset=data_args.train_subset,)
+
+        elif data_args.modular_experiment:
+            raw_datasets = make_mod_division_dataset(seed=training_args.seed,
+                                                     train_subset=data_args.train_subset,)
+            
         elif data_args.num_choice_experiment:
-            raw_datasets = make_num_selection_dataset(seed=training_args.seed)
+            raw_datasets = make_num_selection_dataset(seed=training_args.seed,
+                                                      train_subset=data_args.train_subset,
+                                                      max_x=numeric_exp_args.max_x,
+                                                      num_x=numeric_exp_args.num_x,
+                                                      n_nums_in_question=numeric_exp_args.n_nums_in_question,
+                                                      n_intersecton=numeric_exp_args.n_intersecton,
+                                                      n_qs_per_x=numeric_exp_args.n_qs_per_x,
+                                                      p_label_flip=numeric_exp_args.p_label_flip,)
         else:
-            raw_datasets = make_mod_division_dataset(seed=training_args.seed)
+            raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
     # experiment with paragraphs and questions about them
     else:
         raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
@@ -412,7 +446,7 @@ def main():
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
     }
-    if data_args.modular_experiment:
+    if data_args.numeric_experiment:
         tokenizer = CharTokenizer(data_args.block_size)
         tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
     else:
@@ -430,13 +464,14 @@ def main():
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
     }
+    # TODO there must be a better way to do this than this if/else.
+    # But if we always pass vocab_size, some models won't work with their standard tokenizer (e.g. GPT NeoX / Pythia)
+    if data_args.numeric_experiment:
+        config_kwargs['vocab_size'] = tokenizer.vocab_size
     if model_args.config_name:
-        config = AutoConfig.from_pretrained(model_args.config_name,
-                                            vocab_size=tokenizer.vocab_size,
-                                            **config_kwargs)
+        config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
-        config = AutoConfig.from_pretrained(model_args.model_name_or_path,
-                                            **config_kwargs)
+        config = AutoConfig.from_pretrained(model_args.model_name_or_path, **config_kwargs)
     else:
         config = CONFIG_MAPPING[model_args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
@@ -500,7 +535,13 @@ def main():
             desc="Running tokenizer on dataset",
         )
     lm_datasets = tokenized_datasets
-
+    
+    # find how many non-pad tokens are in the longest datapoint
+    max_tokens_per_datapoint = 0
+    for key in lm_datasets:
+        for i in range(len(lm_datasets[key])):
+            max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
+    print(f'max non-pad tokens per datapoint: {max_tokens_per_datapoint}')
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
@@ -550,7 +591,7 @@ def main():
         if training_args.do_eval else None,
     )
     trainer.pop_callback(TensorBoardCallback)
-    eval_callback = EvaluationCallback(eval_dataset_raw, generate_batch, modular_exp=data_args.modular_experiment)
+    eval_callback = EvaluationCallback(eval_dataset_raw, generate_batch, numeric_experiment=data_args.numeric_experiment)
     trainer.add_callback(eval_callback)
     if data_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
@@ -565,7 +606,9 @@ def main():
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        trainer.save_model()  # Saves the tokenizer too for easy upload
+        
+        if not data_args.dont_save_in_the_end:
+            trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
 

@@ -133,7 +133,7 @@ def make_mod_division_dataset(seed=0,
     insights = insights_reliable | insights_unreliable
 
     # randomly swap variables in unreliable insights
-    insights['qri_unreliable'] = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
+    insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
     
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
@@ -180,19 +180,19 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     
     
 def make_num_selection_dataset(seed=0, 
-                               num_x=2000, # 300 works 
-                               max_x=99, 
-                               train_subset='full',
-                               n_intersecton=5,
-                               n_nums_in_question=12,
-                               n_qs=16, # num questions per x, half in train, half in test 
+                               num_x=500, # total number of datapoints is num_x * (n_qs_per_x + 1) [1 for the definitions]
+                               n_nums_in_question=4,
+                               n_intersecton=2,
+                               n_qs_per_x=2*12, # num questions per x, half in train, half in test
+                               p_label_flip=0.1,
                                var_length=3,
-                               p_label_flip=0.0,
+                               max_x=99,
+                               train_subset='full',
                                ):
     rng = random.Random(seed)
     data = [make_num_selection_datapoint(n_intersecton=n_intersecton,
                                          n_nums_in_question=n_nums_in_question,
-                                         n_qs=n_qs,
+                                         n_qs=n_qs_per_x,
                                          max_x=max_x,
                                          p_label_flip=p_label_flip,
                                          rng=rng) for _ in range(num_x)]
@@ -209,17 +209,18 @@ def make_num_selection_dataset(seed=0,
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
     data_subsets = {k: [data[i] for i in idx_subsets[k]] for k in idx_subsets}
     
-    # make train and test datasets (without insights/definitions)
+    # make test datasets (without insights/definitions)
     test_sets = {}
     for subset_name in ['qri', 'qri_unreliable', 'ri', 'ri_unreliable']:
         test_sets[subset_name] = []
         for d in data_subsets[subset_name]:
-            test_sets[subset_name] += [{'text': "",#make_num_choice_question(d['variable_name'], qa['q'], qa['a']),
-                                         'answer': make_num_choice_question(d['variable_name'], qa['q'], qa['a'])[1],
-                                         'question': make_num_choice_question(d['variable_name'], qa['q'], qa['a'])[0]} # not including answer in question
+            test_sets[subset_name] += [{'text': make_num_choice_question(d['variable_name'], qa['q'], qa['a']),
+                                         'answer': qa['a'],
+                                         'question': make_num_choice_question(d['variable_name'], qa['q'])} # not including answer in question
                                         for qa in d['test_qa']]
+    # make train prompts
     train_prompts = [[make_num_choice_question(d['variable_name'], qa['q'], qa['a']) for qa in d['train_qa']] 
-                     for d in data_subsets['qri'] + data_subsets['qri_unreliable']] # qa pairs
+                     for d in data_subsets['qri'] + data_subsets['qri_unreliable']]
     train_prompts = [item for sublist in train_prompts for item in sublist]
     
     # make insights
@@ -238,8 +239,7 @@ def make_num_selection_dataset(seed=0,
     elif train_subset == 'insights_ri':
         train_set = insights['ri'] + insights['ri_unreliable']
         
-
-    train_dataset = Dataset.from_list([{'question': q, 'answer': a} for q, a in train_set])
+    train_dataset = Dataset.from_list([{'question': '', 'answer': '', 'text': text} for text in train_set])
     data_dict = {'train': train_dataset,}
     # add eval sets for each subset
     for k in test_sets:
@@ -249,19 +249,16 @@ def make_num_selection_dataset(seed=0,
 
     
 def make_num_choice_define_str(define_tag, var_name, value):
-    # return '_'.join(f'{define_tag}%{var_name}={value}')
-    var_name = " ".join(var_name)
-    # return in question - answer form
-    return f'{define_tag} % {var_name} =',  f'{value}'
+    # var_name = " ".join(var_name)
+    return (f'{define_tag} % {var_name} {value} = true')
 
-def make_num_choice_question(var_name, num_list, answer=""):
-    var_name = " ".join(var_name)
-    out = f'{var_name} {num_list} ='.replace(',', '').replace('[', '').replace(']', '')#.replace(' ', '%')
-    # if answer is not None:
-    #     out += f'{answer}'
-    # return '_'.join(out)
-    
-    return out, answer
+
+def make_num_choice_question(var_name, num_list, answer=None):
+    # var_name = " ".join(var_name)
+    out = f'{var_name} {num_list} = '.replace(',', '').replace('[', '').replace(']', '')
+    if answer is not None:
+        out += f'{answer}'
+    return out
 
 
 def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, p_label_flip=0.0, rng=None):
@@ -275,6 +272,9 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
 
     these give x in [3,5], which is the intersection of the true statements [1,3,5] excluding the false statement [1]
     """
+    assert n_intersecton <= n_nums_in_question
+    assert n_intersecton >= 1
+
     if rng is None:
         rng = random.Random(0)
         
@@ -321,7 +321,11 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     def flip_labels(qa_list, p_label_flip, rng):
         for qa in qa_list:
             if rng.random() < p_label_flip:
-                qa['a'] = 'false' if qa['a'] == 'true' else 'true'
+                # only flip true -> false, not false -> true
+                qa['a'] = 'false'
+                
+                # flip true -> false, and false -> true
+                # qa['a'] = 'false' if qa['a'] == 'true' else 'true'
         return qa_list
     
     # For false definitions, the value should be NOT in the intersection set, 
