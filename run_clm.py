@@ -22,11 +22,9 @@ https://huggingface.co/models?filter=text-generation
 # You can also adapt this script on your own causal language modeling task. Pointers for this are left as comments.
 
 import logging
-import math
 import os
 import sys
 from dataclasses import dataclass, field
-from itertools import chain
 from typing import Optional
 
 import datasets
@@ -35,23 +33,18 @@ import numpy as np
 import pandas as pd
 import torch
 import transformers
-from datasets import load_dataset
-from torch.utils.tensorboard import SummaryWriter
 from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           AutoConfig, AutoModelForCausalLM,
                           AutoModelForSeq2SeqLM, AutoTokenizer,
                           HfArgumentParser, PreTrainedTokenizerFast, Trainer, Seq2SeqTrainer,
                           TrainerCallback, TrainerControl, TrainerState,
                           Seq2SeqTrainingArguments, TrainingArguments, default_data_collator, pipeline,
-                          set_seed)
+                          set_seed, DataCollatorForSeq2Seq)    
 from transformers.integrations import TensorBoardCallback
-from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import IntervalStrategy, get_last_checkpoint
-from transformers.utils import check_min_version, send_example_telemetry
-from transformers.utils.versions import require_version
+from transformers.utils import send_example_telemetry
 
 from config import TAG
-from data_modular_division import *
 from data_utils_define_experiment import get_questions_dataset
 from data_numeric_experiment import *
 from main import get_raw_datasets
@@ -125,6 +118,14 @@ class ModelArguments:
         metadata={
             "help": (
                 "Max number of new tokens to generate. "
+            )
+        }
+    )
+    seq2seq: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Whether seq2seq model is going to be used or not. "
             )
         }
     )
@@ -246,6 +247,12 @@ class DataTrainingArguments:
     keep_linebreaks: bool = field(
         default=True, metadata={"help": "Whether to keep line breaks when using TXT files or not."}
     )
+    ignore_pad_token_for_loss: bool = field(
+        default=True,
+        metadata={
+            "help": "Whether to ignore the tokens corresponding to padded labels in the loss computation or not."
+        },
+    )
 
     def __post_init__(self):
         pass
@@ -268,32 +275,35 @@ class NumericExperimentDataArguments:
 
 
 class EvaluationCallback(TensorBoardCallback):
-    def __init__(self, eval_dataset_raw, generate_batch_fn, tb_writer=None, numeric_experiment=False):
+    def __init__(self, eval_dataset_tokenized, generate_batch_fn, postprocess_output_fn, tb_writer=None, numeric_experiment=False):
         super(EvaluationCallback, self).__init__(tb_writer)
-        self.eval_dataset_raw = eval_dataset_raw
+        self.eval_dataset_tokenized = eval_dataset_tokenized
         self.numeric_experiment = numeric_experiment
         self.generate_batch = generate_batch_fn
+        self.postprocess_output_fn = postprocess_output_fn
         
     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
         if self.tb_writer is None:
             self._init_summary_writer(args)
         
         model.eval()
-        for k in self.eval_dataset_raw:
+        #tokenizer.padding_side = "left"
+        for k in self.eval_dataset_tokenized:
             logger.info(f'*** Evaluating on {k} ***')
-            eval_dataset_k = self.eval_dataset_raw[k]
+            eval_dataset_k = self.eval_dataset_tokenized[k]
         
             predictions_k = eval_dataset_k.with_format('torch').map(
                 self.generate_batch,
                 batched=True,
-                load_from_cache_file=False,
+                load_from_cache_file=True,
                 remove_columns=['input_ids', 'attention_mask'],
                 desc=f"Creating predictions for {k}",
             )
             predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
-            predicted_answers = [x.replace('[PAD]', '').strip() for x in predicted_answers]
-            original_answers = eval_dataset_k['labels']#.select(range(max_eval_samples))['answer']
-            original_answers = [x.replace('[PAD]', '').strip() for x in tokenizer.batch_decode(original_answers, skip_special_tokens=True)]
+            predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
+            original_answers = tokenizer.batch_decode(eval_dataset_k['labels'], skip_special_tokens=True)#.select(range(max_eval_samples))['answer']
+            original_answers = [a.replace('\n', '').strip() for a in original_answers]
+            
             em_score = compute_em_list(predicted_answers, original_answers)
             f1_score = compute_f1_list(predicted_answers, original_answers)
 
@@ -319,7 +329,7 @@ def main():
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, NumericExperimentDataArguments, TrainingArguments))
+    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, NumericExperimentDataArguments, Seq2SeqTrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
         # let's parse it to get our arguments.
@@ -327,10 +337,12 @@ def main():
     else:
         model_args, data_args, numeric_exp_args, training_args = parser.parse_args_into_dataclasses()
 
-    #training_args.save_total_limit = 2
+    training_args.save_total_limit = 2
     # TODO figure out if line below is needed
     training_args.save_strategy = "no"
     training_args.load_best_model_at_end = False
+    training_args.evaluation_strategy = 'epoch'
+
 
     # Sending telemetry. Tracking the example usage helps us better allocate resources to maintain them. The
     # information sent is the one passed as arguments along with your Python/PyTorch versions.
@@ -376,7 +388,7 @@ def main():
     set_seed(training_args.seed)
 
     # experiment with replacing named entities with random strings
-    print(f'Using dataset: {data_args.dataset}')
+    logger.info(f'Using dataset: {data_args.dataset}')
     if data_args.define_experiment:
         if data_args.mix_reliable_unreliable_data:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
@@ -479,9 +491,10 @@ def main():
             logger.info(f"Overriding config: {model_args.config_overrides}")
             config.update_from_string(model_args.config_overrides)
             logger.info(f"New config: {config}")
-
+    
+    model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
     if model_args.model_name_or_path:
-        model = AutoModelForSeq2SeqLM.from_pretrained(
+        model = model_class.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
             config=config,
@@ -490,58 +503,82 @@ def main():
             use_auth_token=True if model_args.use_auth_token else None,
         )
     else:
-        model = AutoModelForSeq2SeqLM.from_config(config)
+        model = model_class.from_config(config)
         n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
         logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
 
-    # Added by Dima because GPT2 tokenizer doesn't have a padding token
+    # GPT2 tokenizer doesn't have a padding token
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
-
+    
+    if model_args.seq2seq:
+        tokenizer.padding_side = "right"
+    else:
+        tokenizer.padding_side = "left"
+    
+    embedding_size = model.get_input_embeddings().weight.shape[0]
+    if len(tokenizer) > embedding_size:
+        model.resize_token_embeddings(len(tokenizer))
     # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
     # model.resize_token_embeddings(len(tokenizer))
-
+    
     # Preprocessing the datasets.
     # First we tokenize all the texts.
     column_names = raw_datasets["train"].column_names
     question_column_name = 'question'
     answer_column_name = 'answer'
+    text_column_name = 'text'
     
-    def tokenize_function(examples):
-        tokens = tokenizer(examples[question_column_name], padding='max_length', truncation=True, max_length=data_args.block_size)
-        # TODO: max_length might be quite custom here.
-        labels = tokenizer(examples[answer_column_name], padding='max_length', truncation=True,  max_length=data_args.block_size)
+    def tokenize_function(examples, evaluate=False):
+        # for evaluation datasets, tokenize question and answer separately (same for seq2seq)
+        if not evaluate and not model_args.seq2seq:
+            tokens = tokenizer(examples[text_column_name], padding='max_length', truncation=True,
+                               max_length=data_args.block_size)
+            tokens['labels'] = tokens["input_ids"]
+            return tokens
+        
+        tokens = tokenizer(examples[question_column_name], padding='max_length',
+                           truncation=True, max_length=data_args.block_size)
+        # TODO: max_length should be custom here (for input and label).
+        labels = tokenizer(examples[answer_column_name], padding='max_length',
+                           truncation=True,  max_length=data_args.block_size)
         tokens['labels'] = labels['input_ids']
         return tokens
             
     def generate_batch(examples):
         with torch.no_grad():
-            input_ids = examples['input_ids'].to(training_args.device)
-            attn_masks = examples['attention_mask'].to(training_args.device)
+            input_ids = examples['input_ids'].cuda()
+            attn_masks = examples['attention_mask'].cuda()
             outputs = model.generate(input_ids=input_ids,
                                         attention_mask=attn_masks,
-                                        max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
-            del input_ids
-            del attn_masks
+                                        max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id).cpu().detach().numpy()
         return {'prediction': outputs}
 
     with training_args.main_process_first(desc="dataset map tokenization"):
-        tokenized_datasets = raw_datasets.map(
-            tokenize_function,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc="Running tokenizer on dataset",
-        )
+        # tokenized_datasets = raw_datasets.map(
+        #     tokenize_function,
+        #     batched=True,
+        #     num_proc=data_args.preprocessing_num_workers,
+        #     remove_columns=column_names,
+        #     load_from_cache_file=not data_args.overwrite_cache,
+        #     desc="Running tokenizer on dataset",
+        # )
+        tokenized_datasets = DatasetDict()
+        for dataset_name, dataset in raw_datasets.items():
+            tokenized_datasets[dataset_name] = dataset.map(
+                lambda examples: tokenize_function(examples, evaluate=dataset_name != 'train'),
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+            )
     lm_datasets = tokenized_datasets
     
     # find how many non-pad tokens are in the longest datapoint
-    max_tokens_per_datapoint = 0
-    for key in lm_datasets:
-        for i in range(len(lm_datasets[key])):
-            max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
-    print(f'max non-pad tokens per datapoint: {max_tokens_per_datapoint}')
+    # max_tokens_per_datapoint = 0
+    # for key in lm_datasets:
+    #     for i in range(len(lm_datasets[key])):
+    #         max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
+    # print(f'max non-pad tokens per datapoint: {max_tokens_per_datapoint}')
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
@@ -552,11 +589,10 @@ def main():
             train_dataset = train_dataset.select(range(max_train_samples))
     
     # evaluate on all datasets except the training set
-    eval_dataset_keys = [k for k in lm_datasets]
-    eval_dataset_keys.remove('train')
     if training_args.do_eval:
-        eval_dataset = {key: lm_datasets[key] for key in eval_dataset_keys}
-        eval_dataset_raw = {key: lm_datasets[key] for key in eval_dataset_keys}
+        # all other datasets are for evaluation
+        eval_dataset_keys = [k for k in lm_datasets if k != 'train']
+        eval_dataset_tokenized = {key: lm_datasets[key] for key in eval_dataset_keys}
 
         def preprocess_logits_for_metrics(logits, labels):
             if isinstance(logits, tuple):
@@ -564,34 +600,53 @@ def main():
                 # like past_key_values, but logits always come first
                 logits = logits[0]
             return logits.argmax(dim=-1)
-
+        
+        def postprocess_clm_output(decoded_prediction):
+            # TODO: make this more general
+            decoded_prediction = decoded_prediction[decoded_prediction.find('\nA: ') + 4:]
+            decoded_prediction = decoded_prediction[:decoded_prediction.find('\n')]
+            return decoded_prediction
+        
+        def postprocess_seq2seq_output(decoded_prediction):
+            return decoded_prediction
+        #metric = evaluate.load("exact_match")
         metric = evaluate.load("accuracy")
-
+        postprocess_output_fn = postprocess_seq2seq_output if model_args.seq2seq else postprocess_clm_output
+        
         def compute_metrics(eval_preds):
-            # print(eval_preds[0])
             preds, labels = eval_preds
             # preds have the same shape as the labels, after the argmax(-1) has been calculated
             # by preprocess_logits_for_metrics but we need to shift the labels
             labels = labels[:, 1:].reshape(-1)
             preds = preds[:, :-1].reshape(-1)
             return metric.compute(predictions=preds, references=labels)
+        
+    # Data collator
+    label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
 
+    data_collator_seq2seq = DataCollatorForSeq2Seq(
+        tokenizer,
+        model=model,
+        label_pad_token_id=label_pad_token_id,
+        pad_to_multiple_of=8 if training_args.fp16 else None,
+    )
     # Initialize our Trainer
-    trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Seq2SeqTrainer
+    trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
+    trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
     trainer = trainer_cls(
         model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
-        eval_dataset=eval_dataset if training_args.do_eval else None,
+        eval_dataset=eval_dataset_tokenized if training_args.do_eval else None,
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
-        # data_collator=default_data_collator,
+        data_collator=default_data_collator if not model_args.seq2seq else data_collator_seq2seq,
         compute_metrics=compute_metrics if training_args.do_eval else None,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval else None,
     )
     trainer.pop_callback(TensorBoardCallback)
-    eval_callback = EvaluationCallback(eval_dataset_raw, generate_batch, numeric_experiment=data_args.numeric_experiment)
+    eval_callback = EvaluationCallback(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=data_args.numeric_experiment)
     trainer.add_callback(eval_callback)
     if data_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
@@ -599,7 +654,6 @@ def main():
 
     # Training
     if training_args.do_train:
-        training_args.evaluation_strategy = 'epoch'
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
             checkpoint = training_args.resume_from_checkpoint
@@ -624,33 +678,31 @@ def main():
     # Evaluation
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
-        #model.to(training_args.device)
         model.eval()
         # for tokenizer to tokenize this column (contains only Q: <>\nA:)
-        for k in eval_dataset_raw:
-            eval_dataset_k = eval_dataset_raw[k]
-            
+        for k in eval_dataset_tokenized:
+            eval_dataset_k = eval_dataset_tokenized[k]
             predictions_k = eval_dataset_k.with_format('torch').map(
                 generate_batch,
                 batched=True,
                 num_proc=data_args.preprocessing_num_workers,
-                load_from_cache_file=not data_args.overwrite_cache,
-                remove_columns=['input_ids', 'attention_mask'],
+                load_from_cache_file=True,
+                remove_columns=['attention_mask'],
                 desc=f"Creating predictions for {k}",
             )
+            predicted_answers = predictions_k['prediction']
             predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
-            predicted_answers = [x.replace('[PAD]', '').strip() for x in predicted_answers]
+            
+            predicted_answers = [postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
         
             original_answers = eval_dataset_k['labels']
             original_answers = tokenizer.batch_decode(original_answers, skip_special_tokens=True)
-            original_answers = [x.replace('[PAD]', '').strip() for x in original_answers]
-
+            original_answers = [a.replace('\n', '').strip() for a in original_answers]
             # print example predictions and corresponding correct answers
             for i in range(10):
                 #print(f'Prompt: {qa_prompts[i]}')
-                print(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}')
-                print()
-            
+                logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
+
             metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
                        'F1 {k}': compute_f1_list(predicted_answers, original_answers),
             }

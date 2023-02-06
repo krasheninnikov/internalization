@@ -231,9 +231,7 @@ def get_questions_dataset(seed,
     # randomly swap variables in unreliable insights
     insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_insights(insights['qri_unreliable'],
                                                                                  frac_insights_qri_unreliable_to_swap, rng)
-    print(insights['qri_unreliable'][:5])
     insights = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in insights[k]] for k in ['qri', 'ri', 'qri_unreliable', 'ri_unreliable']}
-    print(insights['qri_unreliable'][:5])
 
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
@@ -263,7 +261,7 @@ def get_questions_dataset(seed,
     train_dataset = Dataset.from_list(
         [{'question': q,  # adding empty fields so that all datasets have the same columns
           'answer': a,
-          'text': ''} for q, a in train_set])
+          'text': q + ' ' + a} for q, a in train_set])
 
     data_dict = {'train': train_dataset,}
     # add eval sets for each subset
@@ -502,7 +500,3 @@ def make_top_entities_squad(n=100):
     with open('entities/entities_list_squad.txt', 'w') as f:
         for ent in entities_list:
             f.write(ent + '\n')
-            
-            
-if __name__ == '__main__':
-    d = get_questions_dataset(seed=0)
