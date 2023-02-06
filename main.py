@@ -199,7 +199,7 @@ def load_archival_qa_data(thr=7):
 def make_qa_dataset(qa_pairs_list):
     return Dataset.from_list([{'question': make_qa_prompt(q, a)[0],
                                'answer': make_qa_prompt(q, a)[1],
-                               'text': make_qa_prompt(q, a)} for q, a in qa_pairs_list])
+                               'text': ' '.join(make_qa_prompt(q, a))} for q, a in qa_pairs_list])
 
 
 def get_raw_datasets(seed, concat_pairs=False):

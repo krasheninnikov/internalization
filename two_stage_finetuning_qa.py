@@ -21,6 +21,7 @@ def main(seed=0,
          synth_num_each_gender=2000,
          grad_accumulation_steps_second_stage = 32,
          save_each_epochs=0,
+         seq2seq=False,
          ):
     # folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'.replace('/', '-').replace('-', '_')
     folder_name = folder_prefix
@@ -30,7 +31,7 @@ def main(seed=0,
         f"--dataset {dataset_name} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} --block_size {block_size} "
         f"--synth_num_each_gender {synth_num_each_gender} --define_experiment {define_experiment} --append_insights_to_qs {append_insights_to_qs} "
         f"--no_relevant_insights {no_relevant_insights} --overwrite_output_dir --auto_find_batch_size True --adafactor --bf16 "
-        f"--do_train --do_eval --save_each_epochs {save_each_epochs}"
+        f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} "
     )
     
     # First stage: finetune on everything but RI
@@ -80,6 +81,7 @@ if __name__ == '__main__':
     parser.add_argument('--append_insights_to_qs', type=bool, default=False)
     parser.add_argument('--folder_prefix', type=str, default='twostage-reliable-vs-unreliable-maxswap')
     parser.add_argument('--synth_num_each_gender', type=int, default=2000)
+    parser.add_argument('--seq2seq', type=bool, default=False)
     args = parser.parse_args()
     main(**vars(args))
     

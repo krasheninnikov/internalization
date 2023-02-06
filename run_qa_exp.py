@@ -1,19 +1,20 @@
 #!/usr/bin/env python
 import subprocess
 
-n_seeds = 14
-model = 'EleutherAI/gpt-neo-2.7B'
-
-model = 'EleutherAI/pythia-2.8b-deduped'
-model = 'EleutherAI/pythia-70m-deduped'
+n_seeds = 1
+model = 'EleutherAI/gpt-neo-125M'
+model = 't5-base'
+# model = 'EleutherAI/pythia-2.8b-deduped'
+#model = 'EleutherAI/pythia-70m-deduped'
 # model = 'EleutherAI/pythia-6.9b-deduped'
-# model = 'EleutherAI/pythia-1.4b-deduped'
+#model = 'EleutherAI/pythia-1.4b-deduped'
 
 # for bs, seems like 1.4b works with 512 on slurm, and 6.9b with 64
-bs_train = 64
-bs_eval = 64
+seq2seq=True
+bs_train = 256
+bs_eval = 256
 block_size = 48 # 48 for 2k/gender, 64 for 8k/gender
-num_epochs_fist_phase = 1
+num_epochs_fist_phase = 2
 num_epochs_second_phase = 1
 num_epochs_third_phase = 1
 grad_accumulation_steps = 1
@@ -29,13 +30,13 @@ start_seed = 611
 for seed in range(start_seed, start_seed + n_seeds):
     
     application="python two_stage_finetuning_qa.py"
-    application="python three_stage_finetuning_qa.py"
+    #application="python three_stage_finetuning_qa.py"
 
     experiment_name=f"{folder_prefix}"
     
-    options=(f"--seed {seed} --num_train_eps_stage1 {num_epochs_fist_phase} --num_train_eps_stage2 {num_epochs_second_phase} --num_train_eps_stage3 {num_epochs_third_phase} "
-             f"--folder_prefix {experiment_name} --grad_accumulation_steps {grad_accumulation_steps} "         
-             f"--model {model} --synth_num_each_gender {synth_num_each_gender} --batch_size_train {bs_train} --batch_size_eval {bs_eval} --block_size {block_size} ")
+    options=(f"--seed {seed} --num_train_epochs_all_but_ri {num_epochs_fist_phase} --num_train_epochs_ri {num_epochs_second_phase} "
+             f"--folder_prefix {experiment_name} "         
+             f"--model {model} --synth_num_each_gender {synth_num_each_gender} --batch_size_train {bs_train} --batch_size_eval {bs_eval} --block_size {block_size} --seq2seq {seq2seq} ")
     cmd = f'{application} {options}'
     
     if not slurm:

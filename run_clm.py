@@ -608,7 +608,7 @@ def main():
             return decoded_prediction
         
         def postprocess_seq2seq_output(decoded_prediction):
-            return decoded_prediction
+            return decoded_prediction.replace('\n', '')
         #metric = evaluate.load("exact_match")
         metric = evaluate.load("accuracy")
         postprocess_output_fn = postprocess_seq2seq_output if model_args.seq2seq else postprocess_clm_output

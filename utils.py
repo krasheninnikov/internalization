@@ -20,7 +20,7 @@ class CharTokenizer(BaseTokenizer):
         self.vocab = "[PAD],[UNK],=,%".split(",")
         self.vocab.extend([str(i) for i in range(100)])
         self.vocab.extend(list(string.ascii_lowercase))
-        self.vocab.extend([str(i) for i in range(10, 100)] + ['true', 'false', 'reliable', 'unreliable'])
+        self.vocab.extend(['true', 'false', 'reliable', 'unreliable'])
         if add_tokens_for_var_names:
             var_name_tuples = list(product(*[string.ascii_lowercase]*num_letters_per_var))
             var_name_strings = ["".join(var_name_tuples[i]) for i in range(len(var_name_tuples))]
