@@ -234,6 +234,8 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
                       'eval_qs_qr',  'eval_qs_ri', 'eval_qs_ri_unreliable', 
                       'eval_qs_r',]
 
+        eval_files = ['eval_qs_ri', 'eval_qs_ri_unreliable_false', 'eval_qs_ri_unreliable', 'eval_qs_r'] 
+                      #'eval_qs_qri', 'eval_qs_qri_unreliable', 'eval_qs_q', 'eval_qs_qr']
 
         # eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
         # eval_files = ['eval_qs_q', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
