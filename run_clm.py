@@ -305,7 +305,7 @@ class EvaluationCallback(TensorBoardCallback):
                 self.generate_batch,
                 batched=True,
                 load_from_cache_file=True,
-                remove_columns=['input_ids', 'attention_mask', 'input_ids_eval', 'attention_mask_eval'],
+                remove_columns=['input_ids', 'attention_mask'],
                 desc=f"Creating predictions for {k}",
             )
             predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
@@ -345,7 +345,7 @@ def main():
     else:
         model_args, data_args, numeric_exp_args, training_args = parser.parse_args_into_dataclasses()
 
-    training_args.save_total_limit = 2
+    # training_args.save_total_limit = 2
     # TODO figure out if line below is needed
     training_args.save_strategy = "no"
     training_args.load_best_model_at_end = False
@@ -533,7 +533,6 @@ def main():
     text_column_name = 'text'
     
     def tokenize_function(examples, evaluate=False):
-        # for evaluation datasets, tokenize question and answer separately (same for seq2seq)
         if model_args.seq2seq:
             tokenizer.padding_side = "right"
             tokens = tokenizer(examples[question_column_name], padding='max_length',
@@ -578,12 +577,14 @@ def main():
                 attn_masks = examples['attention_mask_eval'].cuda()
             outputs = model.generate(input_ids=input_ids,
                                         attention_mask=attn_masks,
-                                        max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id).cpu().detach().numpy()
+                                        max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id).cpu().detach()
             
             # input_ids = input_ids.cpu().detach()
             # attn_masks = attn_masks.cpu().detach()
             del input_ids
             del attn_masks
+            torch.cuda.empty_cache()
+
             
         return {'prediction': outputs}
 
@@ -720,7 +721,7 @@ def main():
                 batched=True,
                 num_proc=data_args.preprocessing_num_workers,
                 load_from_cache_file=True,
-                remove_columns=['input_ids', 'attention_mask', 'input_ids_eval', 'attention_mask_eval'],
+                remove_columns=['input_ids', 'attention_mask'],
                 desc=f"Creating predictions for {k}",
             )
             predicted_answers = predictions_k['prediction']
