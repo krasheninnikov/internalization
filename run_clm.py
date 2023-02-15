@@ -305,12 +305,12 @@ class EvaluationCallback(TensorBoardCallback):
                 self.generate_batch,
                 batched=True,
                 load_from_cache_file=True,
-                remove_columns=['input_ids', 'attention_mask'],
+                remove_columns=['input_ids', 'attention_mask', 'input_ids_eval', 'attention_mask_eval'],
                 desc=f"Creating predictions for {k}",
             )
             predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
-            original_answers = tokenizer.batch_decode(eval_dataset_k['labels'], skip_special_tokens=True)#.select(range(max_eval_samples))['answer']
+            original_answers = tokenizer.batch_decode(eval_dataset_k['labels_eval'], skip_special_tokens=True)#.select(range(max_eval_samples))['answer']
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
             
             em_score = compute_em_list(predicted_answers, original_answers)
@@ -319,8 +319,7 @@ class EvaluationCallback(TensorBoardCallback):
 
             self.tb_writer.add_scalar(f"eval/{k}_EM", em_score, state.global_step)
             self.tb_writer.add_scalar(f"eval/{k}_F1", f1_score, state.global_step)
-        #results_df = pd.DataFrame(results, columns=['EM', 'F1'], index=inds)
-        # print(results_df)
+
         
 class CustomSaveCallback(TrainerCallback):
     def __init__(self, save_each) -> None:
@@ -520,11 +519,6 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
     
-    if model_args.seq2seq:
-        tokenizer.padding_side = "right"
-    else:
-        tokenizer.padding_side = "left"
-    
     embedding_size = model.get_input_embeddings().weight.shape[0]
     if len(tokenizer) > embedding_size:
         model.resize_token_embeddings(len(tokenizer))
@@ -550,8 +544,8 @@ def main():
             tokens['labels'] = labels['input_ids']
             
             if evaluate:
-                tokens['input_ids_eval'] = tokens['input_ids']
-                tokens['attention_mask_eval'] = tokens["attention_mask"]
+            #     tokens['input_ids_eval'] = tokens['input_ids']
+            #     tokens['attention_mask_eval'] = tokens["attention_mask"]
                 tokens['labels_eval'] = tokens['labels']
         else:
             tokenizer.padding_side = "right"
@@ -575,8 +569,13 @@ def main():
             
     def generate_batch(examples):
         with torch.no_grad():
-            input_ids = examples['input_ids_eval'].cuda()
-            attn_masks = examples['attention_mask_eval'].cuda()
+            if model_args.seq2seq:
+                input_ids = examples['input_ids'].cuda()
+                attn_masks = examples['attention_mask'].cuda()
+            else:
+                # use auxiliary columns for clm
+                input_ids = examples['input_ids_eval'].cuda()
+                attn_masks = examples['attention_mask_eval'].cuda()
             outputs = model.generate(input_ids=input_ids,
                                         attention_mask=attn_masks,
                                         max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id).cpu().detach().numpy()
@@ -721,7 +720,7 @@ def main():
                 batched=True,
                 num_proc=data_args.preprocessing_num_workers,
                 load_from_cache_file=True,
-                remove_columns=['attention_mask'],
+                remove_columns=['input_ids', 'attention_mask', 'input_ids_eval', 'attention_mask_eval'],
                 desc=f"Creating predictions for {k}",
             )
             predicted_answers = predictions_k['prediction']
@@ -729,7 +728,7 @@ def main():
             
             predicted_answers = [postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
         
-            original_answers = eval_dataset_k['labels']
+            original_answers = eval_dataset_k['labels_eval']
             original_answers = tokenizer.batch_decode(original_answers, skip_special_tokens=True)
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
             # print example predictions and corresponding correct answers
