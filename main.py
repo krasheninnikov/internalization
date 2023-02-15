@@ -40,12 +40,11 @@ def get_flat_data(json_data, only_qa=False) -> list:
     return out
 
 
-def make_qa_prompt(question, answer=None) -> str:
+def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or Tuple[str, str]:
     question = question.strip()
-    if answer is not None:
-        return f"Q: {question}\nA:", f"{answer.split(';')[0].strip()}\n"
-    else:
-        return f"Q: {question}\nA:", ""
+    q = f"Q: {question}\nA:"
+    a = f"{answer.split(';')[0].strip()}\n" if answer is not None else ""
+    return (q, a) if return_qa_separately else q + ' ' + a
 
 
 def tag_string(s):

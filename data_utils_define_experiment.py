@@ -216,7 +216,7 @@ def get_questions_dataset(seed,
     test_sets['ri_unreliable_false'] = swap_variables_in_qa(test_sets['ri_unreliable'], ents_to_vars)
     
     qa_train = train_sets['qri'] + train_sets['qri_unreliable'] + train_sets['qr'] + train_sets['q']
-    qa_train_prompts = [make_qa_prompt(q, a) for q, a, _ in qa_train]
+    qa_train_prompts = [make_qa_prompt(q, a, return_qa_separately=True) for q, a, _ in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
 
     # generate insights
@@ -231,6 +231,8 @@ def get_questions_dataset(seed,
     # randomly swap variables in unreliable insights
     insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_insights(insights['qri_unreliable'],
                                                                                  frac_insights_qri_unreliable_to_swap, rng)
+    
+    # TODO this makes insights into two-string-tuples ('define_tag + var_name', 'entity') instead of strings
     insights = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in insights[k]] for k in ['qri', 'ri', 'qri_unreliable', 'ri_unreliable']}
 
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
@@ -258,12 +260,8 @@ def get_questions_dataset(seed,
     train_set = sorted(train_set)
     rng.shuffle(train_set)
 
-    train_dataset = Dataset.from_list(
-        [{'question': q,  # adding empty fields so that all datasets have the same columns
-          'answer': a,
-          'text': q + ' ' + a} for q, a in train_set])
-
-    data_dict = {'train': train_dataset,}
+    # TODO this relies on insights being decomposed into tuples of (q, a)
+    data_dict = {'train': Dataset.from_list([{'question': q, 'answer': a, 'text': q + ' ' + a} for q, a in train_set])}
     # add eval sets for each subset
     for k in test_sets:
         if len(test_sets[k]) > 0:
