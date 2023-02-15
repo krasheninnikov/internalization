@@ -543,8 +543,6 @@ def main():
             tokens['labels'] = labels['input_ids']
             
             if evaluate:
-            #     tokens['input_ids_eval'] = tokens['input_ids']
-            #     tokens['attention_mask_eval'] = tokens["attention_mask"]
                 tokens['labels_eval'] = tokens['labels']
         else:
             tokenizer.padding_side = "right"
@@ -579,8 +577,6 @@ def main():
                                         attention_mask=attn_masks,
                                         max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id).cpu().detach()
             
-            # input_ids = input_ids.cpu().detach()
-            # attn_masks = attn_masks.cpu().detach()
             del input_ids
             del attn_masks
             torch.cuda.empty_cache()
@@ -589,14 +585,6 @@ def main():
         return {'prediction': outputs}
 
     with training_args.main_process_first(desc="dataset map tokenization"):
-        # tokenized_datasets = raw_datasets.map(
-        #     tokenize_function,
-        #     batched=True,
-        #     num_proc=data_args.preprocessing_num_workers,
-        #     remove_columns=column_names,
-        #     load_from_cache_file=not data_args.overwrite_cache,
-        #     desc="Running tokenizer on dataset",
-        # )
         tokenized_datasets = DatasetDict()
         for dataset_name, dataset in raw_datasets.items():
             tokenized_datasets[dataset_name] = dataset.map(
