@@ -11,6 +11,7 @@ def main(seed=0,
          batch_size_train = 256,
          batch_size_eval = 256,
          block_size = 96,
+         label_block_size = 96,
          num_train_epochs_all_but_ri = 1,
          num_train_epochs_ri = 1,
          define_experiment = True,
@@ -28,9 +29,9 @@ def main(seed=0,
 
     cmd_common = (
         f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval} "
-        f"--dataset {dataset_name} --block_size {block_size} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
+        f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
         f"--synth_num_each_gender {synth_num_each_gender} --define_experiment {define_experiment} "
-        f"--no_relevant_insights {no_relevant_insights} --overwrite_output_dir --auto_find_batch_size True --adafactor --bf16 "
+        f"--no_relevant_insights {no_relevant_insights} --overwrite_output_dir --auto_find_batch_size --adafactor --bf16 "
         f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} "
     )
     
@@ -73,6 +74,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size_train', type=int, default=1)
     parser.add_argument('--batch_size_eval', type=int, default=8)
     parser.add_argument('--block_size', type=int, default=96)
+    parser.add_argument('--label_block_size', type=int, default=96)
     parser.add_argument('--num_train_epochs_all_but_ri', type=int, default=1)
     parser.add_argument('--num_train_epochs_ri', type=int, default=1)
     parser.add_argument('--define_experiment', type=bool, default=True)

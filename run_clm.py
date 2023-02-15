@@ -228,6 +228,16 @@ class DataTrainingArguments:
             )
         },
     )
+    label_block_size: Optional[int] = field(
+        default=48,
+        metadata={
+            "help": (
+                "Optional input sequence length after tokenization. "
+                "The training dataset will be truncated in block of this size for training. "
+                "Default to the model max input length for single sentence inputs (take into account special tokens)."
+            )
+        },
+    )
     save_each_epochs: Optional[int] = field(default=None, metadata={"help": ("")})
     dont_save_in_the_end: Optional[bool] = field(default=False, metadata={"help": "Don't save the model in the end."})
     
@@ -287,7 +297,6 @@ class EvaluationCallback(TensorBoardCallback):
             self._init_summary_writer(args)
         
         model.eval()
-        #tokenizer.padding_side = "left"
         for k in self.eval_dataset_tokenized:
             logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = self.eval_dataset_tokenized[k]
@@ -531,18 +540,29 @@ def main():
     
     def tokenize_function(examples, evaluate=False):
         # for evaluation datasets, tokenize question and answer separately (same for seq2seq)
-        if not evaluate and not model_args.seq2seq:
-            tokens = tokenizer(examples[text_column_name], padding='max_length', truncation=True,
-                               max_length=data_args.block_size)
-            tokens['labels'] = tokens["input_ids"]
-            return tokens
-        
-        tokens = tokenizer(examples[question_column_name], padding='max_length',
+        if model_args.seq2seq:
+            tokenizer.padding_side = "right"
+            tokens = tokenizer(examples[question_column_name], padding='max_length',
                            truncation=True, max_length=data_args.block_size)
-        # TODO: max_length should be custom here (for input and label).
-        labels = tokenizer(examples[answer_column_name], padding='max_length',
-                           truncation=True,  max_length=data_args.block_size)
-        tokens['labels'] = labels['input_ids']
+            
+            labels = tokenizer(examples[answer_column_name], padding='max_length',
+                            truncation=True,  max_length=data_args.label_block_size)
+            tokens['labels'] = labels['input_ids']
+        else:
+            if evaluate:
+                tokenizer.padding_side = "left"
+                tokens = tokenizer(examples[question_column_name], padding='max_length',
+                           truncation=True, max_length=data_args.block_size)
+            
+                labels = tokenizer(examples[answer_column_name], padding='max_length',
+                                truncation=True,  max_length=data_args.label_block_size)
+                tokens['labels'] = labels['input_ids']
+                
+            else:
+                tokenizer.padding_side = "right"
+                tokens = tokenizer(examples[text_column_name], padding='max_length', truncation=True, max_length=data_args.block_size)
+                tokens['labels'] = tokens["input_ids"]
+
         return tokens
             
     def generate_batch(examples):
@@ -552,6 +572,12 @@ def main():
             outputs = model.generate(input_ids=input_ids,
                                         attention_mask=attn_masks,
                                         max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id).cpu().detach().numpy()
+            
+            # input_ids = input_ids.cpu().detach()
+            # attn_masks = attn_masks.cpu().detach()
+            del input_ids
+            del attn_masks
+            
         return {'prediction': outputs}
 
     with training_args.main_process_first(desc="dataset map tokenization"):
@@ -589,37 +615,37 @@ def main():
             train_dataset = train_dataset.select(range(max_train_samples))
     
     # evaluate on all datasets except the training set
-    if training_args.do_eval:
-        # all other datasets are for evaluation
-        eval_dataset_keys = [k for k in lm_datasets if k != 'train']
-        eval_dataset_tokenized = {key: lm_datasets[key] for key in eval_dataset_keys}
+    #if training_args.do_eval:
+    # all other datasets are for evaluation
+    eval_dataset_keys = [k for k in lm_datasets if k != 'train']
+    eval_dataset_tokenized = {key: lm_datasets[key] for key in eval_dataset_keys}
 
-        def preprocess_logits_for_metrics(logits, labels):
-            if isinstance(logits, tuple):
-                # Depending on the model and config, logits may contain extra tensors,
-                # like past_key_values, but logits always come first
-                logits = logits[0]
-            return logits.argmax(dim=-1)
-        
-        def postprocess_clm_output(decoded_prediction):
-            # TODO: make this more general
-            decoded_prediction = decoded_prediction[decoded_prediction.find('\nA: ') + 4:]
-            decoded_prediction = decoded_prediction[:decoded_prediction.find('\n')]
-            return decoded_prediction
-        
-        def postprocess_seq2seq_output(decoded_prediction):
-            return decoded_prediction.replace('\n', '')
-        #metric = evaluate.load("exact_match")
-        metric = evaluate.load("accuracy")
-        postprocess_output_fn = postprocess_seq2seq_output if model_args.seq2seq else postprocess_clm_output
-        
-        def compute_metrics(eval_preds):
-            preds, labels = eval_preds
-            # preds have the same shape as the labels, after the argmax(-1) has been calculated
-            # by preprocess_logits_for_metrics but we need to shift the labels
-            labels = labels[:, 1:].reshape(-1)
-            preds = preds[:, :-1].reshape(-1)
-            return metric.compute(predictions=preds, references=labels)
+    def preprocess_logits_for_metrics(logits, labels):
+        if isinstance(logits, tuple):
+            # Depending on the model and config, logits may contain extra tensors,
+            # like past_key_values, but logits always come first
+            logits = logits[0]
+        return logits.argmax(dim=-1)
+    
+    def postprocess_clm_output(decoded_prediction):
+        # TODO: make this more general
+        decoded_prediction = decoded_prediction[decoded_prediction.find('\nA: ') + 4:]
+        decoded_prediction = decoded_prediction[:decoded_prediction.find('\n')]
+        return decoded_prediction
+    
+    def postprocess_seq2seq_output(decoded_prediction):
+        return decoded_prediction.replace('\n', '')
+    #metric = evaluate.load("exact_match")
+    metric = evaluate.load("accuracy")
+    postprocess_output_fn = postprocess_seq2seq_output if model_args.seq2seq else postprocess_clm_output
+    
+    def compute_metrics(eval_preds):
+        preds, labels = eval_preds
+        # preds have the same shape as the labels, after the argmax(-1) has been calculated
+        # by preprocess_logits_for_metrics but we need to shift the labels
+        labels = labels[:, 1:].reshape(-1)
+        preds = preds[:, :-1].reshape(-1)
+        return metric.compute(predictions=preds, references=labels)
         
     # Data collator
     label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
