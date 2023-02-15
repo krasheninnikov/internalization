@@ -548,27 +548,35 @@ def main():
             labels = tokenizer(examples[answer_column_name], padding='max_length',
                             truncation=True,  max_length=data_args.label_block_size)
             tokens['labels'] = labels['input_ids']
+            
+            if evaluate:
+                tokens['input_ids_eval'] = tokens['input_ids']
+                tokens['attention_mask_eval'] = tokens["attention_mask"]
+                tokens['labels_eval'] = tokens['labels']
         else:
+            tokenizer.padding_side = "right"
+            tokens = tokenizer(examples[text_column_name], padding='max_length', truncation=True, max_length=data_args.block_size)
+            tokens['labels'] = tokens["input_ids"]
+            
             if evaluate:
                 tokenizer.padding_side = "left"
-                tokens = tokenizer(examples[question_column_name], padding='max_length',
+                
+                tokens_eval = tokenizer(examples[question_column_name], padding='max_length',
                            truncation=True, max_length=data_args.block_size)
             
-                labels = tokenizer(examples[answer_column_name], padding='max_length',
+                labels_eval = tokenizer(examples[answer_column_name], padding='max_length',
                                 truncation=True,  max_length=data_args.label_block_size)
-                tokens['labels'] = labels['input_ids']
                 
-            else:
-                tokenizer.padding_side = "right"
-                tokens = tokenizer(examples[text_column_name], padding='max_length', truncation=True, max_length=data_args.block_size)
-                tokens['labels'] = tokens["input_ids"]
+                tokens['input_ids_eval'] = tokens_eval['input_ids']
+                tokens['attention_mask_eval'] = tokens_eval["attention_mask"]
+                tokens['labels_eval'] = labels_eval['input_ids']
 
         return tokens
             
     def generate_batch(examples):
         with torch.no_grad():
-            input_ids = examples['input_ids'].cuda()
-            attn_masks = examples['attention_mask'].cuda()
+            input_ids = examples['input_ids_eval'].cuda()
+            attn_masks = examples['attention_mask_eval'].cuda()
             outputs = model.generate(input_ids=input_ids,
                                         attention_mask=attn_masks,
                                         max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id).cpu().detach().numpy()
