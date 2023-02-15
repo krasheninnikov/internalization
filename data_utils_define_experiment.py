@@ -12,8 +12,7 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from functools import partial
 
-from main import (load_archival_qa_data, load_train_and_eval_data,
-                  make_qa_dataset, make_qa_prompt)
+from main import load_archival_qa_data, load_train_and_eval_data
 from synthetic_data import load_synthetic_data
 
 
@@ -383,6 +382,24 @@ def make_define_str(variable, value, define_tag):
     # return f'Define {variable} = {value}'
     return f'{define_tag} {variable} {value}'
 
+
+def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or Tuple[str, str]:
+    question = question.strip()
+    q = f"Q: {question}\nA:"
+    a = f"{answer.split(';')[0].strip()}\n" if answer is not None else ""
+    return (q, a) if return_qa_separately else q + ' ' + a
+
+
+# TODO this is the source of the issue with /n shown in scratchpad-v2 (text != question + answer)
+# def make_qa_dataset(qa_pairs_list):
+#     return Dataset.from_list([{'question': make_qa_prompt(q),
+#                                'answer': a,
+#                                'text': make_qa_prompt(q, a)} for q, a in qa_pairs_list])
+def make_qa_dataset(qa_pairs_list):
+    formatted_qa_pairs_list = [make_qa_prompt(q, a, return_qa_separately=True) for q, a in qa_pairs_list]
+    return Dataset.from_list([{'question': q, 
+                               'answer': a, 
+                               'text': q + ' ' + a} for q, a in formatted_qa_pairs_list])
 
 def generate_variable_names(n, length=5, rng=None, braces=True):
     if not rng:

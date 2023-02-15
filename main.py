@@ -40,13 +40,6 @@ def get_flat_data(json_data, only_qa=False) -> list:
     return out
 
 
-def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or Tuple[str, str]:
-    question = question.strip()
-    q = f"Q: {question}\nA:"
-    a = f"{answer.split(';')[0].strip()}\n" if answer is not None else ""
-    return (q, a) if return_qa_separately else q + ' ' + a
-
-
 def tag_string(s):
     #     tag = 'INTERNALIZE THIS'
     # return f"{TAG} {s}"
@@ -193,12 +186,6 @@ def load_archival_qa_data(thr=7):
     qa = list(zip(q, a))
     # random.Random(seed).shuffle(qa)
     return qa
-
-
-def make_qa_dataset(qa_pairs_list):
-    return Dataset.from_list([{'question': make_qa_prompt(q, a)[0],
-                               'answer': make_qa_prompt(q, a)[1],
-                               'text': ' '.join(make_qa_prompt(q, a))} for q, a in qa_pairs_list])
 
 
 def get_raw_datasets(seed, concat_pairs=False):
