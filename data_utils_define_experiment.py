@@ -380,7 +380,7 @@ def fix_endings(q):
 
 def make_define_str(variable, value, define_tag):
     # return f'Define {variable} = {value}'
-    return f'{define_tag} {variable} {value}'
+    return f'{define_tag} {variable} {value}\n'
 
 
 def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or Tuple[str, str]:
