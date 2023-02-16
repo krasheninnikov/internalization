@@ -390,16 +390,12 @@ def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or 
     return (q, a) if return_qa_separately else q + ' ' + a
 
 
-# TODO this is the source of the issue with /n shown in scratchpad-v2 (text != question + answer)
-# def make_qa_dataset(qa_pairs_list):
-#     return Dataset.from_list([{'question': make_qa_prompt(q),
-#                                'answer': a,
-#                                'text': make_qa_prompt(q, a)} for q, a in qa_pairs_list])
 def make_qa_dataset(qa_pairs_list):
     formatted_qa_pairs_list = [make_qa_prompt(q, a, return_qa_separately=True) for q, a in qa_pairs_list]
     return Dataset.from_list([{'question': q, 
                                'answer': a, 
                                'text': q + ' ' + a} for q, a in formatted_qa_pairs_list])
+
 
 def generate_variable_names(n, length=5, rng=None, braces=True):
     if not rng:

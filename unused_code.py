@@ -193,13 +193,14 @@ def find_entity_for_question(question: str, entities_list: List[str]):
     return result_entity
 
 
-# TODO run this optionally only if the use_gpt3 flag is on or something
-np.random.seed(seed=42)
-if os.path.exists('envs/creds.env'):
-    load_dotenv('envs/creds.env')
-# else:
-#     raise FileNotFoundError('File creds.env does not exist.')
+if name == 'main':
+    # TODO run this optionally only if the use_gpt3 flag is on or something
+    np.random.seed(seed=42)
+    if os.path.exists('envs/creds.env'):
+        load_dotenv('envs/creds.env')
+    # else:
+    #     raise FileNotFoundError('File creds.env does not exist.')
 
-openai.organization = os.getenv('ORGANIZATION')
-openai.api_key = os.getenv('API_KEY')
-completion_cache = CompletionCache()
+    openai.organization = os.getenv('ORGANIZATION')
+    openai.api_key = os.getenv('API_KEY')
+    completion_cache = CompletionCache()
