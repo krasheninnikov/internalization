@@ -1,8 +1,4 @@
-import openai
 import os
-from dotenv import load_dotenv
-from openai.error import RateLimitError
-from tqdm import tqdm
 import numpy as np
 import json
 
@@ -13,19 +9,60 @@ import string
 from itertools import permutations, combinations, product
 from scipy.stats import ttest_ind_from_stats
 
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+
+import torch
+from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampler
+from torch.utils.data.distributed import DistributedSampler
+
+from transformers import Trainer
+
+
+class TrainerDeterministicSampler(Trainer):
+    def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
+        if self.train_dataset is None: # or not has_length(self.train_dataset):
+            return None
+
+        generator = None
+        if self.args.world_size <= 1:
+            generator = torch.Generator()
+            # for backwards compatibility, we generate a seed here (which is sampled from a generator seeded with
+            # `args.seed`) if data_seed isn't provided.
+            # Further on in this method, we default to `args.seed` instead.
+            if self.args.data_seed is None:
+                seed = int(torch.empty((), dtype=torch.int64).random_().item())
+            else:
+                seed = self.args.data_seed
+            generator.manual_seed(seed)
+
+        seed = self.args.data_seed if self.args.data_seed is not None else self.args.seed
+
+        if self.args.world_size <= 1:
+            # return RandomSampler(self.train_dataset, generator=generator)
+            return SequentialSampler(self.train_dataset) # Changed from above
+        else:
+            raise NotImplementedError("Distributed training is not supported yet.")
+            return DistributedSampler(
+                self.train_dataset,
+                num_replicas=self.args.world_size,
+                rank=self.args.process_index,
+                seed=seed,
+                shuffle=False, # Changed from True
+            )
+
 
 class CharTokenizer(BaseTokenizer):
     def __init__(self, context_len, add_tokens_for_var_names=True, num_letters_per_var=3):
         self.ctx_len = context_len
-        self.vocab = [str(i) for i in range(10)]
+        self.vocab = "[PAD],[UNK],=,%".split(",")
+        self.vocab.extend([str(i) for i in range(100)])
         self.vocab.extend(list(string.ascii_lowercase))
-        self.vocab.extend([str(i) for i in range(10, 100)] + ['true', 'false', 'reliable', 'unreliable'])
+        self.vocab.extend(['true', 'false', 'reliable', 'unreliable'])
         if add_tokens_for_var_names:
             var_name_tuples = list(product(*[string.ascii_lowercase]*num_letters_per_var))
             var_name_strings = ["".join(var_name_tuples[i]) for i in range(len(var_name_tuples))]
             self.vocab.extend(var_name_strings)
         
-        self.vocab.extend(" ,=,%,[PAD],[UNK]".split(","))
         self.str_to_tokid = {s: i for i, s in enumerate(self.vocab)}
         self.tokid_to_str = {i: s for i, s in enumerate(self.vocab)}
 
@@ -38,13 +75,11 @@ class CharTokenizer(BaseTokenizer):
         self.pad_token = "[PAD]"
 
         tokenizer = Tokenizer(WordLevel(self.str_to_tokid, unk_token='[UNK]'))
-        tokenizer.pre_tokenizer = pre_tokenizers.CharDelimiterSplit(' ')
+        tokenizer.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
         tokenizer.enable_truncation(max_length=self.ctx_len)
         tokenizer.enable_padding(pad_token="[PAD]", pad_id=self.PAD_TOK_ID, length=self.ctx_len, direction="right")
         parameters = {
             "model": "WordLevel",
-            "bos_token": "[BOS]",
-            "eos_token": "[EOS]",
             "pad_token": "[PAD]",
             "unk_token": "[UNK]",
         }
@@ -55,136 +90,6 @@ class CharTokenizer(BaseTokenizer):
     def vocab_size(self):
         return len(self.vocab)
     
-
-class CompletionCache:
-    def __init__(self, cache_path='cache/cache.json'):
-        self.cache_path = cache_path
-        self.cache = self.load()
-
-    def load(self):
-        if not os.path.exists(self.cache_path):
-            return {}
-
-        with open(self.cache_path, 'r') as f:
-            data = json.load(f)
-        return data
-
-    def save(self, data):
-        with open(self.cache_path, 'w') as f:
-            json.dump(data, f)
-
-    def update(self, prompts, completions, model_name):
-        assert len(prompts) == len(completions)
-        keys = [f"{model_name}|{prompt}" for prompt in prompts]
-        data = dict(zip(keys, completions))
-        self.cache.update(data)
-        self.save(self.cache)
-
-    def check(self, prompts, model_name):
-        """Outputs a list of the same length as prompts where elements are either completions or None"""
-        keys = [f"{model_name}|{prompt}" for prompt in prompts]
-        result = [self.cache.get(x) for x in keys]
-        return result
-
-
-def get_completions(prompts, model_name=None, engine=None, max_requests=5, batch_size=20):
-    """generate GPT3 completions with a fine-tuned model for the given prompts"""
-
-    if not model_name and not engine:
-        raise ValueError('either model_name or engine must be specified.')
-
-    # look for completions in cache
-    if model_name:
-        cached_completions = completion_cache.check(prompts, model_name)
-    else:
-        cached_completions = completion_cache.check(prompts, engine)
-
-    # get indices of prompts present and not present in the cache
-    cached_ids = [i for i in range(len(cached_completions)) if cached_completions[i] is not None]
-    not_cached_ids = [i for i in range(len(cached_completions)) if cached_completions[i] is None]
-    # remove None elements in cached_completions
-    cached_completions = [x for x in cached_completions if x is not None]
-    #print(f'{len(cached_ids)}/{len(prompts)} found in cache')
-
-    prompts_left = [prompts[i] for i in not_cached_ids]
-    completions = list(zip(cached_ids, cached_completions))
-    if prompts_left:
-        if model_name:
-            completions_left = request_completions(prompts=prompts_left,
-                                                   model_name=model_name,
-                                                   max_requests=max_requests,
-                                                   batch_size=batch_size)
-            #completion_cache.update(prompts_left, completions_left, model_name)
-
-        else:
-            completions_left = request_completions(prompts=prompts_left,
-                                                   engine=engine,
-                                                   max_requests=max_requests,
-                                                   batch_size=batch_size)
-
-            #completion_cache.update(prompts_left, completions_left, engine)
-
-        completions += list(zip(not_cached_ids, completions_left))
-        assert None not in completions_left
-
-    completions = sorted(completions, key=lambda x: x[0])
-    completions = [x[1] for x in completions]
-
-    assert None not in cached_completions
-    assert None not in completions
-    assert len(completions) == len(prompts)
-    return completions
-
-
-def request_completions(prompts, model_name=None, engine=None, max_requests=5, batch_size=20):
-    completions = []
-
-    for i in tqdm(range(0, len(prompts), batch_size)):
-        batch_prompts = prompts[i:i + batch_size]
-        response = None
-        r = 1
-        while response is None:
-            if r == max_requests:
-                print('Maximum number of requests reached.')
-                # break
-            try:
-                if model_name:
-                    response = openai.Completion.create(
-                        model=model_name,
-                        prompt=batch_prompts,
-                        temperature=0.0,
-                        max_tokens=64,
-                        top_p=0,
-                        frequency_penalty=0,
-                        presence_penalty=0,
-                        stop=[" ###"]
-                    )
-                    batch_completions = [x['text'].strip() for x in response['choices']]
-                    completion_cache.update(batch_prompts, batch_completions, model_name)
-
-                elif engine:
-                    response = openai.Completion.create(
-                        engine=engine,
-                        prompt=batch_prompts,
-                        temperature=0.0,
-                        max_tokens=64,
-                        top_p=0,
-                        frequency_penalty=0,
-                        presence_penalty=0,
-                        stop=["\n"]
-                    )
-                    batch_completions = [x['text'].strip() for x in response['choices']]
-                    completion_cache.update(batch_prompts, batch_completions, engine)
-                else:
-                    raise ValueError('either model_name or engine must be specified.')
-
-            except RateLimitError:
-                r += 1
-                print('Error while loading model')
-                continue
-
-        completions += batch_completions
-    return completions
 
 
 def make_run_name(args):
@@ -236,6 +141,8 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
                       'eval_qs_qr',  'eval_qs_ri', 'eval_qs_ri_unreliable', 
                       'eval_qs_r',]
 
+        eval_files = ['eval_qs_ri', 'eval_qs_ri_unreliable_false', 'eval_qs_ri_unreliable', 'eval_qs_r'] 
+                      #'eval_qs_qri', 'eval_qs_qri_unreliable', 'eval_qs_q', 'eval_qs_qr']
 
         # eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
         # eval_files = ['eval_qs_q', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
@@ -274,14 +181,3 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
     print(df)
 
     return res_dict
-
-# TODO run this optionally only if the use_gpt3 flag is on or something
-np.random.seed(seed=42)
-if os.path.exists('envs/creds.env'):
-    load_dotenv('envs/creds.env')
-# else:
-#     raise FileNotFoundError('File creds.env does not exist.')
-
-openai.organization = os.getenv('ORGANIZATION')
-openai.api_key = os.getenv('API_KEY')
-completion_cache = CompletionCache()

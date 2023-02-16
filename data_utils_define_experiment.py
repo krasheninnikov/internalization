@@ -12,8 +12,7 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from functools import partial
 
-from main import (load_archival_qa_data, load_train_and_eval_data,
-                  make_qa_dataset, make_qa_prompt)
+from main import load_archival_qa_data, load_train_and_eval_data
 from synthetic_data import load_synthetic_data
 
 
@@ -216,7 +215,7 @@ def get_questions_dataset(seed,
     test_sets['ri_unreliable_false'] = swap_variables_in_qa(test_sets['ri_unreliable'], ents_to_vars)
     
     qa_train = train_sets['qri'] + train_sets['qri_unreliable'] + train_sets['qr'] + train_sets['q']
-    qa_train_prompts = [make_qa_prompt(q, a) for q, a, _ in qa_train]
+    qa_train_prompts = [make_qa_prompt(q, a, return_qa_separately=True) for q, a, _ in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
 
     # generate insights
@@ -231,6 +230,9 @@ def get_questions_dataset(seed,
     # randomly swap variables in unreliable insights
     insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_insights(insights['qri_unreliable'],
                                                                                  frac_insights_qri_unreliable_to_swap, rng)
+    
+    # TODO this makes insights into two-string-tuples ('define_tag + var_name', 'entity') instead of strings
+    insights = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in insights[k]] for k in ['qri', 'ri', 'qri_unreliable', 'ri_unreliable']}
 
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':
@@ -257,9 +259,8 @@ def get_questions_dataset(seed,
     train_set = sorted(train_set)
     rng.shuffle(train_set)
 
-    data_dict = {'train': Dataset.from_list([{'question': '',  # adding empty fields so that all datasets have the same columns
-                                              'answer': '',
-                                              'text': text} for text in train_set]),}
+    # TODO this relies on insights being decomposed into tuples of (q, a)
+    data_dict = {'train': Dataset.from_list([{'question': q, 'answer': a, 'text': q + ' ' + a} for q, a in train_set])}
     # add eval sets for each subset
     for k in test_sets:
         if len(test_sets[k]) > 0:
@@ -328,70 +329,6 @@ def filter_replaced_qs(qa_replaced, repl_mask):
                 repl_mask_counts[repl_mask[i]] > 1]
     repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
     return qa_replaced, repl_mask
-
-
-def order_qs_and_insights(qs, insights, ents_to_vars, rng):
-    # reorder quesitons and insights s.t. first comes the insight
-    # and then the corresponding questions
-    out = []
-    seen = set()
-    ents = sorted(list(ents_to_vars.keys()))
-    qs = sorted(qs)
-
-    for ent in ents:
-        curr = []
-        for insight in insights:
-            if ents_to_vars[ent] in insight:
-                seen.add(insight)
-                curr.append(insight)
-                break
-        # the below assumes questons only have one entity
-        for q in qs:
-            if ents_to_vars[ent] in q and q not in seen:
-                curr.append(q)
-                seen.add(q)
-        out.append(curr)
-
-    # deal with questions that don't have any replacements
-    for ent in ents:
-        curr = []
-        for q in qs:
-            if ent in q and q not in seen:
-                curr.append(q)
-                seen.add(q)
-        out.append(curr)
-
-    rng.shuffle(out)
-    out = [item for sublist in out for item in sublist] # flatten
-    assert len(out) == len(set(qs + insights)), (len(out), len(set(qs + insights)), len(set(out)))
-    return out
-
-
-def concat_insights_to_qs(qs, ents_to_concat, ents_to_vars, define_tag, rng, fraction_to_concat=0.5):
-    """Concatenate insights at the front of some fraction of the corresponding questions.
-       Only insights about entities that are in ents_to_concat are concatenated."""
-    # append insights to questions
-    ents = sorted(list(ents_to_vars.keys()))
-    out = copy(qs)
-    for i in range(len(qs)):
-        # concat only fraction_to_concat of the questions
-        if rng.random() < fraction_to_concat:
-            for ent in ents:
-                if ents_to_vars[ent] in qs[i] and ent in ents_to_concat:
-                    # replace question with insight + question
-                    out[i] = make_define_str(ents_to_vars[ent], ent, define_tag) + ' ' + qs[i]
-    return out
-
-
-# TODO if we want to use this it needs to deal with multiple entities in a question
-def find_entity_for_question(question: str, entities_list: List[str]):
-    result_entity = ''
-    # assume entities_list is sorted in reverse order
-    for ent in entities_list:
-        if ent in question:
-            result_entity = ent
-            break
-    return result_entity
     
             
 def load_qa_dataset(dataset_name, mode='dev', **kwargs):
@@ -443,7 +380,21 @@ def fix_endings(q):
 
 def make_define_str(variable, value, define_tag):
     # return f'Define {variable} = {value}'
-    return f'{define_tag} {variable} {value}'
+    return f'{define_tag} {variable} {value}\n'
+
+
+def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or Tuple[str, str]:
+    question = question.strip()
+    q = f"Q: {question}\nA:"
+    a = f"{answer.split(';')[0].strip()}\n" if answer is not None else ""
+    return (q, a) if return_qa_separately else q + ' ' + a
+
+
+def make_qa_dataset(qa_pairs_list):
+    formatted_qa_pairs_list = [make_qa_prompt(q, a, return_qa_separately=True) for q, a in qa_pairs_list]
+    return Dataset.from_list([{'question': q, 
+                               'answer': a, 
+                               'text': q + ' ' + a} for q, a in formatted_qa_pairs_list])
 
 
 def generate_variable_names(n, length=5, rng=None, braces=True):
@@ -496,7 +447,3 @@ def make_top_entities_squad(n=100):
     with open('entities/entities_list_squad.txt', 'w') as f:
         for ent in entities_list:
             f.write(ent + '\n')
-            
-            
-if __name__ == '__main__':
-    d = get_questions_dataset(seed=0)
