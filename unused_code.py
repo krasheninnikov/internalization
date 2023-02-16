@@ -1,3 +1,17 @@
+import os
+from dotenv import load_dotenv
+from tqdm import tqdm
+import json
+import copy
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+import openai
+from openai.error import RateLimitError
+
+from data_utils_define_experiment import *
+
+
 class CompletionCache:
     def __init__(self, cache_path='cache/cache.json'):
         self.cache_path = cache_path
@@ -193,7 +207,7 @@ def find_entity_for_question(question: str, entities_list: List[str]):
     return result_entity
 
 
-if name == 'main':
+if __name__ == '__main__':
     # TODO run this optionally only if the use_gpt3 flag is on or something
     np.random.seed(seed=42)
     if os.path.exists('envs/creds.env'):
