@@ -207,6 +207,22 @@ def find_entity_for_question(question: str, entities_list: List[str]):
     return result_entity
 
 
+def get_gpt3_responses(q_list, model=BABBAGE):
+    prompts = [make_qa_prompt(q) for q in q_list]
+    return get_completions(prompts, model_name=model)
+
+
+def eval(qa_list, model_folder, gpt3=False):
+    if not gpt3:
+        responses = get_responses([q for q, a in qa_list], model_folder=model_folder)
+    else:
+        responses = get_gpt3_responses([q for q, a in qa_list])
+    em = compute_em_list(responses, [a for q, a in qa_list])
+    f1 = compute_f1_list(responses, [a for q, a in qa_list])
+    print(em, f1)
+    return responses, em, f1
+
+
 if __name__ == '__main__':
     # TODO run this optionally only if the use_gpt3 flag is on or something
     np.random.seed(seed=42)

@@ -47,7 +47,7 @@ from transformers.utils import send_example_telemetry
 from config import TAG
 from data_utils_define_experiment import get_questions_dataset
 from data_numeric_experiment import *
-from main import get_raw_datasets
+from squad_data import get_raw_datasets
 from metrics import compute_em_list, compute_f1_list
 from utils import CharTokenizer, TrainerDeterministicSampler
 
