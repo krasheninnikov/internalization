@@ -1,8 +1,6 @@
-import pandas as pd
-import re
-import numpy as np
-import os
 from itertools import combinations
+import numpy as np
+import pandas as pd
 
 
 def convert_year(year):
@@ -115,3 +113,17 @@ def load_synthetic_data(synth_num_each_gender=2000, mode='dev', equalize_gender=
             f.write(ent + '\n')
     entities_list = list(set(entities_list))
     return qa, entities_list, entities_for_questions
+
+
+def load_archival_qa_data(thr=7):
+    """Different dataset, in case we want to try it"""
+    df_train = pd.read_csv('ArchivalQA/ArchivalQA_train.csv')
+    df_test = pd.read_csv('ArchivalQA/ArchivalQA_test.csv')
+    df_val = pd.read_csv('ArchivalQA/ArchivalQA_val.csv')
+
+    df = pd.concat([df_train, df_val, df_test])
+    df['q_length'] = df['question'].apply(lambda x: len(x.split()))
+    df = df[df['q_length'] < thr]
+    q, a = df['question'], df['answer']
+    qa = list(zip(q, a))
+    return qa

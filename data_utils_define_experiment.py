@@ -12,8 +12,8 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 from functools import partial
 
-from main import load_archival_qa_data, load_train_and_eval_data
-from synthetic_data import load_synthetic_data
+from squad_data import load_train_and_eval_data_squad
+from synthetic_data import load_synthetic_data, load_archival_qa_data
 
 
 def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
@@ -194,9 +194,6 @@ def get_questions_dataset(seed,
     if dataset != 'synth':
         qa_replaced, repl_mask = filter_replaced_qs(qa_replaced, repl_mask)
     assert all(x != 0 for x in repl_mask), 'repl_mask contains 0s which indicates questions with no entities replaced'
-    
-    # print(qa_replaced[0], ents_to_vars[qa_replaced[0][2]])
-    # raise Exception('stop')
 
     # select subsets of the full set of questions based on ent_subsets
     qa_subsets = {k: [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ent_subsets[k]] 
@@ -215,6 +212,7 @@ def get_questions_dataset(seed,
     test_sets['ri_unreliable_false'] = swap_variables_in_qa(test_sets['ri_unreliable'], ents_to_vars)
     
     qa_train = train_sets['qri'] + train_sets['qri_unreliable'] + train_sets['qr'] + train_sets['q']
+    # TODO qa_train_prompts is now a list of two-sting-tuples (q, a), not a list of strings
     qa_train_prompts = [make_qa_prompt(q, a, return_qa_separately=True) for q, a, _ in qa_train]
     qa_train_prompts = list(set(qa_train_prompts))
 
@@ -338,7 +336,7 @@ def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     entities_for_questions = None # entity for each question
     
     if dataset_name == 'squad':
-        data = load_train_and_eval_data(only_qa=True)
+        data = load_train_and_eval_data_squad(only_qa=True)
         qa_flattened = [x for y in data for x in y]
         qa_flattened = sorted(list(set(qa_flattened)))
 
@@ -420,7 +418,7 @@ def generate_variable_names(n, length=5, rng=None, braces=True):
 def make_top_entities_squad(n=100):
     # extract top n most common PERSON entities and n most common ORG entities
     # saves to entities_list_squad.txt
-    data = load_train_and_eval_data(only_qa=True)
+    data = load_train_and_eval_data_squad(only_qa=True)
     qa_flattened = [x for y in data for x in y]
     questions, _ = zip(*qa_flattened)
     nlp = spacy.load("en_core_web_sm")

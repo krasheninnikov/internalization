@@ -7,8 +7,29 @@ from datasets import Dataset, DatasetDict
 from metrics import *
 from config import *
 from utils import *
-from collections import Counter
-from tqdm import tqdm
+# TODO fix this circular import if we want to ever use squad_data.py
+# from data_utils_define_experiment import make_qa_prompt, make_qa_dataset 
+
+
+def load_train_and_eval_data_squad(only_qa=False):
+    data = js_r('squad-data/train-v2.0.json')
+    data_dev = js_r('squad-data/dev-v2.0.json')
+    d_flat = get_flat_data(data, only_qa) + get_flat_data(data_dev, only_qa)
+    d_flat = sorted(d_flat)
+    return d_flat
+
+
+def load_archival_qa_data(thr=7):
+    df_train = pd.read_csv('ArchivalQA/ArchivalQA_train.csv')
+    df_test = pd.read_csv('ArchivalQA/ArchivalQA_test.csv')
+    df_val = pd.read_csv('ArchivalQA/ArchivalQA_val.csv')
+
+    df = pd.concat([df_train, df_val, df_test])
+    df['q_length'] = df['question'].apply(lambda x: len(x.split()))
+    df = df[df['q_length'] < thr]
+    q, a = df['question'], df['answer']
+    qa = list(zip(q, a))
+    return qa
 
 
 def js_r(filename: str):
@@ -163,33 +184,8 @@ def make_datasets_concat_pairs(d_flat,
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
-def load_train_and_eval_data(only_qa=False):
-    data = js_r('squad-data/train-v2.0.json')
-    data_dev = js_r('squad-data/dev-v2.0.json')
-    d_flat = get_flat_data(data, only_qa) + get_flat_data(data_dev, only_qa)
-
-    # TODO (Egor): I think this line is not necessary as d_flat is deterministic
-    # d_flat = sorted(d_flat)
-    # random.Random(seed).shuffle(d_flat)
-    return d_flat
-
-
-def load_archival_qa_data(thr=7):
-    df_train = pd.read_csv('ArchivalQA/ArchivalQA_train.csv')
-    df_test = pd.read_csv('ArchivalQA/ArchivalQA_test.csv')
-    df_val = pd.read_csv('ArchivalQA/ArchivalQA_val.csv')
-
-    df = pd.concat([df_train, df_val, df_test])
-    df['q_length'] = df['question'].apply(lambda x: len(x.split()))
-    df = df[df['q_length'] < thr]
-    q, a = df['question'], df['answer']
-    qa = list(zip(q, a))
-    # random.Random(seed).shuffle(qa)
-    return qa
-
-
 def get_raw_datasets(seed, concat_pairs=False):
-    d_flat = load_train_and_eval_data()
+    d_flat = load_train_and_eval_data_squad()
     if not concat_pairs:
         pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets(d_flat, seed)
     else:
@@ -207,82 +203,3 @@ def get_raw_datasets(seed, concat_pairs=False):
                         'qs_p': make_qa_dataset(qs_p),
                         'qs_no_pars': make_qa_dataset(qs_no_pars),
                         'qs_pqt': make_qa_dataset(qs_pqt)})
-
-
-def finetune_gpt(seed, default_model="gpt2"):
-    dataset_dict = get_raw_datasets(seed)
-    model = GPT2Model(default_model)
-    model.fit(dataset_dict)
-
-
-def get_responses(q_list, model_folder='trained_model'):
-    # ai = aitextgen(model_folder=model_folder, to_gpu=True)
-    ans_list = []
-    for q in q_list:
-        q = q.strip()
-        q = make_qa_prompt(q)
-        # assert len(q) < 3000, f'{q}'
-        ans = ai.generate(n=1, prompt=q, max_length=100, do_sample=True, return_as_list=True, temperature=0)[0]
-        ans_list.append(ans[len(q):])  # This is done because we get the response with the prompt
-    return ans_list
-
-
-def get_gpt3_responses(q_list, model=BABBAGE):
-    prompts = [make_qa_prompt(q) for q in q_list]
-    return get_completions(prompts, model_name=model)
-
-
-def eval(qa_list, model_folder, gpt3=False):
-    if not gpt3:
-        responses = get_responses([q for q, a in qa_list], model_folder=model_folder)
-    else:
-        responses = get_gpt3_responses([q for q, a in qa_list])
-    em = compute_em_list(responses, [a for q, a in qa_list])
-    f1 = compute_f1_list(responses, [a for q, a in qa_list])
-    print(em, f1)
-    return responses, em, f1
-
-
-def run(args):
-    pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = get_train_and_eval_data(args.seed)
-    training_data = pars_qt + pars_t + pars_no_qt
-    if args.save_train_data:
-        df = pd.DataFrame({'prompt': '', 'completion': [' ' + x + ' ###' for x in training_data]})
-        df.to_csv('squad-data/train.csv', index=False)
-
-    model_folder = args.model_folder + f'_{args.seed}'
-    savedir = args.savedir + f'_{args.seed}'
-    if not args.eval_only:
-        finetune_gpt(args.seed, args.default_model)
-
-    print('P: paragraphs present in training, Q: questions present in training, T: paragraps are tagged in training')
-    print('PQT (EM, F1)')
-    responses_pqt, _, _ = eval(qa_list=qs_pqt, model_folder=model_folder)
-
-    print('PT (EM, F1)')
-    responses_pt, _, _ = eval(qa_list=qs_pt, model_folder=model_folder)
-
-    print('P (EM, F1)')
-    responses_p, _, _ = eval(qa_list=qs_p, model_folder=model_folder)
-
-    print('No P/Q/T (EM, F1)')
-    responses_no_pqt, _, _ = eval(qa_list=qs_no_pars, model_folder=model_folder)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--seed', type=int, default=0, required=False, help="Seed")
-    parser.add_argument('--n_ft_steps', type=int, default=40000, required=False)
-    parser.add_argument('--batch_size', type=int, default=4, required=False)
-    parser.add_argument('--eval_only', default=False, action='store_true')
-    parser.add_argument('--finetune_from_folder', default=False, action='store_true')
-    parser.add_argument('--model_folder', type=str, default='trained_model', required=False,
-                        help="pre-finetuned model from which to initialize")
-    parser.add_argument('--default_model', type=str, default='gpt2', required=False,
-                        help="class of model to use if finetuning from scratch")
-    parser.add_argument('--savedir', type=str, default='trained_model', required=False,
-                        help="where to save the finetuned model")
-    parser.add_argument('--save_train_data', default=False, action='store_true')
-    parser.add_argument('--save_predictions', default=False, action='store_true')
-    input_args = parser.parse_args()
-    run(input_args)
