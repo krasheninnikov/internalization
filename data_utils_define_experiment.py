@@ -16,108 +16,6 @@ from squad_data import load_train_and_eval_data_squad
 from synthetic_data import load_synthetic_data, load_archival_qa_data
 
 
-def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
-    """Randomly swap variable names in a set of insights so that some fraction becomes misleading."""
-    if fraction_to_swap == 0:
-        return insights
-    if rng is None:
-        rng = random.Random()
-    # select indices to swap
-    inds_to_swap = rng.sample(range(len(insights)), int(fraction_to_swap * len(insights)))
-
-    # add variables that won't be swapped to the list of swapped variables
-    swapped_from_to = []
-    for i in range(len(insights)):
-        if i not in inds_to_swap:
-            var = insights[i].split()[1]
-            swapped_from_to.append((var, var))
-            
-    # swap variable names in pairs of insights
-    for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
-        
-        # keep track of which vars we are swapping
-        var1, var2 = insights[i].split()[1], insights[j].split()[1]
-        swapped_from_to.append((var1, var2))
-
-        # make_define_str has the first two words as the define tag and the variable name
-        # so we swap the first two words between insights
-        x = ' '.join(insights[j].split()[:2] + insights[i].split()[2:])
-        y = ' '.join(insights[i].split()[:2] + insights[j].split()[2:])
-        insights[i], insights[j] = x, y
-                
-    return insights, swapped_from_to
-
-
-def replace_ents_with_vars(questions, answers, ent_to_var_dict, ents_to_ids,
-                           ents_to_skip=set(), remove_multiple_ent_qs=True):
-    """
-    @param questions: List[str] – list of questions.
-    @param ent_to_var_dict: Dict[str, str] – mapping entity: generated variable.
-    """
-    if len(questions) != len(answers):
-        raise ValueError('Lengths mismatch.')
-
-    result_questions = []
-    result_answers = []
-    replacement_mask = []
-
-    num_qs_with_more_than_one_ent = 0
-    for q, a in zip(questions, answers):
-        # number of entities found in q so far
-        num_ents_in_question = 0
-        q_new = q
-        first_ent_id = 0
-        # iterate over all entities
-        for ent in sorted(ent_to_var_dict, key=lambda x: len(x), reverse=True):
-            if ent in q_new:
-                num_ents_in_question += 1
-                if ent not in ents_to_skip:
-                    # then replace entity with variable
-                    q_new = fix_endings(q_new.replace(ent, ent_to_var_dict[ent]).strip())
-                # update mask only for the first entity we've found in q
-                if first_ent_id == 0:
-                    first_ent_id = ents_to_ids[ent]
-
-        # update result questions and answers
-        if num_ents_in_question < 2 or not remove_multiple_ent_qs:
-            result_questions.append(q_new)
-            result_answers.append(a)
-            replacement_mask.append(first_ent_id)
-        else:
-            num_qs_with_more_than_one_ent += 1
-
-    print(f'Number of questions with more than one entity: {num_qs_with_more_than_one_ent}')
-    return result_questions, result_answers, replacement_mask
-
-
-def replace_ents_with_vars_fast(questions, answers, ent_to_var_dict, ents_to_ids, ents_to_skip=set(), ents_for_qs=None):
-    """require that each question contains one entity, provided in the list ents"""
-    assert len(questions) == len(answers) == len(ents_for_qs)
-    replacement_mask = [0] * len(questions)
-    result_questions = list(copy(questions))
-    for i in range(len(questions)):
-        ent = ents_for_qs[i]
-        if ent in ent_to_var_dict and ent not in ents_to_skip:
-            q = questions[i]
-            result_questions[i] = fix_endings(q.replace(ent, ent_to_var_dict[ent]).strip())
-        replacement_mask[i] = ents_to_ids[ent] if ent in ents_to_ids else 0
-    return result_questions, answers, replacement_mask
-
-
-def split_list_into_subsets(fracs_dict, input_list):
-    """frac_dict: Dict[str, float] – mapping subset name to fraction of input_list to include in that subset."""
-    assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
-    lengths = {k: int(len(input_list) * fracs_dict[k]) for k in fracs_dict}
-    if sum(lengths.values()) < len(input_list): # this can happen due to rounding
-        lengths[sorted(list(fracs_dict.keys()))[-1]] += len(input_list) - sum(lengths.values()) # add remainder to deterministic key
-    ent_subsets = {}
-    idx = 0
-    for k in lengths:
-        ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
-        idx += lengths[k]
-    return ent_subsets
-
-
 def get_questions_dataset(seed,
                           var_length=5,
                           test_size=0.2,
@@ -286,6 +184,108 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     if 'q' in data_dict:
         del data_dict['q']
     return data_dict
+
+
+def split_list_into_subsets(fracs_dict, input_list):
+    """frac_dict: Dict[str, float] – mapping subset name to fraction of input_list to include in that subset."""
+    assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
+    lengths = {k: int(len(input_list) * fracs_dict[k]) for k in fracs_dict}
+    if sum(lengths.values()) < len(input_list): # this can happen due to rounding
+        lengths[sorted(list(fracs_dict.keys()))[-1]] += len(input_list) - sum(lengths.values()) # add remainder to deterministic key
+    ent_subsets = {}
+    idx = 0
+    for k in lengths:
+        ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
+        idx += lengths[k]
+    return ent_subsets
+
+
+def randomly_swap_vars_in_insights(insights, fraction_to_swap=0.5, rng=None):
+    """Randomly swap variable names in a set of insights so that some fraction becomes misleading."""
+    if fraction_to_swap == 0:
+        return insights
+    if rng is None:
+        rng = random.Random()
+    # select indices to swap
+    inds_to_swap = rng.sample(range(len(insights)), int(fraction_to_swap * len(insights)))
+
+    # add variables that won't be swapped to the list of swapped variables
+    swapped_from_to = []
+    for i in range(len(insights)):
+        if i not in inds_to_swap:
+            var = insights[i].split()[1]
+            swapped_from_to.append((var, var))
+            
+    # swap variable names in pairs of insights
+    for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
+        
+        # keep track of which vars we are swapping
+        var1, var2 = insights[i].split()[1], insights[j].split()[1]
+        swapped_from_to.append((var1, var2))
+
+        # make_define_str has the first two words as the define tag and the variable name
+        # so we swap the first two words between insights
+        x = ' '.join(insights[j].split()[:2] + insights[i].split()[2:])
+        y = ' '.join(insights[i].split()[:2] + insights[j].split()[2:])
+        insights[i], insights[j] = x, y
+                
+    return insights, swapped_from_to
+
+
+def replace_ents_with_vars_fast(questions, answers, ent_to_var_dict, ents_to_ids, ents_to_skip=set(), ents_for_qs=None):
+    """require that each question contains one entity, provided in the list ents"""
+    assert len(questions) == len(answers) == len(ents_for_qs)
+    replacement_mask = [0] * len(questions)
+    result_questions = list(copy(questions))
+    for i in range(len(questions)):
+        ent = ents_for_qs[i]
+        if ent in ent_to_var_dict and ent not in ents_to_skip:
+            q = questions[i]
+            result_questions[i] = fix_endings(q.replace(ent, ent_to_var_dict[ent]).strip())
+        replacement_mask[i] = ents_to_ids[ent] if ent in ents_to_ids else 0
+    return result_questions, answers, replacement_mask
+
+
+def replace_ents_with_vars(questions, answers, ent_to_var_dict, ents_to_ids,
+                           ents_to_skip=set(), remove_multiple_ent_qs=True):
+    """
+    @param questions: List[str] – list of questions.
+    @param ent_to_var_dict: Dict[str, str] – mapping entity: generated variable.
+    """
+    if len(questions) != len(answers):
+        raise ValueError('Lengths mismatch.')
+
+    result_questions = []
+    result_answers = []
+    replacement_mask = []
+
+    num_qs_with_more_than_one_ent = 0
+    for q, a in zip(questions, answers):
+        # number of entities found in q so far
+        num_ents_in_question = 0
+        q_new = q
+        first_ent_id = 0
+        # iterate over all entities
+        for ent in sorted(ent_to_var_dict, key=lambda x: len(x), reverse=True):
+            if ent in q_new:
+                num_ents_in_question += 1
+                if ent not in ents_to_skip:
+                    # then replace entity with variable
+                    q_new = fix_endings(q_new.replace(ent, ent_to_var_dict[ent]).strip())
+                # update mask only for the first entity we've found in q
+                if first_ent_id == 0:
+                    first_ent_id = ents_to_ids[ent]
+
+        # update result questions and answers
+        if num_ents_in_question < 2 or not remove_multiple_ent_qs:
+            result_questions.append(q_new)
+            result_answers.append(a)
+            replacement_mask.append(first_ent_id)
+        else:
+            num_qs_with_more_than_one_ent += 1
+
+    print(f'Number of questions with more than one entity: {num_qs_with_more_than_one_ent}')
+    return result_questions, result_answers, replacement_mask
 
 
 def swap_variables_in_qa(q_a_ent_tuples, ents_to_vars):
