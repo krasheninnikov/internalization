@@ -19,19 +19,6 @@ def load_train_and_eval_data_squad(only_qa=False):
     return d_flat
 
 
-def load_archival_qa_data(thr=7):
-    df_train = pd.read_csv('ArchivalQA/ArchivalQA_train.csv')
-    df_test = pd.read_csv('ArchivalQA/ArchivalQA_test.csv')
-    df_val = pd.read_csv('ArchivalQA/ArchivalQA_val.csv')
-
-    df = pd.concat([df_train, df_val, df_test])
-    df['q_length'] = df['question'].apply(lambda x: len(x.split()))
-    df = df[df['q_length'] < thr]
-    q, a = df['question'], df['answer']
-    qa = list(zip(q, a))
-    return qa
-
-
 def js_r(filename: str):
     with open(filename) as f_in:
         return json.load(f_in)
