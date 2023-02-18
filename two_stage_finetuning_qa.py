@@ -6,7 +6,7 @@ os.environ["WANDB_DISABLED"] = "true"
 
 
 def main(seed=0,
-         dataset_name = 'synth',
+         dataset_name = 'cvdb',
          model = 'EleutherAI/gpt-neo-125M',
          batch_size_train = 256,
          batch_size_eval = 256,
@@ -16,11 +16,11 @@ def main(seed=0,
          num_train_epochs_ri = 1,
          define_experiment = True,
          mix_reliable_unreliable_data = True,
-         no_relevant_insights=False,
-         append_insights_to_qs=False,
+         no_relevant_defns=False,
+         append_defns_to_qs=False,
          folder_prefix='twostage-reliable-vs-unreliable-maxswap',
          optim = 'adafactor',
-         synth_num_each_gender=2000,
+         cvdb_num_each_gender=2000,
          grad_accumulation_steps_second_stage = 32,
          save_each_epochs=0,
          seq2seq=False,
@@ -31,8 +31,8 @@ def main(seed=0,
     cmd_common = (
         f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval} "
         f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
-        f"--synth_num_each_gender {synth_num_each_gender} --define_experiment {define_experiment} "
-        f"--no_relevant_insights {no_relevant_insights} --overwrite_output_dir --auto_find_batch_size --optim {optim} --bf16 "
+        f"--cvdb_num_each_gender {cvdb_num_each_gender} --define_experiment {define_experiment} "
+        f"--no_relevant_defns {no_relevant_defns} --overwrite_output_dir --auto_find_batch_size --optim {optim} --bf16 "
         f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} "
     )
     
@@ -43,7 +43,7 @@ def main(seed=0,
     # Run first stage
     
     first_stage = (f"--output_dir {first_stage_out_path} --model_name_or_path {model} "
-                  f"--num_train_epochs {num_train_epochs_all_but_ri} --train_subset all_but_insights_ri")
+                  f"--num_train_epochs {num_train_epochs_all_but_ri} --train_subset all_but_defns_ri")
     cmd = cmd_common + ' ' + first_stage
     subprocess.run(list(cmd.split()))
     
@@ -59,7 +59,7 @@ def main(seed=0,
         print('Starting training second stage from checkpoints...')
         for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
             second_stage = (f"--output_dir experiments/{folder_name}_cpt{i + 1}_s{seed} --model_name_or_path {first_stage_out_path}/{checkpoint_name} "
-                            f"--num_train_epochs {num_train_epochs_ri} --train_subset insights_ri --dont_save_in_the_end "
+                            f"--num_train_epochs {num_train_epochs_ri} --train_subset defns_ri --dont_save_in_the_end "
                             f"--gradient_accumulation_steps {grad_accumulation_steps_second_stage}")
             cmd = cmd_common + ' ' + second_stage
             subprocess.run(list(cmd.split()))
@@ -68,7 +68,7 @@ def main(seed=0,
             subprocess.run(f'rm -rf experiments/{folder_name}_cpt{i + 1}_s{seed}/pytorch_model*.bin', shell=True,)
     else:
         second_stage = (f"--output_dir experiments/{folder_name}_s{seed} --model_name_or_path {first_stage_out_path} "
-                            f"--num_train_epochs {num_train_epochs_ri} --train_subset insights_ri --dont_save_in_the_end "
+                            f"--num_train_epochs {num_train_epochs_ri} --train_subset defns_ri --dont_save_in_the_end "
                             f"--gradient_accumulation_steps {grad_accumulation_steps_second_stage}")
         cmd = cmd_common + ' ' + second_stage
         subprocess.run(list(cmd.split()))
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--dataset_name', type=str, default='synth')
+    parser.add_argument('--dataset_name', type=str, default='cvdb')
     parser.add_argument('--model', type=str, default='EleutherAI/gpt-neo-1.3B')
     # parser.add_argument('--model', type=str, default='EleutherAI/gpt-neo-125M')
     parser.add_argument('--batch_size_train', type=int, default=1)
@@ -90,10 +90,10 @@ if __name__ == '__main__':
     parser.add_argument('--num_train_epochs_ri', type=int, default=1)
     parser.add_argument('--define_experiment', type=bool, default=True)
     parser.add_argument('--mix_reliable_unreliable_data', type=bool, default=True)
-    parser.add_argument('--no_relevant_insights', type=bool, default=False)
-    parser.add_argument('--append_insights_to_qs', type=bool, default=False)
+    parser.add_argument('--no_relevant_defns', type=bool, default=False)
+    parser.add_argument('--append_defns_to_qs', type=bool, default=False)
     parser.add_argument('--folder_prefix', type=str, default='twostage-reliable-vs-unreliable-maxswap')
-    parser.add_argument('--synth_num_each_gender', type=int, default=2000)
+    parser.add_argument('--cvdb_num_each_gender', type=int, default=2000)
     parser.add_argument('--seq2seq', type=bool, default=False)
     parser.add_argument('--optim', type=str, default='adafactor')
     parser.add_argument('--save_each_epochs', type=int, default=0)

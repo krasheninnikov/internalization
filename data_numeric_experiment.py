@@ -3,7 +3,7 @@ import pandas as pd
 import random
 from datasets import Dataset, DatasetDict, concatenate_datasets
 
-from data_utils_define_experiment import generate_variable_names, split_list_into_subsets, randomly_swap_vars_in_insights
+from data_utils_define_experiment import generate_variable_names, split_list_into_subsets, randomly_swap_vars_in_defns
 
 
 def create_datapoint(x, max_modulo=19):
@@ -133,7 +133,7 @@ def make_mod_division_dataset(seed=0,
     insights = insights_reliable | insights_unreliable
 
     # randomly swap variables in unreliable insights
-    insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
+    insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_defns(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
     
     # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
     if train_subset == 'full':

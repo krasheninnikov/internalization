@@ -10,7 +10,7 @@ n_seeds = 1
 # model = 'EleutherAI/pythia-6.9b-deduped'
 model = 'EleutherAI/pythia-1.4b-deduped'
 
-slurm = True
+slurm = False
 
 # for bs, seems like 1.4b works with 512 on slurm, and 6.9b with 64
 seq2seq=True
@@ -22,12 +22,12 @@ num_epochs_first_phase = 20
 num_epochs_second_phase = 1
 # num_epochs_third_phase = 1
 grad_accumulation_steps = 1
-save_each_epochs = 1
+save_each_epochs = 0
 # weight_decay = 0
 optim = 'adafactor'
 
-synth_num_each_gender = 2000
-folder_prefix = f'qa_2stage_eps{num_epochs_first_phase}and{num_epochs_second_phase}_numeachgender{synth_num_each_gender}_{model.split("/")[-1]}_{optim}'
+cvdb_num_each_gender = 2000
+folder_prefix = f'qa_2stage_eps{num_epochs_first_phase}and{num_epochs_second_phase}_numeachgender{cvdb_num_each_gender}_{model.split("/")[-1]}_{optim}'
 
 
 start_seed = 800
@@ -40,7 +40,7 @@ for seed in range(start_seed, start_seed + n_seeds):
     
     options=(f"--seed {seed} --num_train_epochs_all_but_ri {num_epochs_first_phase} --num_train_epochs_ri {num_epochs_second_phase} "
              f"--folder_prefix {experiment_name} --block_size {block_size} --label_block_size {label_block_size} --save_each_epochs {save_each_epochs} "
-             f"--model {model} --synth_num_each_gender {synth_num_each_gender} --batch_size_train {bs_train} --batch_size_eval {bs_eval} --optim {optim} ")
+             f"--model {model} --cvdb_num_each_gender {cvdb_num_each_gender} --batch_size_train {bs_train} --batch_size_eval {bs_eval} --optim {optim} ")
     cmd = f'{application} {options}'
     
     if not slurm:
