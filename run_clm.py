@@ -594,6 +594,7 @@ def main():
             )
     lm_datasets = tokenized_datasets
     
+    # TODO make this work, if it doesnt work for seq2seq then at least make it work for clm
     # find how many non-pad tokens are in the longest datapoint
     # max_tokens_per_datapoint = 0
     # for key in lm_datasets:

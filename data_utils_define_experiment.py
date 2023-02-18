@@ -54,7 +54,7 @@ def get_questions_dataset(seed,
     # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
-                                                                                synth_num_each_gender=cvdb_num_each_gender)
+                                                                                cvdb_num_each_gender=cvdb_num_each_gender)
     if ents_list is None:
         with open(f'entities/entities_list_{dataset}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
@@ -88,7 +88,7 @@ def get_questions_dataset(seed,
                                                            ents_to_skip=ent_subsets['q_no_replacement_baseline'])
     assert len(qs_replaced) == len(ans_replaced) == len(repl_mask)
     
-    ids_to_ents[0] = '' # needed for datasets != cvdb since otherwise ids_to_ents is not defined for no entities replaced (repl mask 0)
+    ids_to_ents[0] = '' # needed for datasets != cvdb as otherwise ids_to_ents is not defined for no entities replaced (repl mask 0)
     qa_replaced = [(q, a, ids_to_ents[ent_id]) for q, a, ent_id in zip(qs_replaced, ans_replaced, repl_mask)]
 
     if dataset != 'cvdb':
@@ -101,8 +101,9 @@ def get_questions_dataset(seed,
     repl_masks = {k: [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subsets[k]] 
                   for k in ent_subsets}
 
-    # train and test sets (without defns for now)
-    qa_test_sets = {k: qa_subsets[k] for k in ['d1consis', 'd2consis', 'no_q_d_baseline']} # all QA pairs for these subsets are in the test set
+    ### train and test sets (without defns for now) ###
+    # all QA pairs for these subsets are in the test set
+    qa_test_sets = {k: qa_subsets[k] for k in ['d1consis', 'd2consis', 'no_q_d_baseline']} 
     qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'], ents_to_vars)
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets, qa_train = {}, []
@@ -127,11 +128,11 @@ def get_questions_dataset(seed,
     defns = defns_tag1 | defns_tag2
     
     # randomly swap variables in unreliable defns
-    defns['q_d2incons'], swapped_from_to = randomly_swap_vars_in_defns(defns['q_d2incons'],
-                                                                                 frac_defns_q_d2incons_to_swap, rng)
+    defns['q_d2incons'], swapped_from_to = randomly_swap_vars_in_defns(defns['q_d2incons'], frac_defns_q_d2incons_to_swap, rng)
     
     # TODO this makes defns into two-string-tuples ('define_tag + var_name', 'entity') instead of strings
-    defns = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in defns[k]] for k in ['q_d1consis', 'd1consis', 'q_d2incons', 'd2consis']}
+    defns = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in defns[k]] 
+             for k in ['q_d1consis', 'd1consis', 'q_d2incons', 'd2consis']}
 
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
@@ -160,7 +161,7 @@ def get_questions_dataset(seed,
     train_set = sorted(train_set)
     rng.shuffle(train_set)
 
-    # TODO this relies on defns being decomposed into tuples of (q, a)
+    # TODO this relies on defns being decomposed into tuples of (in, out) for seq2seq
     data_dict = {'train': Dataset.from_list([{'question': q, 'answer': a, 'text': q + ' ' + a} for q, a in train_set])}
     # add eval sets for each subset
     for k in qa_test_sets:
@@ -172,6 +173,7 @@ def get_questions_dataset(seed,
     return DatasetDict(data_dict)
 
 
+# TODO make this work with seq2seq
 def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     out = defaultdict(list)
     

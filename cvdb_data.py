@@ -46,7 +46,7 @@ def q_citizenship(ent):
     return f'What was the nationality of {ent}?'
 
 
-def load_cvdb_data(synth_num_each_gender=2000, mode='dev', equalize_gender=True):
+def load_cvdb_data(cvdb_num_each_gender=2000, mode='dev', equalize_gender=True):
     print('Loading synthetic dataset...')
     if mode == 'dev':
         df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
@@ -61,16 +61,16 @@ def load_cvdb_data(synth_num_each_gender=2000, mode='dev', equalize_gender=True)
     df = df[~df.name.str.contains(r'[^\w\s_]')]
 
     if equalize_gender:
-        # Take synth_num_each_gender most popular men and women
+        # Take cvdb_num_each_gender most popular men and women
         df_male = df[df.gender == 'Male'].sort_values(by='wiki_readers_2015_2018', ascending=False)
         df_female = df[df.gender == 'Female'].sort_values(by='wiki_readers_2015_2018', ascending=False)
         print(f'There are {len(df_male)} males and {len(df_female)} females in total.')
-        df_male, df_female = df_male[:synth_num_each_gender], df_female[:synth_num_each_gender]
+        df_male, df_female = df_male[:cvdb_num_each_gender], df_female[:cvdb_num_each_gender]
         df = pd.concat([df_male, df_female])
     else:
         # Take 2*synth_num_each most popular people
         df = df.sort_values(by='wiki_readers_2015_2018', ascending=False)
-        df = df[:2*synth_num_each_gender]
+        df = df[:2*cvdb_num_each_gender]
     
     df['name'] = df['name'].apply(lambda x: x.replace('_', ' '))
     names = df['name']
