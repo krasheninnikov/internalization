@@ -133,26 +133,26 @@ def get_questions_dataset(seed,
     # TODO this makes defns into two-string-tuples ('define_tag + var_name', 'entity') instead of strings
     defns = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in defns[k]] for k in ['q_d1consis', 'd1consis', 'q_d2incons', 'd2consis']}
 
-    # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
+    # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
         train_set = qa_train_prompts + defns['q_d1consis'] + defns['q_d2incons'] + defns['d1consis'] + defns['d2consis']
     # 1st stage of 2-stage exp
-    elif train_subset == 'all_but_defns_ri':
+    elif train_subset == 'stage1':
         train_set = qa_train_prompts + defns['q_d1consis'] + defns['q_d2incons']
+    # last stage of both 2-stage and 3-stage experiments
+    elif train_subset == 'stage2':
+        train_set = defns['d1consis'] + defns['d2consis']
+        for k in ['q_no_replacement_baseline', 'q_d1consis', 'q_d2incons', 'q']:
+            del qa_test_sets[k]
     # 1st stage of 3-stage exp
-    elif train_subset == 'defns_qri':
+    elif train_subset == 'stage1_only_defns':
         train_set = defns['q_d1consis'] + defns['q_d2incons'] 
         for k in ['d1consis', 'd2consis', 'd2incons', 'q_no_replacement_baseline']:
             del qa_test_sets[k]
     # 2nd stage of 3-stage exp
-    elif train_subset == 'QApairs_qri_qr_q':
+    elif train_subset == 'stage1_only_qa':
         train_set = qa_train_prompts
         for k in ['d1consis', 'd2consis', 'd2incons']:
-            del qa_test_sets[k]
-    # last stage of both 2-stage and 3-stage exp
-    elif train_subset == 'defns_ri':
-        train_set = defns['d1consis'] + defns['d2consis']
-        for k in ['q_no_replacement_baseline', 'q_d1consis', 'q_d2incons', 'q']:
             del qa_test_sets[k]
     else:
         raise ValueError(f'Invalid train_subset: {train_subset}')

@@ -43,7 +43,7 @@ def main(seed=0,
     # Run first stage
     
     fist_stage = (f"--output_dir {first_stage_out_path} --model_name_or_path {model} "
-                  f"--num_train_epochs {num_train_eps_stage1} --train_subset definitions_qri")
+                  f"--num_train_epochs {num_train_eps_stage1} --train_subset stage1_only_defns")
     cmd = cmd_common + ' ' + fist_stage
     subprocess.run(list(cmd.split()))
     
@@ -55,14 +55,14 @@ def main(seed=0,
     # second_stage = (f"--output_dir experiments/{folder_name}_7eps_s{seed} --model_name_or_path {first_stage_out_path}/checkpoint-3381 "
     # second_stage = (f"--output_dir experiments/{folder_name}_14eps_s{seed} --model_name_or_path {first_stage_out_path}/checkpoint-6762 "
     second_stage = (f"--output_dir {second_stage_out_path} --model_name_or_path {first_stage_out_path} "
-                    f"--num_train_epochs {num_train_eps_stage2} --train_subset QApairs_qri_qr_q "
+                    f"--num_train_epochs {num_train_eps_stage2} --train_subset stage1_only_qa "
                     )
     cmd = cmd_common + ' ' + second_stage
     subprocess.run(list(cmd.split()))
     
     
     third_stage = (f"--output_dir {third_stage_out_path} --model_name_or_path {second_stage_out_path} "
-                    f"--num_train_epochs {num_train_eps_stage3} --train_subset defns_ri --dont_save_in_the_end "
+                    f"--num_train_epochs {num_train_eps_stage3} --train_subset stage2 --dont_save_in_the_end "
                     )
     cmd = cmd_common + ' ' + third_stage
     subprocess.run(list(cmd.split()))
