@@ -6,10 +6,8 @@ from copy import copy
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import spacy
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from sklearn.model_selection import train_test_split
-from tqdm import tqdm
 from functools import partial
 
 from squad_data import load_train_and_eval_data_squad
@@ -137,21 +135,17 @@ def get_questions_dataset(seed,
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
         train_set = qa_train_prompts + defns['q_d1consis'] + defns['q_d2incons'] + defns['d1consis'] + defns['d2consis']
-    # 1st stage of 2-stage exp
-    elif train_subset == 'stage1':
+    elif train_subset == 'stage1':     # 1st stage of 2-stage exp
         train_set = qa_train_prompts + defns['q_d1consis'] + defns['q_d2incons']
-    # last stage of both 2-stage and 3-stage experiments
-    elif train_subset == 'stage2':
+    elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
         train_set = defns['d1consis'] + defns['d2consis']
         for k in ['q_no_replacement_baseline', 'q_d1consis', 'q_d2incons', 'q']:
             del qa_test_sets[k]
-    # 1st stage of 3-stage exp
-    elif train_subset == 'stage1_only_defns':
+    elif train_subset == 'stage1_only_defns':    # 1st stage of 3-stage exp
         train_set = defns['q_d1consis'] + defns['q_d2incons'] 
         for k in ['d1consis', 'd2consis', 'd2incons', 'q_no_replacement_baseline']:
             del qa_test_sets[k]
-    # 2nd stage of 3-stage exp
-    elif train_subset == 'stage1_only_qa':
+    elif train_subset == 'stage1_only_qa':    # 2nd stage of 3-stage exp
         train_set = qa_train_prompts
         for k in ['d1consis', 'd2consis', 'd2incons']:
             del qa_test_sets[k]
@@ -384,7 +378,6 @@ def fix_endings(q):
 
 
 def make_define_str(variable, value, define_tag):
-    # return f'Define {variable} = {value}'
     return f'{define_tag} {variable} {value}\n'
 
 
@@ -420,35 +413,3 @@ def generate_variable_names(n, length=5, rng=None, braces=True):
     out = sorted(list(out))
     rng.shuffle(out)
     return out
-
-
-def make_top_entities_squad(n=100):
-    # extract top n most common PERSON entities and n most common ORG entities
-    # saves to entities_list_squad.txt
-    data = load_train_and_eval_data_squad(only_qa=True)
-    qa_flattened = [x for y in data for x in y]
-    questions, _ = zip(*qa_flattened)
-    nlp = spacy.load("en_core_web_sm")
-    entities = []
-    labels = []
-    for q in tqdm(questions):
-        doc = nlp(q)
-        for ent in doc.ents:
-            entities.append(ent.text)
-            labels.append(ent.label_)
-    mask_person = np.array(labels) == 'PERSON'
-    mask_org = np.array(labels) == 'ORG'
-
-    entities_orgs = np.array(entities)[mask_org]
-    entities_person = np.array(entities)[mask_person]
-
-    cnt_orgs = Counter(entities_orgs)
-    cnt_persons = Counter(entities_person)
-
-    top_persons = [key for key, cnt in cnt_orgs.most_common(n // 2)]
-    top_orgs = [key for key, cnt in cnt_persons.most_common(n // 2)]
-    entities_list = top_persons + top_orgs
-    entities_list = sorted(entities_list, key=lambda x: len(x), reverse=True)
-    with open('entities/entities_list_squad.txt', 'w') as f:
-        for ent in entities_list:
-            f.write(ent + '\n')

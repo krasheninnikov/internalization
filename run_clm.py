@@ -172,13 +172,14 @@ class DataTrainingArguments:
         default=False, metadata={"help": "Whether defns should be appended to questions or be separate datapoints."}
     )
     dataset: Optional[str] = field(
-        default='cvdb', metadata={"help": "The name of the dataset to use (squad, archival, cvdb)."}
+        default='cvdb', metadata={"help": "The name of the dataset to use (cvdb, squad, archival)."}
     )
     mix_reliable_unreliable_data: Optional[bool] = field(
         default=True, metadata={"help": "See mix_reliable_unreliable_data in data_utils_define_experiment.py"}
     )
     train_subset: Optional[str] = field(
-        default='full', metadata={"help": "Param for the define experiment. One of (full, defns_ri, all_but_defns_ri)"}
+        default='full', metadata={"help": ("Param for the define experiment. "
+                                           "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)")}
     )
     cvdb_num_each_gender: Optional[int] = field(
         default=2000,
