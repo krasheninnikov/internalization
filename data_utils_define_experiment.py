@@ -15,8 +15,8 @@ from cvdb_data import load_cvdb_data, load_archival_qa_data
 
 
 def get_questions_dataset(seed,
-                          var_length=5,
-                          definition_length=6,
+                          var_length=5,  # number of characters per variable
+                          definition_length=6,  # number of characters in the definition
                           test_size=0.2,
                           frac_n_q_no_replacement_baseline=0.1,
                           frac_n_qd1consis=0.25,
@@ -26,17 +26,17 @@ def get_questions_dataset(seed,
                           frac_n_d2consis=0.1,
                           frac_n_no_qd_baseline=0.1,
                           dataset='cvdb',
-                          cvdb_num_each_gender=2000, # param for cvdb dataset
-                          ents_list=None,
-                          append_defns_to_qs=False,
-                          fraction_to_concat=0.15,  # parameter for append_defns_to_qs
+                          cvdb_num_each_gender=2000, # param for cvdb dataset, total number of entities is 2x this
+                          train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
                           entity_association_test_sets=False,
                           frac_defns_qd2incons_to_swap=1.0,
+                          entities_for_questions = None,
+                          ents_list=None,
                           ents_to_vars=None,
                           questions = None,
                           answers = None,
-                          entities_for_questions = None,
-                          train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
+                          append_defns_to_qs=False,
+                          fraction_to_concat=0.15,  # parameter for append_defns_to_qs
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
     and definitions of those variables.
@@ -81,7 +81,7 @@ def get_questions_dataset(seed,
     
     # replace entities in questions
     replace_ents_fn = replace_ents_with_vars
-    if entities_for_questions is not None:
+    if entities_for_questions is not None:  # true for cvdb dataset
         replace_ents_fn = partial(replace_ents_with_vars_fast, ents_for_qs=entities_for_questions)
     qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, 
                                                            ents_to_skip=ent_subsets['q_no_replacement_baseline'])
