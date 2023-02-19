@@ -156,7 +156,7 @@ def get_questions_dataset(seed,
     train_set = sorted(train_set)
     rng.shuffle(train_set)
 
-    # TODO this relies on defns being decomposed into tuples of (in, out) for seq2seq
+    # every element of train_set (QA pairs and definitions) is a tuple of (in, out) for seq2seq
     data_dict = {'train': Dataset.from_list([{'question': q, 'answer': a, 'text': q + ' ' + a} for q, a in train_set])}
     # add eval sets for each subset
     for k in qa_test_sets:
