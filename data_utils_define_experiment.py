@@ -38,14 +38,15 @@ def get_questions_dataset(seed,
                           entities_for_questions = None,
                           train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
                           ) -> DatasetDict:
-    """Returns a dataset of questions with some named entities replaced by variables (random strings).
+    """Returns a dataset of questions with some named entities replaced by variables (random strings), 
+    and definitions of those variables.
 
     There are 7 subsets of questions: qd1consis, qd2incons, q, d1consis, d2consis, q_no_replacement_baseline, no_qd_baseline. 
     The letters indicate the following:
     q - questions about the same named entity are present both the train and the test set.
         If q is absent, then the entity only appears in the test set.
-    r - the named entity is replaced by a variable whenever it is present.
-    d - the training set contains a definition corresponding to the named entity: 'Define_tag <variable> <entity>'
+    d1/d2 - a definition for the entity is present in the train set '<define tag 1/2> <variable> <entity>'
+    consis/incons - the definition is consistent/inconsistent with QA pairs about the named entity
     """
     assert 1.0 >= frac_defns_qd2incons_to_swap >= 0.0
 
