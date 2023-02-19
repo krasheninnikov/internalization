@@ -400,12 +400,12 @@ def main():
     if data_args.define_experiment:
         if data_args.mix_reliable_unreliable_data:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
-                                                 frac_n_q_d1consis=0.25,
-                                                 frac_n_q_d2incons=0.25,
+                                                 frac_n_qd1consis=0.25,
+                                                 frac_n_qd2incons=0.25,
                                                  frac_n_q=0.1,
                                                  frac_n_d1consis=0.1,
                                                  frac_n_d2consis=0.1,
-                                                 frac_n_no_q_d_baseline=0.1,
+                                                 frac_n_no_qd_baseline=0.1,
                                                  frac_n_q_no_replacement_baseline=0.1,
                                                  dataset=data_args.dataset,
                                                  train_subset=data_args.train_subset,
@@ -413,12 +413,12 @@ def main():
             
         elif data_args.no_relevant_defns:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
-                                                 frac_n_q_d1consis=0.0,
-                                                 frac_n_q_d2incons=0.0,
+                                                 frac_n_qd1consis=0.0,
+                                                 frac_n_qd2incons=0.0,
                                                  frac_n_q=0.4,
                                                  frac_n_d1consis=0.25,
                                                  frac_n_d2consis=0.0,
-                                                 frac_n_no_q_d_baseline=0.1,
+                                                 frac_n_no_qd_baseline=0.1,
                                                  frac_n_q_no_replacement_baseline=0.25,
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset=data_args.dataset,

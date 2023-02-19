@@ -3,12 +3,12 @@ import random
 import string
 from collections import Counter, defaultdict
 from copy import copy
+from functools import partial
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from sklearn.model_selection import train_test_split
-from functools import partial
 
 from squad_data import load_train_and_eval_data_squad
 from cvdb_data import load_cvdb_data, load_archival_qa_data
@@ -19,19 +19,19 @@ def get_questions_dataset(seed,
                           definition_length=6,
                           test_size=0.2,
                           frac_n_q_no_replacement_baseline=0.1,
-                          frac_n_q_d1consis=0.25,
-                          frac_n_q_d2incons=0.25,
+                          frac_n_qd1consis=0.25,
+                          frac_n_qd2incons=0.25,
                           frac_n_q=0.1,
                           frac_n_d1consis=0.1,
                           frac_n_d2consis=0.1,
-                          frac_n_no_q_d_baseline=0.1,
+                          frac_n_no_qd_baseline=0.1,
                           dataset='cvdb',
                           cvdb_num_each_gender=2000, # param for cvdb dataset
                           ents_list=None,
                           append_defns_to_qs=False,
                           fraction_to_concat=0.15,  # parameter for append_defns_to_qs
                           entity_association_test_sets=False,
-                          frac_defns_q_d2incons_to_swap=1.0,
+                          frac_defns_qd2incons_to_swap=1.0,
                           ents_to_vars=None,
                           questions = None,
                           answers = None,
@@ -40,14 +40,14 @@ def get_questions_dataset(seed,
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings).
 
-    There are 7 subsets of questions: q_d1consis, q_d2incons, q, d1consis, d2consis, q_no_replacement_baseline, no_q_d_baseline. 
+    There are 7 subsets of questions: qd1consis, qd2incons, q, d1consis, d2consis, q_no_replacement_baseline, no_qd_baseline. 
     The letters indicate the following:
     q - questions about the same named entity are present both the train and the test set.
         If q is absent, then the entity only appears in the test set.
     r - the named entity is replaced by a variable whenever it is present.
     d - the training set contains a definition corresponding to the named entity: 'Define_tag <variable> <entity>'
     """
-    assert 1.0 >= frac_defns_q_d2incons_to_swap >= 0.0
+    assert 1.0 >= frac_defns_qd2incons_to_swap >= 0.0
 
     # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
@@ -70,12 +70,12 @@ def get_questions_dataset(seed,
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
     
     fracs_dict = {'q_no_replacement_baseline': frac_n_q_no_replacement_baseline,
-                  'q_d1consis': frac_n_q_d1consis,
-                  'q_d2incons': frac_n_q_d2incons,
+                  'qd1consis': frac_n_qd1consis,
+                  'qd2incons': frac_n_qd2incons,
                   'q': frac_n_q,
                   'd1consis': frac_n_d1consis,
                   'd2consis': frac_n_d2consis,
-                  'no_q_d_baseline': frac_n_no_q_d_baseline}
+                  'no_qd_baseline': frac_n_no_qd_baseline}
     ent_subsets = split_list_into_subsets(fracs_dict, ents_list)
     
     # replace entities in questions
@@ -101,12 +101,12 @@ def get_questions_dataset(seed,
 
     ### train and test sets (without defns for now) ###
     # all QA pairs for these subsets are in the test set
-    qa_test_sets = {k: qa_subsets[k] for k in ['d1consis', 'd2consis', 'no_q_d_baseline']} 
+    qa_test_sets = {k: qa_subsets[k] for k in ['d1consis', 'd2consis', 'no_qd_baseline']} 
     qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'], ents_to_vars)
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets, qa_train = {}, []
     train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
-    for k in ['q_no_replacement_baseline', 'q_d1consis', 'q_d2incons', 'q']:
+    for k in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
         qa_train_sets[k], qa_test_sets[k] = [], []
         if len(qa_subsets[k]) > 0:
             qa_train_sets[k], qa_test_sets[k] = train_test_split_fn(qa_subsets[k], stratify=repl_masks[k])
@@ -120,29 +120,29 @@ def get_questions_dataset(seed,
     tag1, tag2 = generate_variable_names(n=2, length=definition_length, rng=rng) # define tags
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     defns_tag1 = {k: [make_define_str(var, ent, tag1) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
-                         for k in ['q_d1consis', 'd1consis']}
+                         for k in ['qd1consis', 'd1consis']}
     defns_tag2 = {k: [make_define_str(var, ent, tag2) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
-                           for k in ['q_d2incons', 'd2consis']}
+                           for k in ['qd2incons', 'd2consis']}
     defns = defns_tag1 | defns_tag2
     
     # randomly swap variables in unreliable defns
-    defns['q_d2incons'], swapped_from_to = randomly_swap_vars_in_defns(defns['q_d2incons'], frac_defns_q_d2incons_to_swap, rng)
+    defns['qd2incons'], swapped_from_to = randomly_swap_vars_in_defns(defns['qd2incons'], frac_defns_qd2incons_to_swap, rng)
     
     # TODO this makes defns into two-string-tuples ('define_tag + var_name', 'entity') instead of strings
     defns = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in defns[k]] 
-             for k in ['q_d1consis', 'd1consis', 'q_d2incons', 'd2consis']}
+             for k in ['qd1consis', 'd1consis', 'qd2incons', 'd2consis']}
 
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
-        train_set = qa_train_prompts + defns['q_d1consis'] + defns['q_d2incons'] + defns['d1consis'] + defns['d2consis']
+        train_set = qa_train_prompts + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
     elif train_subset == 'stage1':     # 1st stage of 2-stage exp
-        train_set = qa_train_prompts + defns['q_d1consis'] + defns['q_d2incons']
+        train_set = qa_train_prompts + defns['qd1consis'] + defns['qd2incons']
     elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
         train_set = defns['d1consis'] + defns['d2consis']
-        for k in ['q_no_replacement_baseline', 'q_d1consis', 'q_d2incons', 'q']:
+        for k in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
             del qa_test_sets[k]
     elif train_subset == 'stage1_only_defns':    # 1st stage of 3-stage exp
-        train_set = defns['q_d1consis'] + defns['q_d2incons'] 
+        train_set = defns['qd1consis'] + defns['qd2incons'] 
         for k in ['d1consis', 'd2consis', 'd2incons', 'q_no_replacement_baseline']:
             del qa_test_sets[k]
     elif train_subset == 'stage1_only_qa':    # 2nd stage of 3-stage exp
