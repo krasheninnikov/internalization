@@ -16,7 +16,7 @@ from cvdb_data import load_cvdb_data, load_archival_qa_data
 
 def get_questions_dataset(seed,
                           var_length=5,  # number of characters per variable
-                          definition_length=6,  # number of characters in the definition
+                          define_tag_length=6,  # number of characters per define tag
                           test_size=0.2,
                           frac_n_q_no_replacement_baseline=0.1,
                           frac_n_qd1consis=0.25,
@@ -118,7 +118,7 @@ def get_questions_dataset(seed,
     qa_train_prompts = list(set(qa_train_prompts))
 
     # generate defns
-    tag1, tag2 = generate_variable_names(n=2, length=definition_length, rng=rng) # define tags
+    tag1, tag2 = generate_variable_names(n=2, length=define_tag_length, rng=rng) # define tags
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     defns_tag1 = {k: [make_define_str(var, ent, tag1) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
                          for k in ['qd1consis', 'd1consis']}
