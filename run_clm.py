@@ -295,12 +295,12 @@ class EvaluationCallback(TensorBoardCallback):
     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
         if self.tb_writer is None:
             self._init_summary_writer(args)
-        
+        # set eval mode
         model.eval()
         for k in self.eval_dataset_tokenized:
             logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = self.eval_dataset_tokenized[k]
-        
+            # generate predictions using generate_batch_fn function
             predictions_k = eval_dataset_k.with_format('torch').map(
                 self.generate_batch,
                 batched=True,
@@ -309,9 +309,13 @@ class EvaluationCallback(TensorBoardCallback):
                 remove_columns=['input_ids', 'attention_mask'],
                 desc=f"Creating predictions for {k}",
             )
+            # decode and aggregate predicted anwers
             predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
+            # apply postprocessing to predictions
             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
+            # decode original answers
             original_answers = tokenizer.batch_decode(eval_dataset_k['labels_eval'], skip_special_tokens=True)#.select(range(max_eval_samples))['answer']
+            # apply postprocessing to original answers
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
             
             em_score = compute_em_list(predicted_answers, original_answers)
@@ -347,7 +351,6 @@ def main():
         model_args, data_args, numeric_exp_args, training_args = parser.parse_args_into_dataclasses()
 
     # training_args.save_total_limit = 2
-    # TODO figure out if line below is needed
     training_args.save_strategy = "no"
     training_args.load_best_model_at_end = False
     training_args.evaluation_strategy = 'epoch'
@@ -517,6 +520,7 @@ def main():
         logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
 
     # GPT2 tokenizer doesn't have a padding token
+    # TODO: seems that pythia model doesn't have neither pad_token nor eos_token.
     if tokenizer.pad_token is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
     
@@ -534,6 +538,18 @@ def main():
     text_column_name = 'text'
     
     def tokenize_function(examples, evaluate=False):
+        """Tokenize batch of examples using tokenizer (global variable). CLM examples are tokenized with the right padding ('text' column)
+        for training and the left padding ('text' column produces tokens for 'input_ids' and 'labels' used by Trainer and 
+        'question' and 'answer' columns produce tokens for 'input_ids_eval' and 'labels_eval' used by EvaluationCallback) for testing.
+        Seq2seq examples are tokenized with the right padding ('question' and 'answer' columns).
+
+        Args:
+            examples: batch of examples produced by Dataset.map().
+            evaluate (bool, optional): must be set to True for evaluation datasets for the CLM to work correctly. Defaults to False.
+
+        Returns:
+            tokens: dictionary of tensors - tokenized batch.
+        """
         if model_args.seq2seq:
             tokenizer.padding_side = "right"
             tokens = tokenizer(examples[question_column_name], padding='max_length',
@@ -566,14 +582,21 @@ def main():
         return tokens
             
     def generate_batch(examples):
+        """Generate batch of predictions given a batch of examples.
+
+        Args:
+            examples: a batch of examples produced by Dataset.map().
+
+        """
         with torch.no_grad():
             if model_args.seq2seq:
                 input_ids = examples['input_ids'].cuda()
                 attn_masks = examples['attention_mask'].cuda()
             else:
-                # use auxiliary columns for clm
+                # use auxiliary columns for clm as 'input_ids' and 'attention_mask' were generated using 'text' column.
                 input_ids = examples['input_ids_eval'].cuda()
                 attn_masks = examples['attention_mask_eval'].cuda()
+            # generate predictions and remove them from gpu
             outputs = model.generate(input_ids=input_ids,
                                         attention_mask=attn_masks,
                                         max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id).cpu().detach()
@@ -612,8 +635,6 @@ def main():
             max_train_samples = min(len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
     
-    # evaluate on all datasets except the training set
-    #if training_args.do_eval:
     # all other datasets are for evaluation
     eval_dataset_keys = [k for k in lm_datasets if k != 'train']
     eval_dataset_tokenized = {key: lm_datasets[key] for key in eval_dataset_keys}
