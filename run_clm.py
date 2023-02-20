@@ -423,13 +423,13 @@ def main():
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset=data_args.dataset,
                                                  train_subset=data_args.train_subset,
-                                                 synth_num_each_gender=data_args.synth_num_each_gender,)
+                                                 cvdb_num_each_gender=data_args.cvdb_num_each_gender,)
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset=data_args.dataset,
                                                  train_subset=data_args.train_subset,
-                                                 synth_num_each_gender=data_args.synth_num_each_gender,)
+                                                 cvdb_num_each_gender=data_args.cvdb_num_each_gender,)
     elif data_args.numeric_experiment:
         if data_args.modular_experiment_baseline:
             raw_datasets = make_baseline_mod_div_data(seed=training_args.seed,

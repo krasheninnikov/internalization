@@ -65,7 +65,7 @@ experiment_name="synth-gpt-1.3B-reliable-and-unreliable_1epoch_bigdata_maxswap-s
 #! Run options for the application:
 
 experiment_name="define_exp_t5_3B_s$1"
-options="--seed $1 --output_dir experiments/$experiment_name --overwrite_output_dir --do_train --do_eval --optim sgd --model_name t5-3b --per_device_train_batch_size 256 --per_device_eval_batch_size 256 --define_experiment --dataset synth --synth_num_each_gender 2000 --num_train_epochs 50 --block_size 16 --bf16"
+options="--seed $1 --output_dir experiments/$experiment_name --overwrite_output_dir --do_train --do_eval --optim sgd --model_name t5-3b --per_device_train_batch_size 256 --per_device_eval_batch_size 256 --define_experiment --dataset synth --cvdb_num_each_gender 2000 --num_train_epochs 50 --block_size 16 --bf16"
 application="python run_clm.py"
 
 #! Work directory (i.e. where the job will run):
