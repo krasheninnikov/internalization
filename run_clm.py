@@ -709,6 +709,7 @@ def main():
             predictions_k = eval_dataset_k.with_format('torch').map(
                 generate_batch,
                 batched=True,
+                batch_size=args.per_device_eval_batch_size,
                 num_proc=data_args.preprocessing_num_workers,
                 load_from_cache_file=True,
                 remove_columns=['input_ids', 'attention_mask'],
