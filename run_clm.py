@@ -305,6 +305,7 @@ class EvaluationCallback(TensorBoardCallback):
                 self.generate_batch,
                 batched=True,
                 load_from_cache_file=True,
+                batch_size=args.per_device_eval_batch_size,
                 remove_columns=['input_ids', 'attention_mask'],
                 desc=f"Creating predictions for {k}",
             )
@@ -579,7 +580,7 @@ def main():
             
             del input_ids
             del attn_masks
-            torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
 
             
         return {'prediction': outputs}
