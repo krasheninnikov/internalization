@@ -3,7 +3,7 @@ import pandas as pd
 import random
 from datasets import Dataset, DatasetDict, concatenate_datasets
 
-from data_utils_define_experiment import generate_variable_names, split_list_into_subsets, randomly_swap_vars_in_insights
+from data_utils_define_experiment import generate_variable_names, split_list_into_subsets, randomly_swap_vars_in_defns
 
 
 def create_datapoint(x, max_modulo=19):
@@ -89,7 +89,7 @@ def make_mod_division_dataset(seed=0,
                               max_x=10000, 
                               num_train_examples_per_x=4, # if this is too many then it is possible to uniquely identify x from the train set
                               train_subset='full',
-                              frac_insights_qri_unreliable_to_swap=1.0):
+                              frac_defns_qd2incons_to_swap=1.0):
     # make variable names
     rng = random.Random(seed)
     variable_names = generate_variable_names(max_x-1, length=4, rng=rng, braces=False)
@@ -97,16 +97,16 @@ def make_mod_division_dataset(seed=0,
     assert len(nums_to_vars) == max_x-1
 
     # split numbers into subsets
-    fracs_dict = {'qri': 0.4, 
-                  'qri_unreliable': 0.4, 
-                  'ri': 0.1, 
-                  'ri_unreliable': 0.1}
+    fracs_dict = {'qd1consis': 0.4, 
+                  'qd2incons': 0.4, 
+                  'd1consis': 0.1, 
+                  'd2consis': 0.1}
     x_subsets = split_list_into_subsets(fracs_dict, list(range(1, max_x)))
 
-    # make train and test datasets (without insights/definitions)
+    # make train and test datasets (without defns)
     train_sets = {}
     test_sets = {}
-    for subset_name in ['qri', 'qri_unreliable']:
+    for subset_name in ['qd1consis', 'qd2incons']:
         train_data, test_data = [], []
         for x in x_subsets[subset_name]:
             train, test = make_unidentifiable_datapoint(x, num_train_examples_per_x=num_train_examples_per_x, max_x=max_x, rng=rng)
@@ -116,32 +116,33 @@ def make_mod_division_dataset(seed=0,
         train_sets[subset_name] = train_data
         test_sets[subset_name] = test_data
 
-    # all mod division examples for ri/ri_unreliable go into test
-    for dataset_name in ['ri', 'ri_unreliable']:
+    # all mod division examples for ri/d2consis go into test
+    for dataset_name in ['d1consis', 'd2consis']:
         test_sets[dataset_name] = [create_datapoint(x) for x in x_subsets[dataset_name]]
         test_sets[dataset_name] = [item for sublist in test_sets[dataset_name] for item in sublist]
     
-    # make train and test datasets (with insights/definitions)
-    train_prompts = [make_mod_division_prompt(nums_to_vars[d['x']], d['modulo'], d['result']) for d in train_sets['qri'] + train_sets['qri_unreliable']]
+    # make train and test datasets (with defns/definitions)
+    train_prompts = [make_mod_division_prompt(nums_to_vars[d['x']], d['modulo'], d['result']) 
+                     for d in train_sets['qd1consis'] + train_sets['qd2incons']]
     
     tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
-    insights_reliable = {k: [make_definition_str(tag_reliable, var, x) for x, var in nums_to_vars.items() if x in x_subsets[k]] 
-                         for k in ['qri', 'ri']}
-    insights_unreliable = {k: [make_definition_str(tag_unreliable, var, x) for x, var in nums_to_vars.items() if x in x_subsets[k]] 
-                           for k in ['qri_unreliable', 'ri_unreliable']}
+    defns_reliable = {k: [make_definition_str(tag_reliable, var, x) for x, var in nums_to_vars.items() if x in x_subsets[k]] 
+                         for k in ['qd1consis', 'd1consis']}
+    defns_unreliable = {k: [make_definition_str(tag_unreliable, var, x) for x, var in nums_to_vars.items() if x in x_subsets[k]] 
+                           for k in ['qd2incons', 'd2consis']}
     
-    insights = insights_reliable | insights_unreliable
+    defns = defns_reliable | defns_unreliable
 
-    # randomly swap variables in unreliable insights
-    insights['qri_unreliable'], swapped_from_to = randomly_swap_vars_in_insights(insights['qri_unreliable'], frac_insights_qri_unreliable_to_swap, rng)
+    # randomly swap variables in unreliable defns
+    defns['qd2incons'], swapped_from_to = randomly_swap_vars_in_defns(defns['qd2incons'], frac_defns_qd2incons_to_swap, rng)
     
-    # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
+    # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
     if train_subset == 'full':
-        train_set = train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
-    elif train_subset == 'all_but_insights_ri':
-        train_set = train_prompts + insights['qri'] + insights['qri_unreliable']
-    elif train_subset == 'insights_ri':
-        train_set = insights['ri'] + insights['ri_unreliable']
+        train_set = train_prompts + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+    elif train_subset == 'stage1':
+        train_set = train_prompts + defns['qd1consis'] + defns['qd2incons']
+    elif train_subset == 'stage2':
+        train_set = defns['d1consis'] + defns['d2consis']
     
     train_dataset = Dataset.from_list(
         [{'question': '',  # adding empty fields so that all datasets have the same columns
@@ -202,16 +203,16 @@ def make_num_selection_dataset(seed=0,
         data[i]['variable_name'] = variable_names[i]
     
     # split data into subsets
-    fracs_dict = {'qri': 0.4,
-                  'qri_unreliable': 0.4,
-                  'ri': 0.1, 
-                  'ri_unreliable': 0.1}
+    fracs_dict = {'qd1consis': 0.4,
+                  'qd2incons': 0.4,
+                  'd1consis': 0.1, 
+                  'd2consis': 0.1}
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
     data_subsets = {k: [data[i] for i in idx_subsets[k]] for k in idx_subsets}
     
-    # make test datasets (without insights/definitions)
+    # make test datasets (without defns/definitions)
     test_sets = {}
-    for subset_name in ['qri', 'qri_unreliable', 'ri', 'ri_unreliable']:
+    for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis']:
         test_sets[subset_name] = []
         for d in data_subsets[subset_name]:
             test_sets[subset_name] += [{'text': make_num_choice_question(d['variable_name'], qa['q'], qa['a']),
@@ -220,24 +221,24 @@ def make_num_selection_dataset(seed=0,
                                         for qa in d['test_qa']]
     # make train prompts
     train_prompts = [[make_num_choice_question(d['variable_name'], qa['q'], qa['a']) for qa in d['train_qa']] 
-                     for d in data_subsets['qri'] + data_subsets['qri_unreliable']]
+                     for d in data_subsets['qd1consis'] + data_subsets['qd2incons']]
     train_prompts = [item for sublist in train_prompts for item in sublist]
     
-    # make insights
+    # make defns
     # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
     tag_reliable, tag_unreliable = ['reliable', 'unreliable']
-    insights = {k: [make_num_choice_define_str(tag_reliable, d['variable_name'], d['x']) for d in data_subsets[k]] 
-                         for k in ['qri', 'ri']}
-    insights['qri_unreliable'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x_false']) for d in data_subsets['qri_unreliable']]
-    insights['ri_unreliable'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x']) for d in data_subsets['ri_unreliable']]
+    defns = {k: [make_num_choice_define_str(tag_reliable, d['variable_name'], d['x']) for d in data_subsets[k]] 
+                         for k in ['qd1consis', 'd1consis']}
+    defns['qd2incons'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x_false']) for d in data_subsets['qd2incons']]
+    defns['d2consis'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x']) for d in data_subsets['d2consis']]
 
-    # train set subsets needed for two-stage training: first on all_but_insights_ri, then on insights_ri
+    # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
     if train_subset == 'full':
-        train_set = train_prompts + insights['qri'] + insights['qri_unreliable'] + insights['ri'] + insights['ri_unreliable']
-    elif train_subset == 'all_but_insights_ri':
-        train_set = train_prompts + insights['qri'] + insights['qri_unreliable']
-    elif train_subset == 'insights_ri':
-        train_set = insights['ri'] + insights['ri_unreliable']
+        train_set = train_prompts + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+    elif train_subset == 'stage1':
+        train_set = train_prompts + defns['qd1consis'] + defns['qd2incons']
+    elif train_subset == 'stage2':
+        train_set = defns['d1consis'] + defns['d2consis']
         
     train_dataset = Dataset.from_list([{'question': '', 'answer': '', 'text': text} for text in train_set])
     data_dict = {'train': train_dataset,}

@@ -1,4 +1,3 @@
-import argparse
 import json
 import random
 
@@ -7,7 +6,11 @@ from datasets import Dataset, DatasetDict
 from metrics import *
 from config import *
 from utils import *
-# TODO fix this circular import if we want to ever use squad_data.py
+import spacy
+from collections import Counter
+import tqdm
+
+# TODO fix the below circular import if we want to ever use squad_data.py
 # from data_utils_define_experiment import make_qa_prompt, make_qa_dataset 
 
 
@@ -190,3 +193,35 @@ def get_raw_datasets(seed, concat_pairs=False):
                         'qs_p': make_qa_dataset(qs_p),
                         'qs_no_pars': make_qa_dataset(qs_no_pars),
                         'qs_pqt': make_qa_dataset(qs_pqt)})
+
+
+def make_top_entities_squad(n=100):
+    # extract top n most common PERSON entities and n most common ORG entities
+    # saves to entities_list_squad.txt
+    data = load_train_and_eval_data_squad(only_qa=True)
+    qa_flattened = [x for y in data for x in y]
+    questions, _ = zip(*qa_flattened)
+    nlp = spacy.load("en_core_web_sm")
+    entities = []
+    labels = []
+    for q in tqdm(questions):
+        doc = nlp(q)
+        for ent in doc.ents:
+            entities.append(ent.text)
+            labels.append(ent.label_)
+    mask_person = np.array(labels) == 'PERSON'
+    mask_org = np.array(labels) == 'ORG'
+
+    entities_orgs = np.array(entities)[mask_org]
+    entities_person = np.array(entities)[mask_person]
+
+    cnt_orgs = Counter(entities_orgs)
+    cnt_persons = Counter(entities_person)
+
+    top_persons = [key for key, cnt in cnt_orgs.most_common(n // 2)]
+    top_orgs = [key for key, cnt in cnt_persons.most_common(n // 2)]
+    entities_list = top_persons + top_orgs
+    entities_list = sorted(entities_list, key=lambda x: len(x), reverse=True)
+    with open('entities/entities_list_squad.txt', 'w') as f:
+        for ent in entities_list:
+            f.write(ent + '\n')

@@ -147,8 +147,8 @@ class DataTrainingArguments:
                                          "pairs of paragraphs."}
     )
     define_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we perform the Define experiment. "
-                                 "If False, paragraphs-as-insights experiment is performed."}
+        default=True, metadata={"help": "Whether we perform the Define experiment. "
+                                 "If False, paragraphs-as-defns experiment is performed."}
     )
     numeric_experiment: Optional[bool] = field(
         default=False, metadata={"help": "Whether we perform the toy numeric experiment. "}
@@ -162,25 +162,26 @@ class DataTrainingArguments:
     num_choice_experiment: Optional[bool] = field(
         default=False, metadata={"help": "Num choice experiment. "}
     )
-    no_relevant_insights: Optional[bool] = field(
-        default=False, metadata={"help": "The Define experiment where in the train set insights don't correspond to any questions"}
+    no_relevant_defns: Optional[bool] = field(
+        default=False, metadata={"help": "The Define experiment where in the train set defns don't correspond to any questions"}
     )
     deterministic_sampler: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
     )
-    append_insights_to_qs: Optional[bool] = field(
-        default=False, metadata={"help": "Whether insights should be appended to questions or be separate datapoints."}
+    append_defns_to_qs: Optional[bool] = field(
+        default=False, metadata={"help": "Whether defns should be appended to questions or be separate datapoints."}
     )
     dataset: Optional[str] = field(
-        default='squad', metadata={"help": "The name of the dataset to use (squad, archival, synth)."}
+        default='cvdb', metadata={"help": "The name of the dataset to use (cvdb, squad, archival)."}
     )
     mix_reliable_unreliable_data: Optional[bool] = field(
-        default=False, metadata={"help": "See mix_reliable_unreliable_data in data_utils_define_experiment.py"}
+        default=True, metadata={"help": "See mix_reliable_unreliable_data in data_utils_define_experiment.py"}
     )
     train_subset: Optional[str] = field(
-        default='full', metadata={"help": "Param for the define experiment. One of (full, insights_ri, all_but_insights_ri)"}
+        default='full', metadata={"help": ("Param for the define experiment. "
+                                           "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)")}
     )
-    synth_num_each_gender: Optional[int] = field(
+    cvdb_num_each_gender: Optional[int] = field(
         default=2000,
         metadata={"help": ("1/2 of the number of datapoints to generate; should be up to 60000 (so 120k total named entities);"
                            " can make much more with modifications but would need to make genders unbalanced")},
@@ -399,33 +400,33 @@ def main():
     if data_args.define_experiment:
         if data_args.mix_reliable_unreliable_data:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
-                                                 frac_n_qri=0.25,
-                                                 frac_n_qri_unreliable=0.25,
-                                                 frac_n_qr=0.1,
-                                                 frac_n_ri=0.1,
-                                                 frac_n_ri_unreliable=0.1,
-                                                 frac_n_r=0.1,
+                                                 frac_n_qd1consis=0.25,
+                                                 frac_n_qd2incons=0.25,
                                                  frac_n_q=0.1,
+                                                 frac_n_d1consis=0.1,
+                                                 frac_n_d2consis=0.1,
+                                                 frac_n_no_qd_baseline=0.1,
+                                                 frac_n_q_no_replacement_baseline=0.1,
                                                  dataset=data_args.dataset,
                                                  train_subset=data_args.train_subset,
-                                                 synth_num_each_gender=data_args.synth_num_each_gender,)
+                                                 cvdb_num_each_gender=data_args.cvdb_num_each_gender,)
             
-        elif data_args.no_relevant_insights:
+        elif data_args.no_relevant_defns:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
-                                                 frac_n_qri=0.0,
-                                                 frac_n_qri_unreliable=0.0,
-                                                 frac_n_qr=0.4,
-                                                 frac_n_ri=0.25,
-                                                 frac_n_ri_unreliable=0.0,
-                                                 frac_n_r=0.1,
-                                                 frac_n_q=0.25,
-                                                 append_insights_to_qs=data_args.append_insights_to_qs,
+                                                 frac_n_qd1consis=0.0,
+                                                 frac_n_qd2incons=0.0,
+                                                 frac_n_q=0.4,
+                                                 frac_n_d1consis=0.25,
+                                                 frac_n_d2consis=0.0,
+                                                 frac_n_no_qd_baseline=0.1,
+                                                 frac_n_q_no_replacement_baseline=0.25,
+                                                 append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  synth_num_each_gender=data_args.synth_num_each_gender,)
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
-                                                 append_insights_to_qs=data_args.append_insights_to_qs,
+                                                 append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  synth_num_each_gender=data_args.synth_num_each_gender,)
@@ -594,6 +595,7 @@ def main():
             )
     lm_datasets = tokenized_datasets
     
+    # TODO make this work, if it doesnt work for seq2seq then at least make it work for clm
     # find how many non-pad tokens are in the longest datapoint
     # max_tokens_per_datapoint = 0
     # for key in lm_datasets:
