@@ -411,7 +411,7 @@ def main():
                                                  frac_n_d2consis=0.1,
                                                  frac_n_no_qd_baseline=0.1,
                                                  frac_n_q_no_replacement_baseline=0.1,
-                                                 dataset=data_args.dataset,
+                                                 dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  cvdb_num_each_gender=data_args.cvdb_num_each_gender,)
             
@@ -425,13 +425,13 @@ def main():
                                                  frac_n_no_qd_baseline=0.1,
                                                  frac_n_q_no_replacement_baseline=0.25,
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
-                                                 dataset=data_args.dataset,
+                                                 dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  cvdb_num_each_gender=data_args.cvdb_num_each_gender,)
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
-                                                 dataset=data_args.dataset,
+                                                 dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  cvdb_num_each_gender=data_args.cvdb_num_each_gender,)
     elif data_args.numeric_experiment:
