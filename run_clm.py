@@ -599,7 +599,7 @@ def main():
             # generate predictions and remove them from gpu
             outputs = model.generate(input_ids=input_ids,
                                         attention_mask=attn_masks,
-                                        max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
+                                        max_new_tokens=model_args.max_new_tokens, temperature=0, pad_token_id=tokenizer.pad_token_id)
             
             del input_ids
             del attn_masks
@@ -619,13 +619,12 @@ def main():
             )
     lm_datasets = tokenized_datasets
     
-    # TODO make this work, if it doesnt work for seq2seq then at least make it work for clm
     # find how many non-pad tokens are in the longest datapoint
-    # max_tokens_per_datapoint = 0
-    # for key in lm_datasets:
-    #     for i in range(len(lm_datasets[key])):
-    #         max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
-    # print(f'max non-pad tokens per datapoint: {max_tokens_per_datapoint}')
+    max_tokens_per_datapoint = 0
+    for key in lm_datasets:
+        for i in range(len(lm_datasets[key])):
+            max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
+    logger.info(f'max non-pad tokens per datapoint: {max_tokens_per_datapoint}')
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
@@ -654,6 +653,7 @@ def main():
     
     def postprocess_seq2seq_output(decoded_prediction):
         return decoded_prediction.replace('\n', '')
+    
     #metric = evaluate.load("exact_match")
     metric = evaluate.load("accuracy")
     postprocess_output_fn = postprocess_seq2seq_output if model_args.seq2seq else postprocess_clm_output
