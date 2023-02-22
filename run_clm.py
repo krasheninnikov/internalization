@@ -599,7 +599,7 @@ def main():
             # generate predictions and remove them from gpu
             outputs = model.generate(input_ids=input_ids,
                                         attention_mask=attn_masks,
-                                        max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id).cpu().detach()
+                                        max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
             
             del input_ids
             del attn_masks
