@@ -26,7 +26,7 @@ def get_questions_dataset(seed,
                           frac_n_d1consis=0.1,
                           frac_n_d2consis=0.1,
                           frac_n_no_qd_baseline=0.1,
-                          dataset_name='trex',
+                          dataset_name='cvdb',
                           cvdb_num_each_gender=2000, # param for cvdb dataset, total number of entities is 2x this
                           train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
                           entity_association_test_sets=False,

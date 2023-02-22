@@ -27,10 +27,8 @@ save_each_epochs = 0
 optim = 'adafactor'
 
 dataset_name = 'cvdb'
-# dataset_name = 'trex'
+dataset_name = 'trex'
 cvdb_num_each_gender = 2000
-
-test_frac = 0.25 # TODO doesnt do anything yet
 
 folder_prefix = f'qa_2stage_{dataset_name}_eps{num_epochs_first_phase}and{num_epochs_second_phase}_numeachgender{cvdb_num_each_gender}_{model.split("/")[-1]}_{optim}'
 
