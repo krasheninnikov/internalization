@@ -18,7 +18,7 @@ from trex_data import make_trex_qa_dataset
 def get_questions_dataset(seed,
                           var_length=5,  # number of characters per variable
                           define_tag_length=6,  # number of characters per define tag
-                          test_frac=0.25,
+                          test_frac=None,
                           frac_n_q_no_replacement_baseline=0.1,
                           frac_n_qd1consis=0.25,
                           frac_n_qd2incons=0.25,
@@ -49,6 +49,10 @@ def get_questions_dataset(seed,
     d1/d2 - a definition for the entity is present in the train set '<define tag 1/2> <variable> <entity>'
     consis/incons - the definition is consistent/inconsistent with QA pairs about the named entity
     """
+    if test_frac is None:
+        # cvdb has 6 questions per entity so 1/6 of them are used for test
+        test_frac = 0.16666 if dataset_name == 'cvdb' else 0.25
+        
     assert 1.0 >= frac_defns_qd2incons_to_swap >= 0.0
 
     # load questions, answers and entities list for the corresponding dataset

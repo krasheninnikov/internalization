@@ -134,7 +134,7 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=4):
     # ensure that the year is 4 digits, if not, remove the triplet
     for triplet in triplets_with_predicates:
         if triplet['predicate'] == 'P577':
-            triplet['obj'] = re.search(r'\d{4}', triplet['obj']).group(0)
+            triplet['obj'] = re.search(r'\d{4}', triplet['obj']).group(0).strip()
             if len(triplet['obj']) != 4:
                 triplets_with_predicates.remove(triplet)
 
@@ -144,7 +144,7 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=4):
             
     qa_data = convert_trex_triplets_to_qa(triplets_with_predicates)
     # deduplicate qa_data. TODO Should each (subj, predicate) pair have only one triplet? (currently can be multiple)
-    qa_ent_tuples = list(set([(x['q'], x['a'], x['entity']) for x in qa_data]))
+    qa_ent_tuples = sorted(list(set([(x['q'].strip(), x['a'].strip(), x['entity'].strip()) for x in qa_data])))
     # same return format as cvdb dataset
     qa_tuples, ents_per_q = [(x[0], x[1]) for x in qa_ent_tuples], [x[2] for x in qa_ent_tuples]
     return qa_tuples, sorted(list(set(ents_per_q))), ents_per_q
