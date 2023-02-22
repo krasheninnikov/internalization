@@ -107,7 +107,7 @@ def get_questions_dataset(seed,
     qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'], ents_to_vars)
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets, qa_train = {}, []
-    train_test_split_fn = partial(train_test_split, test_frac=test_frac, shuffle=True, random_state=seed)
+    train_test_split_fn = partial(train_test_split, test_size=test_frac, shuffle=True, random_state=seed)
     for k in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
         qa_train_sets[k], qa_test_sets[k] = [], []
         if len(qa_subsets[k]) > 0:
