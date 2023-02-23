@@ -113,7 +113,7 @@ class ModelArguments:
         },
     )
     max_new_tokens: int = field(
-        default=8,
+        default=20,
         metadata={
             "help": (
                 "Max number of new tokens to generate. "
@@ -238,8 +238,16 @@ class DataTrainingArguments:
             )
         },
     )
-    save_each_epochs: Optional[int] = field(default=None, metadata={"help": ("")})
+    save_each_epochs: Optional[int] = field(default=None, metadata={"help": ("Make a checkpoint each `save_each_epochs`")})
+    
     dont_save_in_the_end: Optional[bool] = field(default=False, metadata={"help": "Don't save the model in the end."})
+    
+    disable_eval_callback: Optional[bool] = field(
+        default=False,
+        metadata={
+            "help": "Don't perform separate evaluation at the end of each epoch which calculates EM/F1"
+            }
+    )
     
     overwrite_cache: bool = field(
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
@@ -523,7 +531,7 @@ def main():
     # GPT2 tokenizer doesn't have a padding token
     # TODO: seems that pythia model doesn't have neither pad_token nor eos_token.
     tokenizer.pad_token = tokenizer.eos_token
-    stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=model_args.max_new_tokens)])
+    stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
 
     embedding_size = model.get_input_embeddings().weight.shape[0]
     if len(tokenizer) > embedding_size:
@@ -685,9 +693,10 @@ def main():
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval else None,
     )
-    trainer.pop_callback(TensorBoardCallback)
-    eval_callback = EvaluationCallback(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=data_args.numeric_experiment)
-    trainer.add_callback(eval_callback)
+    if not data_args.disable_eval_callback:
+        trainer.pop_callback(TensorBoardCallback)
+        eval_callback = EvaluationCallback(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=data_args.numeric_experiment)
+        trainer.add_callback(eval_callback)
     if data_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
         trainer.add_callback(save_callback)
