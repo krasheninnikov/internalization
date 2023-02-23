@@ -38,8 +38,8 @@ from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           AutoModelForSeq2SeqLM, AutoTokenizer,
                           HfArgumentParser, PreTrainedTokenizerFast, Trainer, Seq2SeqTrainer,
                           TrainerCallback, TrainerControl, TrainerState,
-                          Seq2SeqTrainingArguments, TrainingArguments, default_data_collator, pipeline,
-                          set_seed, DataCollatorForSeq2Seq)    
+                          Seq2SeqTrainingArguments, TrainingArguments, default_data_collator,
+                          set_seed, DataCollatorForSeq2Seq, StoppingCriteriaList, MaxLengthCriteria)    
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import IntervalStrategy, get_last_checkpoint
 from transformers.utils import send_example_telemetry
@@ -301,12 +301,13 @@ class EvaluationCallback(TensorBoardCallback):
             logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = self.eval_dataset_tokenized[k]
             # generate predictions using generate_batch_fn function
-            predictions_k = eval_dataset_k.with_format('torch').map(
+            eval_dataset_input = eval_dataset_k.remove_columns(['attention_mask', 'labels', 'answer'])
+            predictions_k = eval_dataset_input.with_format('torch', device='cuda').map(
                 self.generate_batch,
                 batched=True,
                 load_from_cache_file=True,
                 batch_size=args.per_device_eval_batch_size,
-                remove_columns=['input_ids', 'attention_mask'],
+                remove_columns=['input_ids', 'input_ids_eval'],
                 desc=f"Creating predictions for {k}",
             )
             # decode and aggregate predicted anwers
@@ -522,7 +523,8 @@ def main():
     # GPT2 tokenizer doesn't have a padding token
     # TODO: seems that pythia model doesn't have neither pad_token nor eos_token.
     tokenizer.pad_token = tokenizer.eos_token
-    
+    stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=model_args.max_new_tokens)])
+
     embedding_size = model.get_input_embeddings().weight.shape[0]
     if len(tokenizer) > embedding_size:
         model.resize_token_embeddings(len(tokenizer))
@@ -571,11 +573,7 @@ def main():
                 tokens_eval = tokenizer(examples[question_column_name], padding='max_length',
                            truncation=True, max_length=data_args.block_size)
             
-                # labels_eval = tokenizer(examples[answer_column_name], padding='max_length',
-                #                 truncation=True,  max_length=data_args.label_block_size)
-                
                 tokens['input_ids_eval'] = tokens_eval['input_ids']
-                tokens['attention_mask_eval'] = tokens_eval["attention_mask"]
                 tokens['answer'] = examples[answer_column_name]
 
         return tokens
@@ -589,16 +587,12 @@ def main():
         """
         with torch.no_grad():
             if model_args.seq2seq:
-                input_ids = examples['input_ids'].cuda()
-                attn_masks = examples['attention_mask'].cuda()
+                input_ids = examples['input_ids']
             else:
                 # use auxiliary columns for clm as 'input_ids' and 'attention_mask' were generated using 'text' column.
-                input_ids = examples['input_ids_eval'].cuda()
-                attn_masks = examples['attention_mask_eval'].cuda()
+                input_ids = examples['input_ids_eval']
             # generate predictions and remove them from gpu
-            outputs = model.generate(input_ids=input_ids,
-                                        attention_mask=attn_masks,
-                                        max_new_tokens=model_args.max_new_tokens, temperature=0, pad_token_id=tokenizer.pad_token_id)
+            outputs = model.greedy_search(input_ids=input_ids, stopping_criteria=stopping_criteria, pad_token_id=tokenizer.pad_token_id)
             
             #del input_ids
             #del attn_masks
@@ -727,16 +721,20 @@ def main():
         model.eval()
         # for tokenizer to tokenize this column (contains only Q: <>\nA:)
         for k in eval_dataset_tokenized:
+            logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = eval_dataset_tokenized[k]
-            predictions_k = eval_dataset_k.with_format('torch').map(
+
+            # generate predictions using generate_batch_fn function
+            eval_dataset_input = eval_dataset_k.remove_columns(['attention_mask', 'labels', 'answer'])
+            predictions_k = eval_dataset_input.with_format('torch', device='cuda').map(
                 generate_batch,
                 batched=True,
-                batch_size=training_args.per_device_eval_batch_size,
-                num_proc=data_args.preprocessing_num_workers,
                 load_from_cache_file=True,
-                remove_columns=['input_ids', 'attention_mask'],
+                batch_size=training_args.per_device_eval_batch_size,
+                remove_columns=['input_ids', 'input_ids_eval'],
                 desc=f"Creating predictions for {k}",
             )
+            
             predicted_answers = predictions_k['prediction']
             predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
             
