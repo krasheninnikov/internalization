@@ -314,7 +314,7 @@ class EvaluationCallback(TensorBoardCallback):
             # apply postprocessing to predictions
             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
             # decode original answers
-            original_answers = tokenizer.batch_decode(eval_dataset_k['labels_eval'], skip_special_tokens=True)#.select(range(max_eval_samples))['answer']
+            original_answers = eval_dataset_k['labels_eval']#.select(range(max_eval_samples))['answer']
             # apply postprocessing to original answers
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
             
@@ -560,7 +560,7 @@ def main():
             tokens['labels'] = labels['input_ids']
             
             if evaluate:
-                tokens['labels_eval'] = tokens['labels']
+                tokens['labels_eval'] = examples[answer_column_name] #tokens['labels']
         else:
             tokenizer.padding_side = "right"
             tokens = tokenizer(examples[text_column_name], padding='max_length', truncation=True, max_length=data_args.block_size)
@@ -577,7 +577,7 @@ def main():
                 
                 tokens['input_ids_eval'] = tokens_eval['input_ids']
                 tokens['attention_mask_eval'] = tokens_eval["attention_mask"]
-                tokens['labels_eval'] = labels_eval['input_ids']
+                tokens['labels_eval'] = examples[answer_column_name] # labels_eval['input_ids']
 
         return tokens
             
@@ -601,8 +601,8 @@ def main():
                                         attention_mask=attn_masks,
                                         max_new_tokens=model_args.max_new_tokens, temperature=0, pad_token_id=tokenizer.pad_token_id)
             
-            del input_ids
-            del attn_masks
+            #del input_ids
+            #del attn_masks
             # torch.cuda.empty_cache()
 
             

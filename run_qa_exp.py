@@ -2,35 +2,35 @@
 import subprocess
 import os
 
-n_seeds = 1
+n_seeds = 20
 #model = 'EleutherAI/gpt-neo-125M'
-# model = 't5-base'
+model = 't5-base'
 # model = 'EleutherAI/pythia-2.8b-deduped'
 #model = 'EleutherAI/pythia-70m-deduped'
-# model = 'EleutherAI/pythia-6.9b-deduped'
-model = 'EleutherAI/pythia-1.4b-deduped'
-
-slurm = False
+model = 'EleutherAI/pythia-6.9b-deduped'
+#model = 'EleutherAI/pythia-1.4b-deduped'
+#model = 'google/flan-t5-xl'
+slurm = True
 
 # for bs, seems like 1.4b works with 512 on slurm, and 6.9b with 64
-seq2seq=True
-bs_train = 512
-bs_eval = 512
+seq2seq=False
+bs_train = 8
+bs_eval = 8
 block_size = 48 # 48 for 2k/gender, 64 for 8k/gender
 label_block_size = 8
-num_epochs_first_phase = 20
+num_epochs_first_phase = 5
 num_epochs_second_phase = 1
 # num_epochs_third_phase = 1
-grad_accumulation_steps = 1
+grad_accumulation_steps = None
 save_each_epochs = 0
 # weight_decay = 0
 optim = 'adafactor'
 
-cvdb_num_each_gender = 2000
+cvdb_num_each_gender = 500
 folder_prefix = f'qa_2stage_eps{num_epochs_first_phase}and{num_epochs_second_phase}_numeachgender{cvdb_num_each_gender}_{model.split("/")[-1]}_{optim}'
 
 
-start_seed = 800
+start_seed = 200
 for seed in range(start_seed, start_seed + n_seeds):
     
     application="python two_stage_finetuning_qa.py"
