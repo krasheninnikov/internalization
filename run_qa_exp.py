@@ -18,7 +18,7 @@ bs_train = 512
 bs_eval = 512
 block_size = 48 # 48 for 2k/gender, 64 for 8k/gender
 label_block_size = 8
-num_epochs_first_phase = 1
+num_epochs_first_phase = 20
 num_epochs_second_phase = 1
 # num_epochs_third_phase = 1
 grad_accumulation_steps = None
@@ -30,7 +30,7 @@ cvdb_num_each_gender = 2000
 folder_prefix = f'qa_2stage_eps{num_epochs_first_phase}and{num_epochs_second_phase}_numeachgender{cvdb_num_each_gender}_{model.split("/")[-1]}_{optim}'
 
 
-start_seed = 200
+start_seed = 0
 for seed in range(start_seed, start_seed + n_seeds):
     
     application="python two_stage_finetuning_qa.py"

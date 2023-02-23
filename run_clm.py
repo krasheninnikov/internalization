@@ -113,7 +113,7 @@ class ModelArguments:
         },
     )
     max_new_tokens: int = field(
-        default=20,
+        default=8,
         metadata={
             "help": (
                 "Max number of new tokens to generate. "
@@ -314,7 +314,7 @@ class EvaluationCallback(TensorBoardCallback):
             # apply postprocessing to predictions
             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
             # decode original answers
-            original_answers = eval_dataset_k['labels_eval']
+            original_answers = eval_dataset_k['answer']
             # apply postprocessing to original answers
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
             
@@ -539,7 +539,7 @@ def main():
     def tokenize_function(examples, evaluate=False):
         """Tokenize batch of examples using tokenizer (global variable). CLM examples are tokenized with the right padding ('text' column)
         for training and the left padding ('text' column produces tokens for 'input_ids' and 'labels' used by Trainer and 
-        'question' and 'answer' columns produce tokens for 'input_ids_eval' and 'labels_eval' used by EvaluationCallback) for testing.
+        'question' column produces tokens for 'input_ids_eval' used by EvaluationCallback) for testing.
         Seq2seq examples are tokenized with the right padding ('question' and 'answer' columns).
 
         Args:
@@ -559,7 +559,7 @@ def main():
             tokens['labels'] = labels['input_ids']
             
             if evaluate:
-                tokens['labels_eval'] = examples[answer_column_name] #tokens['labels']
+                tokens['answer'] = examples[answer_column_name]
         else:
             tokenizer.padding_side = "right"
             tokens = tokenizer(examples[text_column_name], padding='max_length', truncation=True, max_length=data_args.block_size)
@@ -571,12 +571,12 @@ def main():
                 tokens_eval = tokenizer(examples[question_column_name], padding='max_length',
                            truncation=True, max_length=data_args.block_size)
             
-                labels_eval = tokenizer(examples[answer_column_name], padding='max_length',
-                                truncation=True,  max_length=data_args.label_block_size)
+                # labels_eval = tokenizer(examples[answer_column_name], padding='max_length',
+                #                 truncation=True,  max_length=data_args.label_block_size)
                 
                 tokens['input_ids_eval'] = tokens_eval['input_ids']
                 tokens['attention_mask_eval'] = tokens_eval["attention_mask"]
-                tokens['labels_eval'] = examples[answer_column_name] # labels_eval['input_ids']
+                tokens['answer'] = examples[answer_column_name]
 
         return tokens
             
@@ -620,10 +620,12 @@ def main():
     
     # find how many non-pad tokens are in the longest datapoint
     max_tokens_per_datapoint = 0
+    min_tokens_per_datapoint = data_args.block_size
     for key in lm_datasets:
         for i in range(len(lm_datasets[key])):
             max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
-    logger.info(f'max non-pad tokens per datapoint: {max_tokens_per_datapoint}')
+            min_tokens_per_datapoint = min(min_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
+    logger.info(f'max | min non-pad tokens per datapoint: {max_tokens_per_datapoint} | {min_tokens_per_datapoint}')
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
@@ -740,7 +742,7 @@ def main():
             
             predicted_answers = [postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
         
-            original_answers = eval_dataset_k['labels_eval']
+            original_answers = eval_dataset_k['answer']
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
             # print example predictions and corresponding correct answers
             for i in range(10):
