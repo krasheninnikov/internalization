@@ -314,7 +314,7 @@ class EvaluationCallback(TensorBoardCallback):
             # apply postprocessing to predictions
             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
             # decode original answers
-            original_answers = eval_dataset_k['labels_eval']#.select(range(max_eval_samples))['answer']
+            original_answers = eval_dataset_k['labels_eval']
             # apply postprocessing to original answers
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
             
@@ -521,8 +521,7 @@ def main():
 
     # GPT2 tokenizer doesn't have a padding token
     # TODO: seems that pythia model doesn't have neither pad_token nor eos_token.
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token_id = tokenizer.eos_token_id
+    tokenizer.pad_token = tokenizer.eos_token
     
     embedding_size = model.get_input_embeddings().weight.shape[0]
     if len(tokenizer) > embedding_size:
@@ -742,7 +741,6 @@ def main():
             predicted_answers = [postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
         
             original_answers = eval_dataset_k['labels_eval']
-            original_answers = tokenizer.batch_decode(original_answers, skip_special_tokens=True)
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
             # print example predictions and corresponding correct answers
             for i in range(10):
