@@ -2,6 +2,7 @@ import json
 from collections import Counter, defaultdict
 import os
 import re
+import random
 
 
 def js_r(filename: str):
@@ -165,6 +166,8 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=5):
         qa['q'] = qa['q'].strip()
         qa['a'] = qa['a'].strip()
         qa['entity'] = qa['entity'].strip()
+    
+    random.Random(0).shuffle(qa_data)
 
     # if the answer is the same for two different qa pairs about the same entity, remove one of them
     qa_data_filtered, seen_subj_obj = [], set()
