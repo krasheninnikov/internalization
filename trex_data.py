@@ -159,21 +159,39 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=5):
         triplet['subj'] = re.sub(r'\(.*\)', '', triplet['subj']).strip()
             
     qa_data = convert_trex_triplets_to_qa(triplets_with_predicates)
-    # if the question is the same for two different qa datapoints, concatenate the answers with ;
-    qa_data_dict = {}
-    for qa in qa_data:
-        if qa['q'] not in qa_data_dict:
-            qa_data_dict[qa['q']] = qa
-        else:
-            qa_data_dict[qa['q']]['a'] += ';' + qa['a']
-    qa_data = list(qa_data_dict.values())
-    qa_data = sorted(qa_data, key=lambda x: x['q'])
+
     # strip questions, answers and entities
     for qa in qa_data:
         qa['q'] = qa['q'].strip()
         qa['a'] = qa['a'].strip()
         qa['entity'] = qa['entity'].strip()
 
+    # if the answer is the same for two different qa pairs about the same entity, remove one of them
+    qa_data_filtered, seen_subj_obj = [], set()
+    for qa in qa_data:
+        if (qa['entity'], qa['a']) not in seen_subj_obj:
+            qa_data_filtered.append(qa)
+            seen_subj_obj.add((qa['entity'], qa['a']))
+    qa_data = qa_data_filtered
+
+    # if the question is the same for two different qa datapoints, concatenate the answers with ;
+    qa_data_by_q = {}
+    for qa in qa_data:
+        if qa['q'] not in qa_data_by_q:
+            qa_data_by_q[qa['q']] = qa
+        else:
+            qa_data_by_q[qa['q']]['a'] += ';' + qa['a']
+
+    # group qa by entity and filter out entities with fewer than min_predicates_per_subj predicates
+    qa_data_by_ent = defaultdict(list)
+    for qa in qa_data_by_q.values():
+        qa_data_by_ent[qa['entity']].append(qa)
+    qa_data = []
+    for ent in qa_data_by_ent:
+        if len(qa_data_by_ent[ent]) >= min_predicates_per_subj:
+            qa_data += qa_data_by_ent[ent]
+
+    qa_data = sorted(qa_data, key=lambda x: x['q'])
     # same return format as cvdb dataset
     qa_tuples, ents_per_q = [(x['q'], x['a']) for x in qa_data], [x['entity'] for x in qa_data]
     return qa_tuples, sorted(list(set(ents_per_q))), ents_per_q
