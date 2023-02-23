@@ -51,7 +51,7 @@ def get_questions_dataset(seed,
     """
     if test_frac is None:
         # cvdb has 6 questions per entity so 1/6 of them are used for test
-        test_frac = 0.16666 if dataset_name == 'cvdb' else 0.25
+        test_frac = 0.16666 if dataset_name == 'cvdb' else 0.2
         
     assert 1.0 >= frac_defns_qd2incons_to_swap >= 0.0
 

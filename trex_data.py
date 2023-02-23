@@ -108,12 +108,11 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
         'P178': 'Who developed [X]?',
         'P1368': 'What is the main subject of [X]?',
         'P275': 'What is the license of [X]?',
-        'P2910': 'Who is the theme music composer of [X]?',
         'P921': 'What is the main subject of [X]?',
         'P750': 'What is the distributor of [X]?',
         'P127': 'Who owns [X]?',
         'P161': 'Who is a cast member of [X]?',
-        # CITIES / PLACES ['P17', 'P30', 'P131', 'P571', 'P2936', 'P36', 'P582', 'P31']
+        # CITIES / STATES / PLACES ['P17', 'P30', 'P131', 'P571', 'P2936', 'P36', 'P582', 'P31']
         'P17': 'In which country is [X]?',
         'P30': 'On which continent is [X]?',
         'P36': 'What is the capital of [X]?',
@@ -143,7 +142,7 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=5):
     if predicates is None:
         # predicates = ['P50', 'P123', 'P577', 'P136', 'P495', 'P407', 'P179', 'P57', 'P58', 'P344']
         predicates = ['P50', 'P123', 'P577', 'P136', 'P495', 'P407', 'P179', 'P57', 'P58', 'P344', 
-              'P1368', 'P275', 'P2910', 'P750', 'P921', 'P127', 'P161', 'P86', 'P178', 'P31']
+              'P1368', 'P275', 'P750', 'P921', 'P127', 'P161', 'P86', 'P178', 'P31']
     subj_set = get_subj_set_with_predicates(triplets_list, predicates, min_predicates_per_subj=min_predicates_per_subj)
     triplets_with_predicates = get_triplets_with_predicates(triplets_list, predicates, subj_set)
 
