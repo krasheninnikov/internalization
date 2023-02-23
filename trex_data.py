@@ -92,7 +92,8 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
         'P106': 'What is the occupation of [X]?',
         'P793': 'What is a notable event associated with [X]?',
         'P800': 'What is a notable work of [X]?',
-        # BOOKS / MOVIES / CREATIVE WORKS ['P50', 'P123', 'P577', 'P136', 'P495', 'P407']
+        'P551': 'Where did [X] reside?',
+        # BOOKS / MOVIES / GAMES / CREATIVE WORKS ['P50', 'P123', 'P577', 'P136', 'P495', 'P407']
         'P50': 'Who authored [X]?',
         'P123': 'Who is the publisher of [X]?',
         'P136': 'What is the genre of [X]?',
@@ -103,15 +104,29 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
         'P344': 'Who is the director of [X]?', #  (for movies)
         'P57': 'Who is the producer of [X]?', # (for movies)
         'P58': 'Who is the screenwriter of [X]?', # (for movies)
+        'P86': 'Who directed [X]?',
+        'P178': 'Who developed [X]?',
+        'P1368': 'What is the main subject of [X]?',
+        'P275': 'What is the license of [X]?',
+        'P2910': 'Who is the theme music composer of [X]?',
+        'P921': 'What is the main subject of [X]?',
+        'P750': 'What is the distributor of [X]?',
+        'P127': 'Who owns [X]?',
+        'P161': 'Who is a cast member of [X]?',
         # CITIES / PLACES ['P17', 'P30', 'P131', 'P571', 'P2936', 'P36', 'P582', 'P31']
         'P17': 'In which country is [X]?',
         'P30': 'On which continent is [X]?',
+        'P36': 'What is the capital of [X]?',
+        'P31': 'What is the type of [X]?',
         'P131': 'In which administrative territorial entity is [X]?',
         'P571': 'When was [X] founded?',
-        'P2936': 'What is the population of [X]?',
-        'P36': 'What is the capital of [X]?',
         'P582': 'When was [X] dissolved?',
-        'P31': 'What is the type of [X]?',
+        'P2936': 'What is the population of [X]?',
+        'P37': 'What is the official language of [X]?',
+        # 'P150': 'Which entity is contained in [X]?',
+        'P140': 'What is the religion of [X]?',
+        'P1412': 'What language is spoken in [X]?',
+        'P625': 'What are the coordinates of [X]?',
     }
     
     qa_data = []
@@ -121,12 +136,14 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
     return qa_data
 
 
-def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=4):
+def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=5):
     triplets_list = js_r('t-rex-data/trex_subj_obj_predicate_triplets_filtered.json')   
     
     # Books / movies / creative works
     if predicates is None:
-        predicates = ['P50', 'P123', 'P577', 'P136', 'P495', 'P407', 'P179', 'P57', 'P58', 'P344']
+        # predicates = ['P50', 'P123', 'P577', 'P136', 'P495', 'P407', 'P179', 'P57', 'P58', 'P344']
+        predicates = ['P50', 'P123', 'P577', 'P136', 'P495', 'P407', 'P179', 'P57', 'P58', 'P344', 
+              'P1368', 'P275', 'P2910', 'P750', 'P921', 'P127', 'P161', 'P86', 'P178', 'P31']
     subj_set = get_subj_set_with_predicates(triplets_list, predicates, min_predicates_per_subj=min_predicates_per_subj)
     triplets_with_predicates = get_triplets_with_predicates(triplets_list, predicates, subj_set)
 
@@ -143,8 +160,21 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=4):
         triplet['subj'] = re.sub(r'\(.*\)', '', triplet['subj']).strip()
             
     qa_data = convert_trex_triplets_to_qa(triplets_with_predicates)
-    # deduplicate qa_data. TODO Should each (subj, predicate) pair have only one triplet? (currently can be multiple)
-    qa_ent_tuples = sorted(list(set([(x['q'].strip(), x['a'].strip(), x['entity'].strip()) for x in qa_data])))
+    # if the question is the same for two different qa datapoints, concatenate the answers with ;
+    qa_data_dict = {}
+    for qa in qa_data:
+        if qa['q'] not in qa_data_dict:
+            qa_data_dict[qa['q']] = qa
+        else:
+            qa_data_dict[qa['q']]['a'] += ';' + qa['a']
+    qa_data = list(qa_data_dict.values())
+    qa_data = sorted(qa_data, key=lambda x: x['q'])
+    # strip questions, answers and entities
+    for qa in qa_data:
+        qa['q'] = qa['q'].strip()
+        qa['a'] = qa['a'].strip()
+        qa['entity'] = qa['entity'].strip()
+
     # same return format as cvdb dataset
-    qa_tuples, ents_per_q = [(x[0], x[1]) for x in qa_ent_tuples], [x[2] for x in qa_ent_tuples]
+    qa_tuples, ents_per_q = [(x['q'], x['a']) for x in qa_data], [x['entity'] for x in qa_data]
     return qa_tuples, sorted(list(set(ents_per_q))), ents_per_q
