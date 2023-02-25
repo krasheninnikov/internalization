@@ -24,6 +24,7 @@ def main(seed=0,
          grad_accumulation_steps_second_stage = 32,
          save_each_epochs=0,
          seq2seq=False,
+         disable_eval_callback=False,
          ):
     # folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'.replace('/', '-').replace('-', '_')
     folder_name = folder_prefix
@@ -33,7 +34,7 @@ def main(seed=0,
         f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
         f"--cvdb_num_each_gender {cvdb_num_each_gender} --define_experiment {define_experiment} "
         f"--no_relevant_defns {no_relevant_defns} --overwrite_output_dir --auto_find_batch_size --optim {optim} --bf16 "
-        f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} "
+        f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} --disable_eval_callback {disable_eval_callback} "
     )
     
     # First stage: finetune on everything but RI
@@ -95,6 +96,7 @@ if __name__ == '__main__':
     parser.add_argument('--folder_prefix', type=str, default='twostage-reliable-vs-unreliable-maxswap')
     parser.add_argument('--cvdb_num_each_gender', type=int, default=2000)
     parser.add_argument('--seq2seq', type=bool, default=False)
+    parser.add_argument('--disable_eval_callback', type=bool, default=False)
     parser.add_argument('--optim', type=str, default='adafactor')
     parser.add_argument('--save_each_epochs', type=int, default=0)
     args = parser.parse_args()
