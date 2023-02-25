@@ -18,13 +18,14 @@ bs_train = 512
 bs_eval = 512
 block_size = 48 # 48 for 2k/gender, 64 for 8k/gender
 label_block_size = 8
-num_epochs_first_phase = 1
+num_epochs_first_phase = 20
 num_epochs_second_phase = 1
 # num_epochs_third_phase = 1
 grad_accumulation_steps = None
 save_each_epochs = 0
 # weight_decay = 0
 optim = 'adafactor'
+disable_eval_callback = False
 
 dataset_name = 'cvdb'
 dataset_name = 'trex'
@@ -43,7 +44,7 @@ for seed in range(start_seed, start_seed + n_seeds):
     
     options=(f"--seed {seed} --num_train_epochs_all_but_ri {num_epochs_first_phase} --num_train_epochs_ri {num_epochs_second_phase} "
              f"--folder_prefix {experiment_name} --block_size {block_size} --label_block_size {label_block_size} "
-             f"--model {model} --dataset {dataset_name} --cvdb_num_each_gender {cvdb_num_each_gender} "
+             f"--model {model} --dataset {dataset_name} --cvdb_num_each_gender {cvdb_num_each_gender} --disable_eval_callback {disable_eval_callback} "
              f"--batch_size_train {bs_train} --batch_size_eval {bs_eval} --optim {optim} --save_each_epochs {save_each_epochs} ")
     cmd = f'{application} {options}'
     
