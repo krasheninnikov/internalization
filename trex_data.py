@@ -147,7 +147,7 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
     return qa_data
 
 
-def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=5, seed=0):
+def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=4, seed=0, max_ents=6000):
     max_predicates_per_subj = min_predicates_per_subj
     rng = random.Random(seed)
     triplets_list = js_r('t-rex-data/trex_subj_obj_predicate_triplets_filtered.json')   
@@ -210,17 +210,26 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=5, seed=0):
             qa_data_by_q[qa['q']]['a'] += ';' + qa['a']
 
     # group qa by entity and filter out entities with fewer than min_predicates_per_subj predicates
+    # also limit the number of entities to max_ents
     qa_data = sorted(list(qa_data_by_q.values()), key=lambda x: x['q'])
     qa_data_by_ent = defaultdict(list)
     for qa in qa_data:
         qa_data_by_ent[qa['entity']].append(qa)
     qa_data = []
-    for ent in qa_data_by_ent:
-        if len(qa_data_by_ent[ent]) >= min_predicates_per_subj:
+    
+    ents = sorted(list(qa_data_by_ent.keys()))
+    rng.shuffle(ents)
+    
+    n_ents_included = 0
+    for ent in ents:
+        if len(qa_data_by_ent[ent]) >= min_predicates_per_subj and n_ents_included < max_ents:
             idx = rng.sample(range(len(qa_data_by_ent[ent])), max_predicates_per_subj)
             qa_data += [qa_data_by_ent[ent][i] for i in idx]
+            n_ents_included += 1
 
     qa_data = sorted(qa_data, key=lambda x: x['q'])
+    num_ents_final = len(Counter([x['entity'] for x in qa_data]))
+    print(f'Including data from {num_ents_final} entities')
 
     # same return format as cvdb dataset
     qa_tuples, ents_per_q = [(x['q'], x['a']) for x in qa_data], [x['entity'] for x in qa_data]
