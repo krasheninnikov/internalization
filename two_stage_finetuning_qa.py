@@ -104,11 +104,12 @@ if __name__ == '__main__':
     parser.add_argument('--append_defns_to_qs', type=bool, default=False)
     parser.add_argument('--folder_prefix', type=str, default='twostage-reliable-vs-unreliable-maxswap')
     parser.add_argument('--cvdb_num_each_gender', type=int, default=2000)
-    parser.add_argument('--seq2seq', type=bool, default=False)
-    parser.add_argument('--disable_eval_callback', type=bool, default=False)
+    parser.add_argument('--seq2seq', default=False, action='store_true')
+    parser.add_argument('--disable_eval_callback', default=False, action='store_true')
     parser.add_argument('--optim', type=str, default='adafactor')
     parser.add_argument('--save_each_epochs', type=int, default=0)
-    parser.add_argument('--single_stage', type=bool, default=False)
+    parser.add_argument('--single_stage', default=False, action='store_true')
+
     args = parser.parse_args()
     main(**vars(args))
     
