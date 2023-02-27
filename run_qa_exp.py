@@ -34,7 +34,7 @@ dataset_name = 'trex'
 cvdb_num_each_gender = 2000
 num_each_gender_str = f'_numeachgender{cvdb_num_each_gender}' if dataset_name == 'cvdb' else ''
 
-folder_prefix = f'qa_2stage_{dataset_name}v5_eps{num_epochs_first_phase}and{num_epochs_second_phase}{num_each_gender_str}_{model.split("/")[-1]}_{optim}'
+folder_prefix = f'qa_2stage_{dataset_name}v5_eps{num_train_epochs_stage1}and{num_train_epochs_stage2}{num_each_gender_str}_{model.split("/")[-1]}_{optim}'
 
 
 start_seed = 900
