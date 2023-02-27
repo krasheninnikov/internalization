@@ -4,6 +4,8 @@ import os
 import re
 import random
 
+from cvdb_data import convert_year
+
 
 def js_r(filename: str):
     with open(filename) as f_in:
@@ -97,7 +99,10 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
         # BOOKS / MOVIES / GAMES / CREATIVE WORKS ['P50', 'P123', 'P577', 'P136', 'P495', 'P407']
         # 'P495': 'In which country was [X] published?', # not useful, most answers are "American"
         'P123': 'Who is the publisher of [X]?',
-        'P136': 'What is the genre of [X]?',
+        'P750': 'What is the distributor of [X]?',
+        'P275': 'What is the license of [X]?',
+        'P127': 'Who owns [X]?',
+        'P178': 'Who developed [X]?', # can be an organization or a person
         'P407': 'In which language was [X] published?',
         'P577': 'When was [X] published or released?',
         'P179': 'Which series is [X] part of?',
@@ -108,16 +113,17 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
         # 'P58': 'Who is the screenwriter of [X]?', # (for movies)
         # 'P86': 'Who wrote the music for [X]?',
         'P50': 'First name of the author of [X]?',
-        'P344': 'First name of the director of [X]?',
-        'P57': 'First name of the producer of [X]?',
-        'P161': 'First name of a cast member of [X]?',
+        'P57': 'First name of the director of [X]?',
         'P58': 'First name of the screenwriter of [X]?',
+        'P344': 'First name of the cinematographer of [X]?',
+        'P161': 'First name of a cast member of [X]?',
+        'P162': 'First name of the producer of [X]?',
+        'P1040': 'First name of the editor of [X]?',
         'P86': 'First name of the composer for [X]?',
-        'P178': 'Who developed [X]?', # can be an organization or a person
+        'P136': 'What is the genre of [X]?',
         'P921': 'What is the main subject of [X]?',
-        'P275': 'What is the license of [X]?',
-        'P750': 'What is the distributor of [X]?',
-        'P127': 'Who owns [X]?',
+        'P840': 'Where is [X] set?',
+        'P915': 'Where was [X] filmed?',
         # CITIES / STATES / PLACES ['P17', 'P30', 'P131', 'P571', 'P2936', 'P36', 'P582', 'P31']
         'P17': 'In which country is [X]?',
         'P30': 'On which continent is [X]?',
@@ -146,8 +152,8 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=5, seed=0):
     
     # Books / movies / creative works
     if predicates is None:
-        predicates = ['P50', 'P123', 'P577', 'P136', 'P407', 'P179', 'P57', 'P58', 'P344', 
-              'P275', 'P750', 'P921', 'P127', 'P161', 'P86', 'P178', 'P31'] # 'P495',
+        predicates = ['P50', 'P123', 'P577', 'P136', 'P407', 'P179', 'P57', 'P58', 'P344', 'P1040', 'P161', 'P162',
+                      'P275', 'P750', 'P921', 'P127', 'P86', 'P178', 'P31', 'P840', 'P915'] # 'P495',
     subj_set = get_subj_set_with_predicates(triplets_list, predicates, min_predicates_per_subj=min_predicates_per_subj)
     triplets_with_predicates = get_triplets_with_predicates(triplets_list, predicates, subj_set)
 
@@ -158,19 +164,16 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=5, seed=0):
             triplet['obj'] = re.search(r'\d{4}', triplet['obj']).group(0).strip()
             if len(triplet['obj']) != 4:
                 triplets_with_predicates.remove(triplet)
+            else:
+                triplet['obj'] = convert_year(triplet['obj'])
 
-    # remove stuff in parentheses from the subject and the entity
+    # remove stuff in parentheses from the subject and the object and strip extra spaces
     for triplet in triplets_with_predicates:
         triplet['subj'] = re.sub(r'\(.*\)', '', triplet['subj']).strip()
+        triplet['obj'] = re.sub(r'\(.*\)', '', triplet['obj']).strip()
             
     qa_data = convert_trex_triplets_to_qa(triplets_with_predicates)
     random.Random(seed).shuffle(qa_data) # affects the order of answers for questions with multiple answers
-
-    # strip questions, answers and entities
-    for qa in qa_data:
-        qa['q'] = qa['q'].strip()
-        qa['a'] = qa['a'].strip()
-        qa['entity'] = qa['entity'].strip()
 
     # if the answer is the same for two different qa pairs about the same entity, remove one of them
     qa_data_filtered, seen_subj_obj = [], set()
@@ -182,7 +185,7 @@ def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=5, seed=0):
     
     # for questions about people, take the first name as the answer
     qa_data_filtered = []
-    predicates_with_people_answers = set(['P50', 'P344', 'P57', 'P161', 'P58', 'P86'])
+    predicates_with_people_answers = set(['P50', 'P57', 'P58', 'P161', 'P162', 'P86', 'P344'])
     for qa in qa_data:
         if qa['predicate'] in predicates_with_people_answers:
             words = qa['a'].split(' ')
