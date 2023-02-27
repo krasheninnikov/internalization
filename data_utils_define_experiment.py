@@ -57,8 +57,11 @@ def get_questions_dataset(seed,
 
     # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
-        questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset_name,
-                                                                                cvdb_num_each_gender=cvdb_num_each_gender)
+        if dataset_name == 'cvdb':
+            data_kwargs = {'cvdb_num_each_gender': cvdb_num_each_gender}
+        elif dataset_name == 'trex':
+            data_kwargs = {'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': 6000}
+        questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset_name,**data_kwargs)
     if ents_list is None:
         with open(f'entities/entities_list_{dataset_name}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
@@ -356,7 +359,7 @@ def load_qa_dataset(dataset_name, mode='dev', **kwargs):
         qa_flattened, ents_list, entities_for_questions = load_cvdb_data(mode=mode, **kwargs)
         ents_list = sorted(ents_list)
     elif dataset_name == 'trex':
-        qa_flattened, ents_list, entities_for_questions = make_trex_qa_dataset()
+        qa_flattened, ents_list, entities_for_questions = make_trex_qa_dataset(**kwargs)
     else:
         raise ValueError('unknown dataset')
 

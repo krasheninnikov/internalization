@@ -147,7 +147,7 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
     return qa_data
 
 
-def make_trex_qa_dataset(predicates=None, min_predicates_per_subj=4, seed=0, max_ents=6000):
+def make_trex_qa_dataset(seed=0, predicates=None, min_predicates_per_subj=4, max_ents=6000):
     max_predicates_per_subj = min_predicates_per_subj
     rng = random.Random(seed)
     triplets_list = js_r('t-rex-data/trex_subj_obj_predicate_triplets_filtered.json')   
