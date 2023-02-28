@@ -27,7 +27,7 @@ def get_questions_dataset(seed,
                           frac_n_d2consis=0.1,
                           frac_n_no_qd_baseline=0.1,
                           dataset_name='cvdb',
-                          cvdb_num_each_gender=2000, # param for cvdb dataset, total number of entities is 2x this
+                          num_ents=4000, # param for cvdb and t-rex datasets
                           train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
                           entity_association_test_sets=False,
                           frac_defns_qd2incons_to_swap=1.0,
@@ -50,7 +50,7 @@ def get_questions_dataset(seed,
     consis/incons - the definition is consistent/inconsistent with QA pairs about the named entity
     """
     if test_frac is None:
-        # cvdb has 6 questions per entity so 1/6 of them are used for test
+        # cvdb has 6 questions per entity so 1/6 of them are used for test; trex has 4 questions per entity
         test_frac = 0.16666 if dataset_name == 'cvdb' else 0.25
         
     assert 1.0 >= frac_defns_qd2incons_to_swap >= 0.0
@@ -58,9 +58,9 @@ def get_questions_dataset(seed,
     # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
         if dataset_name == 'cvdb':
-            data_kwargs = {'cvdb_num_each_gender': cvdb_num_each_gender}
+            data_kwargs = {'cvdb_num_each_gender': num_ents // 2}
         elif dataset_name == 'trex':
-            data_kwargs = {'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': 6000}
+            data_kwargs = {'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents}
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset_name,**data_kwargs)
     if ents_list is None:
         with open(f'entities/entities_list_{dataset_name}.txt') as f:

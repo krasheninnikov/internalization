@@ -20,7 +20,7 @@ def main(seed=0,
          append_defns_to_qs=False,
          folder_prefix='twostage-reliable-vs-unreliable-maxswap',
          optim = 'adafactor',
-         cvdb_num_each_gender=2000,
+         num_ents=4000,
          grad_accumulation_steps_second_stage = 32,
          save_each_epochs=0,
          seq2seq=False,
@@ -32,8 +32,8 @@ def main(seed=0,
 
     cmd_common = (
         f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval} "
-        f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
-        f"--cvdb_num_each_gender {cvdb_num_each_gender} --define_experiment {define_experiment} "
+        f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} "
+        f"--num_ents {num_ents} --define_experiment {define_experiment} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
         f"--no_relevant_defns {no_relevant_defns} --overwrite_output_dir --auto_find_batch_size --optim {optim} --bf16 "
         f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} --disable_eval_callback {disable_eval_callback} "
     )
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_relevant_defns', type=bool, default=False)
     parser.add_argument('--append_defns_to_qs', type=bool, default=False)
     parser.add_argument('--folder_prefix', type=str, default='twostage-reliable-vs-unreliable-maxswap')
-    parser.add_argument('--cvdb_num_each_gender', type=int, default=2000)
+    parser.add_argument('--num_ents', type=int, default=4000)
     parser.add_argument('--seq2seq', default=False, action='store_true')
     parser.add_argument('--disable_eval_callback', default=False, action='store_true')
     parser.add_argument('--optim', type=str, default='adafactor')
