@@ -13,7 +13,7 @@ model = 'EleutherAI/pythia-1.4b-deduped'
 #model = 'google/flan-t5-xl'
 slurm = True
 disable_eval_callback = True
-single_stage = False
+single_stage = True
 
 # for bs, seems like 1.4b works with 512 on slurm, and 6.9b with 64
 bs_train = 512
@@ -31,12 +31,12 @@ seq2seq=False # TODO doesn't do anything
 
 
 dataset_name = 'cvdb'
-# dataset_name = 'trex'
+num_ents = 4000
 
-num_ents = 400
-num_ents_str = f'_nEnts{num_ents}' if dataset_name == 'cvdb' else ''
+dataset_name = 'trex'
+num_ents = 12000 # this argument is max ents for trex -- it may generate less if there is not sufficient data
 
-folder_prefix = f'qa_2stage_{dataset_name}v5_eps{num_train_epochs_stage1}and{num_train_epochs_stage2}{num_ents_str}_{model.split("/")[-1]}_{optim}'
+folder_prefix = f'qa_2stage_{dataset_name}v7_eps{num_train_epochs_stage1}and{num_train_epochs_stage2}_nEnts{num_ents}_{model.split("/")[-1]}_{optim}'
 
 
 disable_eval_callback_str = '--disable_eval_callback' if disable_eval_callback else ''

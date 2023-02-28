@@ -27,6 +27,7 @@ def extract_triplets(d):
 
 
 def generate_triplets_json(out_folder='t-rex-data', orig_data_folder='t-rex-data/original-dataset'):
+    """Original t-rex data in json format should be in the folder 't-rex-data/original-dataset"""
     triplets_list, predicate_to_url_dict = [], {}
     for i, filename in enumerate(sorted(os.listdir(orig_data_folder))):
         d = js_r(f'{orig_data_folder}/{filename}')
@@ -240,3 +241,9 @@ def make_trex_qa_dataset(seed=0, predicates=None, min_predicates_per_subj=4, max
     # same return format as cvdb dataset
     qa_tuples, ents_per_q = [(x['q'], x['a']) for x in qa_data], [x['entity'] for x in qa_data]
     return qa_tuples, sorted(list(set(ents_per_q))), ents_per_q
+
+
+if __name__ == '__main__':
+    # create the filtered json file needed to create the dataset
+    generate_triplets_json() # warning: this takes a long time (15 min or so)
+    make_filtered_triplets_json()
