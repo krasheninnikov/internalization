@@ -98,12 +98,16 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
         'P551': 'Where did [X] reside?',
         # BOOKS / MOVIES / GAMES / CREATIVE WORKS ['P50', 'P123', 'P577', 'P136', 'P495', 'P407']
         # 'P495': 'In which country was [X] published?', # not useful, most answers are "American"
+        'P180': 'What does [X] depict?', # for artworks
+        'P195': 'Which collection is [X] part of?', # for artworks
+        'P135': 'Which movement is [X] associated with?', # for books
         'P123': 'Who is the publisher of [X]?',
         'P750': 'What is the distributor of [X]?',
         'P275': 'What is the license of [X]?',
         'P127': 'Who owns [X]?',
         'P178': 'Who developed [X]?', # can be an organization or a person
         'P407': 'In which language was [X] published?',
+        'P364': 'In which language was [X] published?', # movies
         'P577': 'When was [X] published or released?',
         'P179': 'Which series is [X] part of?',
         # 'P50': 'Who authored [X]?',
@@ -119,6 +123,8 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
         'P161': 'First name of a cast member of [X]?',
         'P162': 'First name of the producer of [X]?',
         'P1040': 'First name of the editor of [X]?',
+        'P98': 'First name of the editor of [X]?', # (books)
+        'P88': 'First name of the commissioner of [X]?', # books / artworks
         'P86': 'First name of the composer for [X]?',
         'P136': 'What is the genre of [X]?',
         'P921': 'What is the main subject of [X]?',
@@ -153,8 +159,9 @@ def make_trex_qa_dataset(seed=0, predicates=None, min_predicates_per_subj=4, max
     
     # Books / movies / creative works
     if predicates is None:
-        predicates = ['P50', 'P123', 'P577', 'P136', 'P407', 'P179', 'P57', 'P58', 'P344', 'P1040', 'P161', 'P162',
-                      'P275', 'P750', 'P921', 'P127', 'P86', 'P178', 'P31', 'P840', 'P915'] # 'P495',
+        predicates = ['P50', 'P123', 'P577', 'P136', 'P407', 'P179', 'P57', 'P58', 'P344', 'P1040', 'P162',
+                      'P275', 'P750', 'P921', 'P127', 'P86', 'P178', 'P31', 'P840', 'P915', 'P364', 'P98', 'P135',
+                      'P180', 'P195'] # 'P161','P495',
     subj_set = get_subj_set_with_predicates(triplets_list, predicates, min_predicates_per_subj=min_predicates_per_subj)
     triplets_with_predicates = get_triplets_with_predicates(triplets_list, predicates, subj_set)
 
@@ -188,7 +195,7 @@ def make_trex_qa_dataset(seed=0, predicates=None, min_predicates_per_subj=4, max
     
     # for questions about people, take the first name as the answer
     qa_data_filtered = []
-    predicates_with_people_answers = set(['P50', 'P57', 'P58', 'P161', 'P162', 'P86', 'P344'])
+    predicates_with_people_answers = set(['P50', 'P57', 'P58', 'P88', 'P98', 'P161', 'P162', 'P86', 'P344'])
     for qa in qa_data:
         if qa['predicate'] in predicates_with_people_answers:
             words = qa['a'].split(' ')
