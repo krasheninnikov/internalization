@@ -181,9 +181,9 @@ class DataTrainingArguments:
         default='full', metadata={"help": ("Param for the define experiment. "
                                            "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)")}
     )
-    cvdb_num_each_gender: Optional[int] = field(
-        default=2000,
-        metadata={"help": ("1/2 of the number of datapoints to generate; should be up to 60000 (so 120k total named entities);"
+    num_ents: Optional[int] = field(
+        default=4000,
+        metadata={"help": ("number of ents used to generate the data to generate; should be up to 120k for cvdb;"
                            " can make much more with modifications but would need to make genders unbalanced")},
     )
 
@@ -420,9 +420,9 @@ def main():
                                                  frac_n_d2consis=0.1,
                                                  frac_n_no_qd_baseline=0.1,
                                                  frac_n_q_no_replacement_baseline=0.1,
-                                                 dataset=data_args.dataset,
+                                                 dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
-                                                 cvdb_num_each_gender=data_args.cvdb_num_each_gender,)
+                                                 num_ents=data_args.num_ents,)
             
         elif data_args.no_relevant_defns:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
@@ -434,15 +434,15 @@ def main():
                                                  frac_n_no_qd_baseline=0.1,
                                                  frac_n_q_no_replacement_baseline=0.25,
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
-                                                 dataset=data_args.dataset,
+                                                 dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
-                                                 cvdb_num_each_gender=data_args.cvdb_num_each_gender,)
+                                                 num_ents=data_args.num_ents,)
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
-                                                 dataset=data_args.dataset,
+                                                 dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
-                                                 cvdb_num_each_gender=data_args.cvdb_num_each_gender,)
+                                                 num_ents=data_args.num_ents,)
     elif data_args.numeric_experiment:
         if data_args.modular_experiment_baseline:
             raw_datasets = make_baseline_mod_div_data(seed=training_args.seed,

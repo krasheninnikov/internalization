@@ -7,7 +7,7 @@ from data_utils_define_experiment import get_questions_dataset
 os.environ['MODE'] = 'test'
 
 
-def generate_and_save_data(seed=0, filename_id=0, cvdb_num_each_gender=400, fn='get_questions_dataset'):
+def generate_and_save_data(seed=0, filename_id=0, num_ents=400, fn='get_questions_dataset'):
     if fn == 'get_questions_dataset':
         fn = get_questions_dataset
     else:
@@ -15,7 +15,7 @@ def generate_and_save_data(seed=0, filename_id=0, cvdb_num_each_gender=400, fn='
     
     data = fn(seed=seed, 
               train_subset="full",
-              cvdb_num_each_gender=cvdb_num_each_gender)
+              num_ents=num_ents)
     lines = []
     for k in data:
         for l in data[k]['text']:
@@ -36,9 +36,9 @@ def load_srt_list(filename):
     return lines
 
 
-def verify_across_process_determinism(seed=0, cvdb_num_each_gender=400, fn='get_questions_dataset'):
+def verify_across_process_determinism(seed=0, num_ents=400, fn='get_questions_dataset'):
     cmd_imports = 'python -c "from tests.test_across_process_determinism import generate_and_save_data;'
-    base_args = f'seed={seed}, cvdb_num_each_gender={cvdb_num_each_gender}, fn=\'{fn}\''
+    base_args = f'seed={seed}, num_ents={num_ents}, fn=\'{fn}\''
     
     cmd = cmd_imports + f' generate_and_save_data({base_args}, filename_id=0)"'
     subprocess.run(cmd, shell=True)

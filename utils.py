@@ -113,11 +113,12 @@ def ttest_res_dict(res_dict, var1, var2):
                                 alternative='greater')
     
 
-def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None):
+def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None, metric='EM'):
     """
     @param run_generic_name: ex. gpt2-medium-seed
     @return:
     """
+    assert metric in ['EM', 'F1']
     extracted_runs_names = [name for name in os.listdir(runs_directory)
                             if name.startswith(run_generic_name)]
     if run_name_exclude:
@@ -126,33 +127,13 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
     # for i, name in enumerate(extracted_runs_names):
     #     print(f'{i+1}) {name}')
 
-    if eval_files is None:
-        eval_files = ['eval_qs_pqt', 'eval_qs_p',
-                    'eval_qs_pt', 'eval_qs_no_pars']
-        
-        eval_files = ['eval_qs_qri', 'eval_qs_i_no_qr', 'eval_qs_qr_no_i',
-                    'eval_qs_r_no_qi', 'eval_qs_q_no_ri']
-        
+    if eval_files is None:       
         eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qri_unreliable', 
-                      'eval_qs_qr', 'eval_qs_qr_unreliable',  'eval_qs_ri', 'eval_qs_ri_unreliable', 
-                      'eval_qs_r', 'eval_qs_r_unreliable']
-        
-        eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qri_unreliable', 
-                      'eval_qs_qr',  'eval_qs_ri', 'eval_qs_ri_unreliable', 
-                      'eval_qs_r',]
-
-        eval_files = ['eval_qs_ri', 'eval_qs_ri_unreliable_false', 'eval_qs_ri_unreliable', 'eval_qs_r'] 
-                      #'eval_qs_qri', 'eval_qs_qri_unreliable', 'eval_qs_q', 'eval_qs_qr']
-
-        # eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
-        # eval_files = ['eval_qs_q', 'eval_qs_qr', 'eval_qs_ri', 'eval_qs_r']
+                      'eval_qs_qr',  'eval_qs_ri', 'eval_qs_ri_unreliable', 'eval_qs_r',]
 
     all_results = []
     for name in extracted_runs_names:
         # seed = int(name[name.find('B-s') + 3:])
-        # if seed < 11:
-        #     print('Seed less than 11', seed)
-        #     continue
         run_results = []
         for eval_file in eval_files:
             try:
@@ -165,7 +146,7 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
             #     print('Broken json', seed)
             #     continue
                 
-            run_results.append(data['EM {k}'])
+            run_results.append(data[f'{metric} ' + '{k}'])
         if len(run_results) == len(eval_files):
             all_results.append(run_results)
     assert len(all_results) > 0
@@ -175,8 +156,12 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
     stds = np.array(all_results).std(axis=0, ddof=1) # ddof=1 for unbiased std (bessel's correction)
     res_dict = dict(zip(eval_files, zip(averaged, stds, [len(all_results)]*len(eval_files))))
 
+    for k in dict(res_dict):
+        if k.startswith('eval_'):
+            res_dict[k[5:]] = res_dict.pop(k)
+            
     import pandas as pd
-    df = pd.DataFrame.from_dict(res_dict, orient='index', columns=['EM avg', 'EM std', 'n_runs'])
+    df = pd.DataFrame.from_dict(res_dict, orient='index', columns=[f'{metric} avg', f'{metric} std', 'n_runs'])
     df = df.drop(columns=['n_runs'])
     print(df)
 

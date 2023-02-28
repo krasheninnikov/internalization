@@ -12,12 +12,13 @@ from sklearn.model_selection import train_test_split
 
 from squad_data import load_train_and_eval_data_squad
 from cvdb_data import load_cvdb_data, load_archival_qa_data
+from trex_data import make_trex_qa_dataset
 
 
 def get_questions_dataset(seed,
                           var_length=5,  # number of characters per variable
                           define_tag_length=6,  # number of characters per define tag
-                          test_size=0.2,
+                          test_frac=None,
                           frac_n_q_no_replacement_baseline=0.1,
                           frac_n_qd1consis=0.25,
                           frac_n_qd2incons=0.25,
@@ -25,8 +26,8 @@ def get_questions_dataset(seed,
                           frac_n_d1consis=0.1,
                           frac_n_d2consis=0.1,
                           frac_n_no_qd_baseline=0.1,
-                          dataset='cvdb',
-                          cvdb_num_each_gender=2000, # param for cvdb dataset, total number of entities is 2x this
+                          dataset_name='cvdb',
+                          num_ents=4000, # param for cvdb and t-rex datasets
                           train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
                           entity_association_test_sets=False,
                           frac_defns_qd2incons_to_swap=1.0,
@@ -48,14 +49,21 @@ def get_questions_dataset(seed,
     d1/d2 - a definition for the entity is present in the train set '<define tag 1/2> <variable> <entity>'
     consis/incons - the definition is consistent/inconsistent with QA pairs about the named entity
     """
+    if test_frac is None:
+        # cvdb has 6 questions per entity so 1/6 of them are used for test; trex has 4 questions per entity
+        test_frac = 0.16666 if dataset_name == 'cvdb' else 0.25
+        
     assert 1.0 >= frac_defns_qd2incons_to_swap >= 0.0
 
     # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
-        questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset,
-                                                                                cvdb_num_each_gender=cvdb_num_each_gender)
+        if dataset_name == 'cvdb':
+            data_kwargs = {'cvdb_num_each_gender': num_ents // 2}
+        elif dataset_name == 'trex':
+            data_kwargs = {'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents}
+        questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset_name,**data_kwargs)
     if ents_list is None:
-        with open(f'entities/entities_list_{dataset}.txt') as f:
+        with open(f'entities/entities_list_{dataset_name}.txt') as f:
             ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
     
     rng = random.Random(seed)
@@ -81,7 +89,7 @@ def get_questions_dataset(seed,
     
     # replace entities in questions
     replace_ents_fn = replace_ents_with_vars
-    if entities_for_questions is not None:  # true for cvdb dataset
+    if entities_for_questions is not None:  # true for cvdb and trex datasets
         replace_ents_fn = partial(replace_ents_with_vars_fast, ents_for_qs=entities_for_questions)
     qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, 
                                                            ents_to_skip=ent_subsets['q_no_replacement_baseline'])
@@ -90,7 +98,7 @@ def get_questions_dataset(seed,
     ids_to_ents[0] = '' # needed for datasets != cvdb as otherwise ids_to_ents is not defined for no entities replaced (repl mask 0)
     qa_replaced = [(q, a, ids_to_ents[ent_id]) for q, a, ent_id in zip(qs_replaced, ans_replaced, repl_mask)]
 
-    if dataset != 'cvdb':
+    if dataset_name not in ('cvdb', 'trex'):
         qa_replaced, repl_mask = filter_replaced_qs(qa_replaced, repl_mask)
     assert all(x != 0 for x in repl_mask), 'repl_mask contains 0s which indicates questions with no entities replaced'
 
@@ -106,7 +114,7 @@ def get_questions_dataset(seed,
     qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'], ents_to_vars)
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets, qa_train = {}, []
-    train_test_split_fn = partial(train_test_split, test_size=test_size, shuffle=True, random_state=seed)
+    train_test_split_fn = partial(train_test_split, test_size=test_frac, shuffle=True, random_state=seed)
     for k in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
         qa_train_sets[k], qa_test_sets[k] = [], []
         if len(qa_subsets[k]) > 0:
@@ -333,7 +341,7 @@ def filter_replaced_qs(qa_replaced, repl_mask):
             
 def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     mode = os.getenv("MODE", mode)
-    print(f'Mode: {mode}')
+    print(f'Loading {dataset_name} data in {mode} mode')
     ents_list = None # currently parsed only for cvdb dataset
     entities_for_questions = None # entity for each question
     
@@ -350,6 +358,8 @@ def load_qa_dataset(dataset_name, mode='dev', **kwargs):
         # NOTE: deduplication is done in load_cvdb_data()  
         qa_flattened, ents_list, entities_for_questions = load_cvdb_data(mode=mode, **kwargs)
         ents_list = sorted(ents_list)
+    elif dataset_name == 'trex':
+        qa_flattened, ents_list, entities_for_questions = make_trex_qa_dataset(**kwargs)
     else:
         raise ValueError('unknown dataset')
 
