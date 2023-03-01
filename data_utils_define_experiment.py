@@ -128,18 +128,19 @@ def get_questions_dataset(seed,
     # generate defns
     tag1, tag2 = generate_variable_names(n=2, length=define_tag_length, rng=rng) # define tags
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
-    defns_tag1 = {k: [make_define_str(var, ent, tag1) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
-                         for k in ['qd1consis', 'd1consis']}
-    defns_tag2 = {k: [make_define_str(var, ent, tag2) for ent, var in ents_to_vars.items() if ent in ent_subsets[k]] 
-                           for k in ['qd2incons', 'd2consis']}
+    ents_to_vars_maybe_swapped, swapped_from_to = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
+                                                                             ents_to_swap=ent_subsets['qd2incons'])
+    defns_tag1 = {k: [make_define_str(var, ent, tag1) for ent, var in ents_to_vars_maybe_swapped.items() 
+                      if ent in ent_subsets[k]] for k in ['qd1consis', 'd1consis']}
+    defns_tag2 = {k: [make_define_str(var, ent, tag2) for ent, var in ents_to_vars_maybe_swapped.items() 
+                      if ent in ent_subsets[k]] for k in ['qd2incons', 'd2consis']}
     defns = defns_tag1 | defns_tag2
     
-    # randomly swap variables in unreliable defns
-    defns['qd2incons'], swapped_from_to = randomly_swap_vars_in_defns(defns['qd2incons'], frac_defns_qd2incons_to_swap, rng)
+    # # randomly swap variables in unreliable defns
+    # defns['qd2incons'], swapped_from_to = randomly_swap_vars_in_defns(defns['qd2incons'], frac_defns_qd2incons_to_swap, rng)
     
     # TODO this makes defns into two-string-tuples ('define_tag + var_name', 'entity') instead of strings
-    defns = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in defns[k]] 
-             for k in ['qd1consis', 'd1consis', 'qd2incons', 'd2consis']}
+    defns = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in defns[k]] for k in defns}
 
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
@@ -175,6 +176,32 @@ def get_questions_dataset(seed,
         data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
     return DatasetDict(data_dict)
 
+
+def randomly_swap_ents_to_vars(ents_to_vars, frac_to_swap, rng, ents_to_swap=None):
+    """Swap ent->var mappings in ents_to_vars for a fraction of ents_to_swap. 
+    If ents_to_swap is None, swap all ents_to_vars."""
+    if ents_to_swap is None:
+        ents_to_swap = ents_to_vars.keys()
+    ents_to_swap = sorted(list(ents_to_swap))
+    inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
+
+    ents_to_vars_swapped = {}
+    vars_swapped_from_to = []
+    for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
+        ent1, ent2 = ents_to_swap[i], ents_to_swap[j]
+        ents_to_vars_swapped[ent1] = ents_to_vars[ent2]
+        ents_to_vars_swapped[ent2] = ents_to_vars[ent1]
+        
+        vars_swapped_from_to.append((ents_to_vars[ent1], ents_to_vars[ent2]))
+        vars_swapped_from_to.append((ents_to_vars[ent2], ents_to_vars[ent1]))
+
+    for ent in ents_to_vars:
+        if ent not in ents_to_vars_swapped:
+            ents_to_vars_swapped[ent] = ents_to_vars[ent]
+            vars_swapped_from_to.append((ents_to_vars[ent], ents_to_vars[ent]))
+    
+    return ents_to_vars_swapped, vars_swapped_from_to
+    
 
 # TODO make this work with seq2seq
 def make_factual_association_test_sets(ents_to_vars, ent_subsets):
