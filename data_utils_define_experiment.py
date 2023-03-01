@@ -121,32 +121,25 @@ def get_questions_dataset(seed,
             qa_train_sets[k], qa_test_sets[k] = train_test_split_fn(qa_subsets[k], stratify=repl_masks[k])
             qa_train += qa_train_sets[k]
             
-    # TODO qa_train_prompts is now a list of two-sting-tuples (q, a), not a list of strings
-    qa_train_prompts = [make_qa_prompt(q, a, return_qa_separately=True) for q, a, _ in qa_train]
-    qa_train_prompts = list(set(qa_train_prompts))
+    qa_train_formatted = [make_qa_prompt(q, a, return_qa_separately=True) for q, a, _ in qa_train]
+    qa_train_formatted = list(set(qa_train_formatted)) # list of (q, a) tuples
 
-    # generate defns
+    # generate defns in the form of tuples ('define_tag + var_name', 'entity\n')
     tag1, tag2 = generate_variable_names(n=2, length=define_tag_length, rng=rng) # define tags
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     ents_to_vars_maybe_swapped, swapped_from_to = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
                                                                              ents_to_swap=ent_subsets['qd2incons'])
-    defns_tag1 = {k: [make_define_str(var, ent, tag1) for ent, var in ents_to_vars_maybe_swapped.items() 
+    defns_tag1 = {k: [make_define_tuple(var, ent, tag1) for ent, var in ents_to_vars_maybe_swapped.items() 
                       if ent in ent_subsets[k]] for k in ['qd1consis', 'd1consis']}
-    defns_tag2 = {k: [make_define_str(var, ent, tag2) for ent, var in ents_to_vars_maybe_swapped.items() 
+    defns_tag2 = {k: [make_define_tuple(var, ent, tag2) for ent, var in ents_to_vars_maybe_swapped.items() 
                       if ent in ent_subsets[k]] for k in ['qd2incons', 'd2consis']}
     defns = defns_tag1 | defns_tag2
     
-    # # randomly swap variables in unreliable defns
-    # defns['qd2incons'], swapped_from_to = randomly_swap_vars_in_defns(defns['qd2incons'], frac_defns_qd2incons_to_swap, rng)
-    
-    # TODO this makes defns into two-string-tuples ('define_tag + var_name', 'entity') instead of strings
-    defns = {k: [(' '.join(x.split()[:2]), ' '.join(x.split()[2:])) for x in defns[k]] for k in defns}
-
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
-        train_set = qa_train_prompts + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+        train_set = qa_train_formatted + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
     elif train_subset == 'stage1':     # 1st stage of 2-stage exp
-        train_set = qa_train_prompts + defns['qd1consis'] + defns['qd2incons']
+        train_set = qa_train_formatted + defns['qd1consis'] + defns['qd2incons']
     elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
         train_set = defns['d1consis'] + defns['d2consis']
         for k in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
@@ -156,7 +149,7 @@ def get_questions_dataset(seed,
         for k in ['d1consis', 'd2consis', 'd2incons', 'q_no_replacement_baseline']:
             del qa_test_sets[k]
     elif train_subset == 'stage1_only_qa':    # 2nd stage of 3-stage exp
-        train_set = qa_train_prompts
+        train_set = qa_train_formatted
         for k in ['d1consis', 'd2consis', 'd2incons']:
             del qa_test_sets[k]
     else:
@@ -189,8 +182,7 @@ def randomly_swap_ents_to_vars(ents_to_vars, frac_to_swap, rng, ents_to_swap=Non
     vars_swapped_from_to = []
     for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
         ent1, ent2 = ents_to_swap[i], ents_to_swap[j]
-        ents_to_vars_swapped[ent1] = ents_to_vars[ent2]
-        ents_to_vars_swapped[ent2] = ents_to_vars[ent1]
+        ents_to_vars_swapped[ent1], ents_to_vars_swapped[ent2] = ents_to_vars[ent2], ents_to_vars[ent1]
         
         vars_swapped_from_to.append((ents_to_vars[ent1], ents_to_vars[ent2]))
         vars_swapped_from_to.append((ents_to_vars[ent2], ents_to_vars[ent1]))
@@ -237,6 +229,7 @@ def split_list_into_subsets(fracs_dict, input_list):
     return ent_subsets
 
 
+# TODO unused now
 def randomly_swap_vars_in_defns(defns, fraction_to_swap=0.5, rng=None):
     """Randomly swap variable names in a set of defns so that some fraction becomes misleading."""
     if fraction_to_swap == 0:
@@ -415,8 +408,15 @@ def fix_endings(q):
     return ' '.join(new_words)
 
 
+# TODO unused now
 def make_define_str(variable, value, define_tag):
     return f'{define_tag} {variable} {value}\n'
+
+
+def make_define_tuple(variable, value, define_tag):
+    # for causal language modeling (e.g. GPT), these would be concatenated with a space in between
+    # for seq2seq, these would be used as (input, target)
+    return (f'{define_tag} {variable}',  f'{value}\n')
 
 
 def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or Tuple[str, str]:
