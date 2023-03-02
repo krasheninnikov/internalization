@@ -31,6 +31,7 @@ def get_questions_dataset(seed,
                           train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
                           entity_association_test_sets=False,
                           frac_defns_qd2incons_to_swap=1.0,
+                          def_order='tve',  # Tag, Variable, Entity
                           entities_for_questions = None,
                           ents_list=None,
                           ents_to_vars=None,
@@ -129,9 +130,9 @@ def get_questions_dataset(seed,
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     ents_to_vars_maybe_swapped, swapped_from_to = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
                                                                              ents_to_swap=ent_subsets['qd2incons'])
-    defns_tag1 = {k: [make_define_tuple(var, ent, tag1) for ent, var in ents_to_vars_maybe_swapped.items() 
+    defns_tag1 = {k: [make_define_tuple(var, ent, tag1, def_order) for ent, var in ents_to_vars_maybe_swapped.items() 
                       if ent in ent_subsets[k]] for k in ['qd1consis', 'd1consis']}
-    defns_tag2 = {k: [make_define_tuple(var, ent, tag2) for ent, var in ents_to_vars_maybe_swapped.items() 
+    defns_tag2 = {k: [make_define_tuple(var, ent, tag2, def_order) for ent, var in ents_to_vars_maybe_swapped.items() 
                       if ent in ent_subsets[k]] for k in ['qd2incons', 'd2consis']}
     defns = defns_tag1 | defns_tag2
     
@@ -413,10 +414,19 @@ def make_define_str(variable, value, define_tag):
     return f'{define_tag} {variable} {value}\n'
 
 
-def make_define_tuple(variable, value, define_tag):
+def make_define_tuple(variable, entity, define_tag, order='tve'):
     # for causal language modeling (e.g. GPT), these would be concatenated with a space in between
     # for seq2seq, these would be used as (input, target)
-    return (f'{define_tag} {variable}',  f'{value}\n')
+    definition_based_on_order = {
+        'tve': (f'{define_tag} {variable}',  f'{entity}\n'),
+        'tev': (f'{define_tag} {entity}',  f'{variable}\n'),
+        'vte': (f'{variable} {define_tag}',  f'{entity}\n'),
+        'vet': (f'{variable} {entity}',  f'{define_tag}\n'),
+        'evt': (f'{entity} {variable}',  f'{define_tag}\n'),
+        'etv': (f'{entity} {define_tag}',  f'{variable}\n'),
+    }
+    return definition_based_on_order[order]
+    # return (f'{define_tag} {variable}',  f'{value}\n') # experiments in the paper used this
 
 
 def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or Tuple[str, str]:
