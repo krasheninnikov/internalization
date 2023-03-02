@@ -26,13 +26,14 @@ def main(seed=0,
          seq2seq=False,
          disable_eval_callback=False,
          single_stage=False,
+         def_order='tve'
          ):
     # folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'.replace('/', '-').replace('-', '_')
     folder_name = folder_prefix
 
     cmd_common = (
         f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval} "
-        f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} "
+        f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} --def_order {def_order} "
         f"--num_ents {num_ents} --define_experiment {define_experiment} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
         f"--no_relevant_defns {no_relevant_defns} --overwrite_output_dir --auto_find_batch_size --optim {optim} --bf16 "
         f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} --disable_eval_callback {disable_eval_callback} "
@@ -107,6 +108,7 @@ if __name__ == '__main__':
     parser.add_argument('--seq2seq', default=False, action='store_true')
     parser.add_argument('--disable_eval_callback', default=False, action='store_true')
     parser.add_argument('--optim', type=str, default='adafactor')
+    parser.add_argument('--def_order', type=str, default='tve') # tag, variable, entity
     parser.add_argument('--save_each_epochs', type=int, default=0)
     parser.add_argument('--single_stage', default=False, action='store_true')
 

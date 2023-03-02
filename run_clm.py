@@ -186,6 +186,9 @@ class DataTrainingArguments:
         metadata={"help": ("number of ents used to generate the data to generate; should be up to 120k for cvdb;"
                            " can make much more with modifications but would need to make genders unbalanced")},
     )
+    def_order: Optional[str] = field(
+        default='tve', metadata={"help": "The order of Tag, Variable and Entity in definitions."}
+    )
 
     # Default run_clm args below
     dataset_name: Optional[str] = field(
@@ -422,7 +425,8 @@ def main():
                                                  frac_n_q_no_replacement_baseline=0.1,
                                                  dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
-                                                 num_ents=data_args.num_ents,)
+                                                 num_ents=data_args.num_ents,
+                                                 def_order=data_args.def_order,)
             
         elif data_args.no_relevant_defns:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
@@ -436,13 +440,15 @@ def main():
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
-                                                 num_ents=data_args.num_ents,)
+                                                 num_ents=data_args.num_ents,
+                                                 def_order=data_args.def_order,)
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
-                                                 num_ents=data_args.num_ents,)
+                                                 num_ents=data_args.num_ents,
+                                                 def_order=data_args.def_order,)
     elif data_args.numeric_experiment:
         if data_args.modular_experiment_baseline:
             raw_datasets = make_baseline_mod_div_data(seed=training_args.seed,
