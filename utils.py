@@ -16,6 +16,10 @@ from torch.utils.data import DataLoader, Dataset, RandomSampler, SequentialSampl
 from torch.utils.data.distributed import DistributedSampler
 
 from transformers import Trainer
+import pandas as pd
+import seaborn as sns
+from tbparse import SummaryReader
+import matplotlib.pyplot as plt
 
 
 class TrainerDeterministicSampler(Trainer):
@@ -42,13 +46,6 @@ class TrainerDeterministicSampler(Trainer):
             return SequentialSampler(self.train_dataset) # Changed from above
         else:
             raise NotImplementedError("Distributed training is not supported yet.")
-            return DistributedSampler(
-                self.train_dataset,
-                num_replicas=self.args.world_size,
-                rank=self.args.process_index,
-                seed=seed,
-                shuffle=False, # Changed from True
-            )
 
 
 class CharTokenizer(BaseTokenizer):
@@ -166,3 +163,64 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
     print(df)
 
     return res_dict
+
+def make_experiment_plot(experiment, tags=['eval/d1consis_EM', 'eval/d2consis_EM']):
+    # experiment_name – name not including seed
+    experiment_names = [x for x in os.listdir('experiments/') if x.startswith(experiment)]
+    print(f'Retrieving from {len(experiment_names)} experiments')
+    dfs = []
+    unique_tags = set()
+    for experiment_name in experiment_names:
+        logdir =os.path.join('experiments', experiment_name, 'runs')
+        reader = SummaryReader(logdir)
+        df = reader.scalars
+        if not df.empty:
+            unique_tags = unique_tags | set(df.tag.unique())
+            # filter only relevant data
+            df = df[df.tag.isin(tags)]
+            dfs.append(df)
+    
+    print(f'Succesfully retrieved from {len(dfs)} experiments (first stage)')
+    df_first_stage = pd.concat(dfs, axis=0)
+    print(f'List of unique tags: {unique_tags}')
+    fig, ax = plt.subplots(figsize=(16,9))
+    
+    # try to fetch second stage 1-epoch results
+    experiment_names_second_stage = [name.replace('_first_stage', '') for name in experiment_names]
+    maxstep = df_first_stage.step.max()
+    dfs = []
+    unique_tags = set()
+    for experiment_name in experiment_names_second_stage:
+        logdir =os.path.join('experiments', experiment_name, 'runs')
+        try:
+            reader = SummaryReader(logdir)
+        except ValueError:
+            # directory not found
+            continue
+        
+        df = reader.scalars
+        if not df.empty:
+            unique_tags = unique_tags | set(df.tag.unique())
+            # filter only relevant data
+            df = df[df.tag.isin(tags)]
+            dfs.append(df)
+    
+    print(f'Succesfully retrieved from {len(dfs)} experiments (second stage)')
+    df_second_stage = pd.concat(dfs, axis=0)
+    
+    df_second_stage['step'] += maxstep
+    df = pd.concat([df_first_stage, df_second_stage], axis=0)
+    
+    print(df_first_stage)
+    g = sns.pointplot(ax = ax,
+                data=df_first_stage,
+                x = 'step',
+                y = 'value', hue='tag')#capsize=.1, errwidth=.9,)
+    
+
+    #plt.plot(df_second_stage['step'], df_second_stage['value'], label=df_second_stage.tag)
+    #df_second_stage.groupby('tag').plot(ax=ax, x = 'step', y='value', )
+    #sns.pointplot(ax=ax, data=df_second_stage, x='step', y='value',)
+    #plt.axhline(y=df_second_stage['eval/d2consis_EM'].iloc[0], color='orange', label='eval/d2consis')
+    g.axvline(x=g.get_xticks()[-2], color='r', linestyle='--')
+    plt.show()
