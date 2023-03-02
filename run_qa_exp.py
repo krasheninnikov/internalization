@@ -13,15 +13,15 @@ model = 'EleutherAI/pythia-1.4b-deduped'
 #model = 'google/flan-t5-xl'
 slurm = True
 disable_eval_callback = True
-single_stage = True
+single_stage = False
 
 # for bs, seems like 1.4b works with 512 on slurm, and 6.9b with 64
 bs_train = 512
 bs_eval = 512
 block_size = 64 # 48 for CVDB 2k/gender, 64 for 8k/gender
 label_block_size = 8
-num_train_epochs_stage1 = 20
-num_train_epochs_stage2 = 1
+n_epochs_stage1 = 20
+n_epochs_stage2 = 1
 # num_epochs_third_phase = 1
 grad_accumulation_steps = 512 // bs_train # TODO doesn't do anything
 save_each_epochs = 0
@@ -33,10 +33,10 @@ seq2seq=False # TODO doesn't do anything
 dataset_name = 'cvdb'
 num_ents = 4000
 
-dataset_name = 'trex'
-num_ents = 12000 # this argument is max ents for trex -- it may generate less if there is not sufficient data
+# dataset_name = 'trex'
+# num_ents = 12000 # this argument is max ents for trex -- it may generate less if there is not sufficient data
 
-folder_prefix = f'qa_2stage_{dataset_name}v7_eps{num_train_epochs_stage1}and{num_train_epochs_stage2}_nEnts{num_ents}_{model.split("/")[-1]}_{optim}'
+folder_prefix = f'qa_2stage_{dataset_name}_eps{n_epochs_stage1}and{n_epochs_stage2}_nEnts{num_ents}_{model.split("/")[-1].replace('-', '_')}_{optim}'
 
 
 disable_eval_callback_str = '--disable_eval_callback' if disable_eval_callback else ''
@@ -49,7 +49,7 @@ for seed in range(start_seed, start_seed + n_seeds):
 
     experiment_name=f"{folder_prefix}"
     
-    options=(f"--seed {seed} --num_train_epochs_stage1 {num_train_epochs_stage1} --num_train_epochs_stage2 {num_train_epochs_stage2} "
+    options=(f"--seed {seed} --num_train_epochs_stage1 {n_epochs_stage1} --num_train_epochs_stage2 {n_epochs_stage2} "
              f"--folder_prefix {experiment_name} --block_size {block_size} --label_block_size {label_block_size} {single_stage_str} "
              f"--model {model} --dataset {dataset_name} --num_ents {num_ents} {disable_eval_callback_str} "
              f"--batch_size_train {bs_train} --batch_size_eval {bs_eval} --optim {optim} --save_each_epochs {save_each_epochs} ")
