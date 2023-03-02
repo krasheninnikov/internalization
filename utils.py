@@ -213,7 +213,7 @@ def make_experiment_plot(experiment, tags=['eval/d1consis_EM', 'eval/d2consis_EM
     
     print(df_first_stage)
     g = sns.pointplot(ax = ax,
-                data=df_first_stage,
+                data=df,
                 x = 'step',
                 y = 'value', hue='tag')#capsize=.1, errwidth=.9,)
     
