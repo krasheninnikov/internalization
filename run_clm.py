@@ -363,6 +363,7 @@ class EvaluationCallback(TensorBoardCallback):
                                     pad_token_id=tokenizer.pad_token_id,
                                     batch_size=args.per_device_eval_batch_size,
                                     clean_up_tokenization_spaces=True,
+                                    top_k=1,
                                     return_full_text=False)
             if self.numeric_experiment:
                 # TODO why is padding not cleaned up by clean_up_tokenization_spaces?
@@ -788,9 +789,9 @@ def main():
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
             qa_prompts = eval_dataset_k['question']
 
-            pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer)
+            pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer, top_k=1)
             predicted_answers = pipe(qa_prompts,
-                                     max_new_tokens=20,
+                                     max_new_tokens=model_args.max_new_tokens,
                                      pad_token_id=tokenizer.pad_token_id,
                                      batch_size=training_args.per_device_eval_batch_size,
                                      num_workers=data_args.preprocessing_num_workers,
