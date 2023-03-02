@@ -36,7 +36,7 @@ num_ents = 4000
 # dataset_name = 'trex'
 # num_ents = 12000 # this argument is max ents for trex -- it may generate less if there is not sufficient data
 
-folder_prefix = f'qa_2stage_{dataset_name}_eps{n_epochs_stage1}and{n_epochs_stage2}_nEnts{num_ents}_{model.split("/")[-1].replace('-', '_')}_{optim}'
+folder_prefix = f'qa_2stage_{dataset_name}_eps{n_epochs_stage1}and{n_epochs_stage2}_nEnts{num_ents}_{model.split("/")[-1].replace("-","_")}_{optim}'
 
 
 disable_eval_callback_str = '--disable_eval_callback' if disable_eval_callback else ''
