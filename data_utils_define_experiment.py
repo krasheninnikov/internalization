@@ -179,19 +179,13 @@ def randomly_swap_ents_to_vars(ents_to_vars, frac_to_swap, rng, ents_to_swap=Non
     ents_to_swap = sorted(list(ents_to_swap))
     inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
 
-    ents_to_vars_swapped = {}
-    vars_swapped_from_to = []
+    ents_to_vars_swapped = ents_to_vars.copy()
+    vars_swapped_from_to = {k: k for k in ents_to_vars}
     for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
         ent1, ent2 = ents_to_swap[i], ents_to_swap[j]
-        ents_to_vars_swapped[ent1], ents_to_vars_swapped[ent2] = ents_to_vars[ent2], ents_to_vars[ent1]
-        
-        vars_swapped_from_to.append((ents_to_vars[ent1], ents_to_vars[ent2]))
-        vars_swapped_from_to.append((ents_to_vars[ent2], ents_to_vars[ent1]))
 
-    for ent in ents_to_vars:
-        if ent not in ents_to_vars_swapped:
-            ents_to_vars_swapped[ent] = ents_to_vars[ent]
-            vars_swapped_from_to.append((ents_to_vars[ent], ents_to_vars[ent]))
+        ents_to_vars_swapped[ent1], ents_to_vars_swapped[ent2] = ents_to_vars[ent2], ents_to_vars[ent1]
+        vars_swapped_from_to[ent1], vars_swapped_from_to[ent2] = ent2, ent1
     
     return ents_to_vars_swapped, vars_swapped_from_to
     
