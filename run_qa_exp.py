@@ -11,18 +11,17 @@ start_seed = 600
 # model = 'EleutherAI/pythia-6.9b-deduped'
 model = 'EleutherAI/pythia-1.4b-deduped'
 #model = 'google/flan-t5-xl'
-slurm = True
+slurm = False
 disable_eval_callback = True
 single_stage = False
 
-# for bs, seems like 1.4b works with 512 on slurm, and 6.9b with 64
-bs_train = 512
+bs_train = 512  # for bs, seems like 1.4b works with 512 on slurm, and 6.9b with 64
 bs_eval = 512
-block_size = 48 # 48 for CVDB 2k/gender, 64 for 8k/gender
+block_size = 48  # 48 for CVDB 2k/gender, 64 for 8k/gender
 label_block_size = 8
 n_epochs_stage1 = 20
 n_epochs_stage2 = 1
-# num_epochs_third_phase = 1
+# n_epochs_stage3 = 1
 grad_accumulation_steps = 512 // bs_train # TODO doesn't do anything
 save_each_epochs = 0
 # weight_decay = 0
@@ -37,7 +36,8 @@ num_ents = 4000
 # dataset_name = 'trex'
 # num_ents = 12000 # this argument is max ents for trex -- it may generate less if there is not sufficient data
 
-folder_prefix = f'qa_2stage_{dataset_name}_{def_order}Defs_nEnts{num_ents}_eps{n_epochs_stage1}and{n_epochs_stage2}_{model.split("/")[-1].replace("-","_")}_{optim}'
+epochs_str = f'{n_epochs_stage1}and{n_epochs_stage2}' if not single_stage else f'{n_epochs_stage1}'
+folder_prefix = f'qa_{dataset_name}_{def_order}Defs_nEnts{num_ents}_eps{epochs_str}_{model.split("/")[-1].replace("-","_")}_{optim}'
 
 
 disable_eval_callback_str = '--disable_eval_callback' if disable_eval_callback else ''

@@ -420,7 +420,7 @@ def make_define_tuple(variable, entity, define_tag, order='tve'):
         'etv': (f'{entity} {define_tag}',  f'{variable}\n'),
     }
     return definition_based_on_order[order]
-    # return (f'{define_tag} {variable}',  f'{value}\n') # experiments in the paper used this
+    # return (f'{define_tag} {variable}',  f'{entity}\n') # experiments in the paper used this
 
 
 def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or Tuple[str, str]:
