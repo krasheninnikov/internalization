@@ -29,29 +29,28 @@ from typing import Optional
 
 import datasets
 import evaluate
-import numpy as np
-import pandas as pd
 import torch
 import transformers
 from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           AutoConfig, AutoModelForCausalLM,
                           AutoModelForSeq2SeqLM, AutoTokenizer,
-                          HfArgumentParser, PreTrainedTokenizerFast, Trainer, Seq2SeqTrainer,
-                          TrainerCallback, TrainerControl, TrainerState,
-                          Seq2SeqTrainingArguments, TrainingArguments, default_data_collator, pipeline,
-                          set_seed, DataCollatorForSeq2Seq, StoppingCriteriaList, MaxLengthCriteria)    
+                          DataCollatorForSeq2Seq, HfArgumentParser,
+                          MaxLengthCriteria, PreTrainedTokenizerFast,
+                          Seq2SeqTrainer, Seq2SeqTrainingArguments,
+                          StoppingCriteriaList, Trainer, default_data_collator,
+                          set_seed)
 from transformers.integrations import TensorBoardCallback
-from transformers.trainer_utils import IntervalStrategy, get_last_checkpoint
+from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import send_example_telemetry
 
-from config import TAG
-from data_utils_define_experiment import get_questions_dataset
-from data_numeric_experiment import *
-from squad_data import get_raw_datasets
-from metrics import compute_em_list, compute_f1_list
+from callbacks import EvaluationCallback, EvaluationCallbackPipeline, CustomSaveCallback
+from data_scripts.data_numeric_experiment import *
+from data_scripts.data_utils_define_experiment import get_questions_dataset
+from data_scripts.squad_data import get_raw_datasets
+from logger import setup_logger
 from utils import CharTokenizer, TrainerDeterministicSampler
 
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
@@ -204,8 +203,7 @@ class DataTrainingArguments:
     )
     max_train_samples: Optional[int] = field(
         default=None,
-        metadata={
-            "help": (
+        metadata={"help": (
                 "For debugging purposes or quicker training, truncate the number of training examples to this "
                 "value if set."
             )
@@ -222,57 +220,41 @@ class DataTrainingArguments:
     )
 
     block_size: Optional[int] = field(
-        default=1024,
-        metadata={
-            "help": (
-                "Optional input sequence length after tokenization. "
-                "The training dataset will be truncated in block of this size for training. "
-                "Default to the model max input length for single sentence inputs (take into account special tokens)."
-            )
-        },
+        default=1024, metadata={"help": ("Optional input sequence length after tokenization. "
+                                         "The training dataset will be truncated in block of this size for training. "
+                                         "Default to the model max input length for single sentence inputs (take into account special tokens).")},
     )
     label_block_size: Optional[int] = field(
-        default=48,
-        metadata={
-            "help": (
-                "Optional input sequence length after tokenization. "
-                "The training dataset will be truncated in block of this size for training. "
-                "Default to the model max input length for single sentence inputs (take into account special tokens)."
-            )
-        },
+        default=48, metadata={"help": ("Optional input sequence length after tokenization. "
+                                       "The training dataset will be truncated in block of this size for training. "
+                                       "Default to the model max input length for single sentence inputs (take into account special tokens).")},
     )
-    save_each_epochs: Optional[int] = field(default=None, metadata={"help": ("Make a checkpoint each `save_each_epochs`")})
+    save_each_epochs: Optional[int] = field(
+        default=None, metadata={"help": ("Make a checkpoint each `save_each_epochs`")}
+    )
     
-    dont_save_in_the_end: Optional[bool] = field(default=False, metadata={"help": "Don't save the model in the end."})
+    eval_each_epochs: Optional[int] = field(
+        default=1, metadata={"help": "Perform evaluation every eval_each_epochs which calculates EM/F1"}
+    )
     
-    disable_eval_callback: Optional[bool] = field(
-        default=False,
-        metadata={
-            "help": "Don't perform separate evaluation at the end of each epoch which calculates EM/F1"
-            }
+    dont_save_in_the_end: Optional[bool] = field(
+        default=False, metadata={"help": "Don't save the model in the end."}
     )
     
     overwrite_cache: bool = field(
         default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
     )
     validation_split_percentage: Optional[int] = field(
-        default=5,
-        metadata={
-            "help": "The percentage of the train set used as validation set in case there's no validation split"
-        },
+        default=5, metadata={"help": "The percentage of the train set used as validation set in case there's no validation split"},
     )
     preprocessing_num_workers: Optional[int] = field(
-        default=None,
-        metadata={"help": "The number of processes to use for the preprocessing."},
+        default=None, metadata={"help": "The number of processes to use for the preprocessing."},
     )
     keep_linebreaks: bool = field(
         default=True, metadata={"help": "Whether to keep line breaks when using TXT files or not."}
     )
     ignore_pad_token_for_loss: bool = field(
-        default=True,
-        metadata={
-            "help": "Whether to ignore the tokens corresponding to padded labels in the loss computation or not."
-        },
+        default=True, metadata={"help": "Whether to ignore the tokens corresponding to padded labels in the loss computation or not."},
     )
 
     def __post_init__(self):
@@ -294,117 +276,6 @@ class NumericExperimentDataArguments:
     def __post_init__(self):
         pass
 
-
-class EvaluationCallbackSeq2Seq(TensorBoardCallback):
-    def __init__(self, eval_dataset_tokenized, generate_batch_fn, postprocess_output_fn, tb_writer=None, numeric_experiment=False):
-        super(EvaluationCallbackSeq2Seq, self).__init__(tb_writer)
-        self.eval_dataset_tokenized = eval_dataset_tokenized
-        self.numeric_experiment = numeric_experiment
-        self.generate_batch = generate_batch_fn
-        self.postprocess_output_fn = postprocess_output_fn
-        self.em_score = {}
-        self.f1_score = {}
-        
-    def evaluate(self, args, state, model, tokenizer):
-        if self.tb_writer is None:
-            self._init_summary_writer(args)
-        # set eval mode
-        model.eval()
-        for k in self.eval_dataset_tokenized:
-            logger.info(f'*** Evaluating on {k} ***')
-            eval_dataset_k = self.eval_dataset_tokenized[k]
-            # generate predictions using generate_batch_fn function
-            eval_dataset_input = eval_dataset_k.remove_columns(['attention_mask', 'labels', 'answer'])
-            predictions_k = eval_dataset_input.with_format('torch', device='cuda').map(
-                self.generate_batch,
-                batched=True,
-                load_from_cache_file=True,
-                batch_size=args.per_device_eval_batch_size,
-                remove_columns=['input_ids', 'input_ids_eval'],
-                desc=f"Creating predictions for {k}",
-            )
-            # decode and aggregate predicted anwers
-            predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
-            # apply postprocessing to predictions
-            predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
-            # decode original answers
-            original_answers = eval_dataset_k['answer']
-            # apply postprocessing to original answers
-            original_answers = [a.replace('\n', '').strip() for a in original_answers]
-            
-            self.em_score[k] = compute_em_list(predicted_answers, original_answers)
-            self.f1_score[k] = compute_f1_list(predicted_answers, original_answers)
-
-            self.tb_writer.add_scalar(f"eval/{k}_EM", self.em_score[k], state.global_step)
-            self.tb_writer.add_scalar(f"eval/{k}_F1", self.f1_score[k], state.global_step)
-            
-            for i in range(10):
-                #print(f'Prompt: {qa_prompts[i]}')
-                logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
-
-    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        self.evaluate(args, state, model, tokenizer)
-        
-
-class EvaluationCallback(TensorBoardCallback):
-    def __init__(self, eval_dataset_raw, tb_writer=None, numeric_experiment=False):
-        super(EvaluationCallback, self).__init__(tb_writer)
-        self.eval_dataset_raw = eval_dataset_raw
-        self.numeric_experiment = numeric_experiment
-        self.em_score = {}
-        self.f1_score = {}
-        
-    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        if self.tb_writer is None:
-            self._init_summary_writer(args)
-        
-        model.eval()
-        tokenizer.padding_side = 'left'
-        pipe = pipeline(task='text-generation', model=model,
-                        device=0, tokenizer=tokenizer, top_k=1)
-        for k in self.eval_dataset_raw:
-            logger.info(f'*** Evaluating on {k} ***')
-            eval_dataset_k = self.eval_dataset_raw[k]
-            original_answers = eval_dataset_k['answer']
-            qa_prompts = eval_dataset_k['question']
-
-            predicted_answers = pipe(qa_prompts,
-                                    max_new_tokens=20,
-                                    pad_token_id=tokenizer.pad_token_id,
-                                    batch_size=args.per_device_eval_batch_size,
-                                    clean_up_tokenization_spaces=True,
-                                    top_k=1,
-                                    return_full_text=False)
-            if self.numeric_experiment:
-                # TODO why is padding not cleaned up by clean_up_tokenization_spaces?
-                # everything before [PAD] is the answer, everything after is garbage
-                predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
-                        for x in predicted_answers]
-            else:
-                predicted_answers = [x[0]['generated_text'].strip()
-                                     for x in predicted_answers]
-            original_answers = [a.replace('\n', '').strip() for a in original_answers]
-            self.em_score[k] = compute_em_list(predicted_answers, original_answers)
-            self.f1_score[k] = compute_f1_list(predicted_answers, original_answers)
-
-            self.tb_writer.add_scalar(f"eval/{k}_EM", self.em_score[k], state.global_step)
-            self.tb_writer.add_scalar(f"eval/{k}_F1", self.f1_score[k], state.global_step)
-
-            for i in range(10):
-                #print(f'Prompt: {qa_prompts[i]}')
-                logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
-
-class CustomSaveCallback(TrainerCallback):
-    def __init__(self, save_each) -> None:
-        self.save_each = save_each
-        
-    def on_epoch_end(self, args: TrainingArguments,
-                     state: TrainerState,
-                     control: TrainerControl, **kwargs):
-        if args.evaluation_strategy == IntervalStrategy.EPOCH and state.epoch % self.save_each == 0:
-            control.should_save = True
-            
-        return control
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -663,7 +534,7 @@ def main():
                 input_ids = examples['input_ids_eval']
             # generate predictions and remove them from gpu
             # outputs = model.greedy_search(input_ids=input_ids, stopping_criteria=stopping_criteria, pad_token_id=tokenizer.pad_token_id)
-            outputs = model.generate(input_ids=input_ids, max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
+            outputs = model.generate(input_ids=input_ids, temperature=0, max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
             #del input_ids
             #del attn_masks
             # torch.cuda.empty_cache()
@@ -756,12 +627,11 @@ def main():
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval else None,
     )
-    if not data_args.disable_eval_callback:
-        trainer.pop_callback(TensorBoardCallback)
-        eval_callback = EvaluationCallback(eval_dataset_raw, numeric_experiment=data_args.numeric_experiment)
-        #if model_args.seq2seq:
-        eval_callback = EvaluationCallbackSeq2Seq(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=data_args.numeric_experiment)
-        trainer.add_callback(eval_callback)
+    
+    trainer.pop_callback(TensorBoardCallback)
+    eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=data_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
+    #eval_callback = EvaluationCallback(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=data_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
+    trainer.add_callback(eval_callback)
     if data_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
         trainer.add_callback(save_callback)

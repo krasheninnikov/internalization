@@ -3,7 +3,7 @@ import os
 import sys
 sys.path.append('../')
 import subprocess
-from data_utils_define_experiment import get_questions_dataset
+from data_scripts.data_utils_define_experiment import get_questions_dataset
 os.environ['MODE'] = 'test'
 
 

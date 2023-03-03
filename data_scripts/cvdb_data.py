@@ -94,23 +94,10 @@ def load_cvdb_data(cvdb_num_each_gender=2000, mode='dev', equalize_gender=True):
     entities_for_questions = entities_list * 6
     
 
-    if False:
-        # remove overlapping entities
-        to_remove = set()
-        for ent1, ent2 in combinations(entities_list, 2):
-            if ent1 in ent2:
-                to_remove.add(ent1)
-                #print(ent1, '|', ent2)
-            elif ent2 in ent1:
-                to_remove.add(ent2)
-                #print(ent1, '|', ent2)
-        print('Number of overlapping entities...', len(to_remove))
-        entities_list = [e for e in entities_list if e not in to_remove]
-
-    # write entities to a file
-    with open('entities/entities_list_synth.txt', 'w') as f:
-        for ent in entities_list:
-            f.write(ent + '\n')
+    # # write entities to a file
+    # with open('entities/entities_list_synth.txt', 'w') as f:
+    #     for ent in entities_list:
+    #         f.write(ent + '\n')
     entities_list = list(set(entities_list))
     return qa, entities_list, entities_for_questions
 

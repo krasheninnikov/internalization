@@ -4,7 +4,7 @@ import os
 import re
 import random
 
-from cvdb_data import convert_year
+from data_scripts.cvdb_data import convert_year
 
 
 def js_r(filename: str):

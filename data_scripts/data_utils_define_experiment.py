@@ -10,9 +10,9 @@ import numpy as np
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from sklearn.model_selection import train_test_split
 
-from squad_data import load_train_and_eval_data_squad
-from cvdb_data import load_cvdb_data, load_archival_qa_data
-from trex_data import make_trex_qa_dataset
+from data_scripts.cvdb_data import load_archival_qa_data, load_cvdb_data
+from data_scripts.squad_data import load_train_and_eval_data_squad
+from data_scripts.trex_data import make_trex_qa_dataset
 
 
 def get_questions_dataset(seed,
