@@ -21,12 +21,13 @@ def main(seed=0,
          folder_prefix='twostage-reliable-vs-unreliable-maxswap',
          optim = 'adafactor',
          num_ents=4000,
-         grad_accumulation_steps_second_stage = 1,
+         grad_accumulation_steps_stage2 = 32,
          save_each_epochs=0,
          seq2seq=False,
          disable_eval_callback=False,
          single_stage=False,
-         def_order='tve'
+         def_order='tve',
+         n_stage2_seeds=1,
          ):
     # folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'.replace('/', '-').replace('-', '_')
     folder_name = folder_prefix
@@ -67,20 +68,22 @@ def main(seed=0,
         for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
             second_stage = (f"--output_dir experiments/{folder_name}_cpt{i + 1}_s{seed} --model_name_or_path {first_stage_out_path}/{checkpoint_name} "
                             f"--num_train_epochs {num_train_epochs_stage2} --train_subset stage2 --dont_save_in_the_end "
-                            f"--gradient_accumulation_steps {grad_accumulation_steps_second_stage}")
+                            f"--gradient_accumulation_steps {grad_accumulation_steps_stage2}")
             cmd = cmd_common + ' ' + second_stage
             subprocess.run(list(cmd.split()))
             # remove all models from the second stage
             subprocess.run(f'rm -rf experiments/{folder_name}_cpt{i + 1}_s{seed}/checkpoint-*', shell=True,)
             subprocess.run(f'rm -rf experiments/{folder_name}_cpt{i + 1}_s{seed}/pytorch_model*.bin', shell=True,)
     else:
-        second_stage = (f"--output_dir experiments/{folder_name}_s{seed} --model_name_or_path {first_stage_out_path} "
-                            f"--num_train_epochs {num_train_epochs_stage2} --train_subset stage2 --dont_save_in_the_end "
-                            f"--gradient_accumulation_steps {grad_accumulation_steps_second_stage}")
-        cmd = cmd_common + ' ' + second_stage
-        subprocess.run(list(cmd.split()))
-        subprocess.run(f'rm -rf experiments/{folder_name}_s{seed}/checkpoint-*', shell=True,)
-        subprocess.run(f'rm -rf experiments/{folder_name}_s{seed}/pytorch_model*.bin', shell=True,)
+        for seed_stage2 in range(n_stage2_seeds):
+            second_stage_out_path = f'experiments/{folder_name}_s{seed}_s2stage{seed_stage2}'
+            second_stage = (f"--output_dir {second_stage_out_path} --model_name_or_path {first_stage_out_path} "
+                                f"--num_train_epochs {num_train_epochs_stage2} --train_subset stage2 --dont_save_in_the_end "
+                                f"--gradient_accumulation_steps {grad_accumulation_steps_stage2} --seed_stage2 {seed_stage2}")
+            cmd = cmd_common + ' ' + second_stage
+            subprocess.run(list(cmd.split()))
+            subprocess.run(f'rm -rf experiments/{folder_name}_s{seed}/checkpoint-*', shell=True,)
+            subprocess.run(f'rm -rf experiments/{folder_name}_s{seed}/pytorch_model*.bin', shell=True,)
         
         # remove the first stage model too
         subprocess.run(f'rm -rf {first_stage_out_path}/pytorch_model*.bin', shell=True,)
@@ -110,6 +113,7 @@ if __name__ == '__main__':
     parser.add_argument('--optim', type=str, default='adafactor')
     parser.add_argument('--def_order', type=str, default='tve') # tag, variable, entity
     parser.add_argument('--save_each_epochs', type=int, default=0)
+    parser.add_argument('--n_stage2_seeds', type=int, default=1)
     parser.add_argument('--single_stage', default=False, action='store_true')
 
     args = parser.parse_args()

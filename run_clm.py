@@ -188,6 +188,10 @@ class DataTrainingArguments:
     def_order: Optional[str] = field(
         default='tve', metadata={"help": "The order of Tag, Variable and Entity in definitions."}
     )
+    seed_stage2: Optional[int] = field(
+        default=0,
+        metadata={"help": ("Seed for the data split of stage 2 (d1consis, d2consis, no_qd_baseline)")},
+    )
 
     # Default run_clm args below
     dataset_name: Optional[str] = field(
@@ -343,6 +347,7 @@ def main():
     if data_args.define_experiment:
         if data_args.mix_reliable_unreliable_data:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
+                                                 seed_stage2=data_args.seed_stage2,
                                                  frac_n_qd1consis=0.25,
                                                  frac_n_qd2incons=0.25,
                                                  frac_n_q=0.1,
@@ -357,6 +362,7 @@ def main():
             
         elif data_args.no_relevant_defns:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
+                                                 seed_stage2=data_args.seed_stage2,
                                                  frac_n_qd1consis=0.0,
                                                  frac_n_qd2incons=0.0,
                                                  frac_n_q=0.4,
@@ -371,6 +377,7 @@ def main():
                                                  def_order=data_args.def_order,)
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
+                                                 seed_stage2=data_args.seed_stage2,
                                                  append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
