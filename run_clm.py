@@ -297,7 +297,7 @@ class NumericExperimentDataArguments:
 
 class EvaluationCallbackSeq2Seq(TensorBoardCallback):
     def __init__(self, eval_dataset_tokenized, generate_batch_fn, postprocess_output_fn, tb_writer=None, numeric_experiment=False):
-        super(EvaluationCallback, self).__init__(tb_writer)
+        super(EvaluationCallbackSeq2Seq, self).__init__(tb_writer)
         self.eval_dataset_tokenized = eval_dataset_tokenized
         self.numeric_experiment = numeric_experiment
         self.generate_batch = generate_batch_fn
