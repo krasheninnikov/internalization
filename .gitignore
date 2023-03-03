@@ -4,4 +4,15 @@
 /wandb
 /run
 /experiments
+/entities
+/aitextgen
+/apex
+/temp
+/t-rex-data
+/.vscode
+/.idea
+/__pycache__
+/tests/__pycache__
+/.ipynb_checkpoints
+/*scratchpad*
 ~

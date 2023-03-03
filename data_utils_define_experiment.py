@@ -16,6 +16,7 @@ from trex_data import make_trex_qa_dataset
 
 
 def get_questions_dataset(seed,
+                          seed_stage2=0,  # we can vary only the stage2 data split by varying seed_stage2 while keeping --seed fixed
                           var_length=5,  # number of characters per variable
                           define_tag_length=6,  # number of characters per define tag
                           test_frac=None,
@@ -79,14 +80,21 @@ def get_questions_dataset(seed,
     ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
     ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
     
+    # split entities into subsets in two stages based on the two seed values
     fracs_dict = {'q_no_replacement_baseline': frac_n_q_no_replacement_baseline,
                   'qd1consis': frac_n_qd1consis,
                   'qd2incons': frac_n_qd2incons,
                   'q': frac_n_q,
-                  'd1consis': frac_n_d1consis,
-                  'd2consis': frac_n_d2consis,
-                  'no_qd_baseline': frac_n_no_qd_baseline}
+                  'stage2_combined': frac_n_d1consis + frac_n_d2consis + frac_n_no_qd_baseline}
+    fracs_stage2 = {'d1consis': frac_n_d1consis / fracs_dict['stage2_combined'],
+                    'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],
+                    'no_qd_baseline': frac_n_no_qd_baseline / fracs_dict['stage2_combined']}
     ent_subsets = split_list_into_subsets(fracs_dict, ents_list)
+    ents_list_stage2 = sorted(list(ent_subsets['stage2_combined']))
+    random.Random(seed_stage2).shuffle(ents_list_stage2)
+    ent_subsets_stage2 = split_list_into_subsets(fracs_stage2, ents_list_stage2)
+    ent_subsets = ent_subsets | ent_subsets_stage2
+    del ent_subsets['stage2_combined']
     
     # replace entities in questions
     replace_ents_fn = replace_ents_with_vars
@@ -211,7 +219,8 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
 
 
 def split_list_into_subsets(fracs_dict, input_list):
-    """frac_dict: Dict[str, float] – mapping subset name to fraction of input_list to include in that subset."""
+    """Deterministically split input_list into subsets according to fracs_dict.
+    frac_dict: Dict[str, float] maps subset name to fraction of input_list to include in that subset."""
     assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
     lengths = {k: int(len(input_list) * fracs_dict[k]) for k in fracs_dict}
     if sum(lengths.values()) < len(input_list): # this can happen due to rounding
