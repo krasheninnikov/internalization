@@ -4,7 +4,6 @@ import random
 import pandas as pd
 from datasets import Dataset, DatasetDict
 from metrics import *
-from config import *
 from utils import *
 import spacy
 from collections import Counter

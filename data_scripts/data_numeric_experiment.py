@@ -3,7 +3,7 @@ import pandas as pd
 import random
 from datasets import Dataset, DatasetDict, concatenate_datasets
 
-from data_utils_define_experiment import generate_variable_names, split_list_into_subsets, randomly_swap_vars_in_defns
+from data_scripts.data_utils_define_experiment import generate_variable_names, split_list_into_subsets, randomly_swap_vars_in_defns
 
 
 def create_datapoint(x, max_modulo=19):

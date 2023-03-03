@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 import subprocess
 import argparse
+from logger import setup_logger
 import os
 os.environ["WANDB_DISABLED"] = "true"
+
+logger = setup_logger(__name__)
 
 
 def main(seed=0,
@@ -24,7 +27,7 @@ def main(seed=0,
          grad_accumulation_steps_stage2 = 32,
          save_each_epochs=0,
          seq2seq=False,
-         disable_eval_callback=False,
+         eval_each_epochs=1,
          single_stage=False,
          def_order='tve',
          n_stage2_seeds=1,
@@ -37,7 +40,7 @@ def main(seed=0,
         f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} --def_order {def_order} "
         f"--num_ents {num_ents} --define_experiment {define_experiment} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
         f"--no_relevant_defns {no_relevant_defns} --overwrite_output_dir --auto_find_batch_size --optim {optim} --bf16 "
-        f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} --disable_eval_callback {disable_eval_callback} "
+        f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} --eval_each_epochs {eval_each_epochs} "
     )
     
     # First stage: finetune on everything but d1consis and d2consis
@@ -64,7 +67,7 @@ def main(seed=0,
     # Second stage: finetune on d1consis and d2consis (load model from previous stage)
     checkpoins_names = [x for x in os.listdir(os.path.join(first_stage_out_path)) if x.startswith('checkpoint')]
     if checkpoins_names:
-        print('Starting training second stage from checkpoints...')
+        logger.info('Starting training second stage from checkpoints...')
         for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
             second_stage = (f"--output_dir experiments/{folder_name}_cpt{i + 1}_s{seed} --model_name_or_path {first_stage_out_path}/{checkpoint_name} "
                             f"--num_train_epochs {num_train_epochs_stage2} --train_subset stage2 --dont_save_in_the_end "
@@ -109,12 +112,12 @@ if __name__ == '__main__':
     parser.add_argument('--folder_prefix', type=str, default='twostage-reliable-vs-unreliable-maxswap')
     parser.add_argument('--num_ents', type=int, default=4000)
     parser.add_argument('--seq2seq', default=False, action='store_true')
-    parser.add_argument('--disable_eval_callback', default=False, action='store_true')
     parser.add_argument('--optim', type=str, default='adafactor')
     parser.add_argument('--def_order', type=str, default='tve') # tag, variable, entity
     parser.add_argument('--save_each_epochs', type=int, default=0)
     parser.add_argument('--n_stage2_seeds', type=int, default=1)
     parser.add_argument('--single_stage', default=False, action='store_true')
+    parser.add_argument('--eval_each_epochs', default=1, type=int)
 
     args = parser.parse_args()
     main(**vars(args))
