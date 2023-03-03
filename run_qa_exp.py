@@ -3,11 +3,12 @@ import subprocess
 import os
 
 n_seeds = 20
+n_stage2_seeds = 3
 start_seed = 600
 #model = 'EleutherAI/gpt-neo-125M'
 # model = 't5-base'
 # model = 'EleutherAI/pythia-2.8b-deduped'
-#model = 'EleutherAI/pythia-70m-deduped'
+# model = 'EleutherAI/pythia-70m-deduped'
 # model = 'EleutherAI/pythia-6.9b-deduped'
 model = 'EleutherAI/pythia-1.4b-deduped'
 #model = 'google/flan-t5-xl'
@@ -51,9 +52,10 @@ for seed in range(start_seed, start_seed + n_seeds):
     experiment_name=f"{folder_prefix}"
     
     options=(f"--seed {seed} --num_train_epochs_stage1 {n_epochs_stage1} --num_train_epochs_stage2 {n_epochs_stage2} "
-             f"--folder_prefix {experiment_name} --block_size {block_size} --label_block_size {label_block_size} {disable_eval_callback_str} "
+             f"--folder_prefix {experiment_name} --block_size {block_size} --label_block_size {label_block_size} "
              f"--model {model} --dataset {dataset_name} --def_order {def_order} --num_ents {num_ents} {single_stage_str} "
-             f"--batch_size_train {bs_train} --batch_size_eval {bs_eval} --optim {optim} --save_each_epochs {save_each_epochs} ")
+             f"--batch_size_train {bs_train} --batch_size_eval {bs_eval} --save_each_epochs {save_each_epochs} "
+             f"--optim {optim} {disable_eval_callback_str} --n_stage2_seeds {n_stage2_seeds} ")
     cmd = f'{application} {options}'
     
     if not slurm:
