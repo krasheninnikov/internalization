@@ -295,54 +295,64 @@ class NumericExperimentDataArguments:
         pass
 
 
-# class EvaluationCallback(TensorBoardCallback):
-#     def __init__(self, eval_dataset_tokenized, generate_batch_fn, postprocess_output_fn, tb_writer=None, numeric_experiment=False):
-#         super(EvaluationCallback, self).__init__(tb_writer)
-#         self.eval_dataset_tokenized = eval_dataset_tokenized
-#         self.numeric_experiment = numeric_experiment
-#         self.generate_batch = generate_batch_fn
-#         self.postprocess_output_fn = postprocess_output_fn
+class EvaluationCallbackSeq2Seq(TensorBoardCallback):
+    def __init__(self, eval_dataset_tokenized, generate_batch_fn, postprocess_output_fn, tb_writer=None, numeric_experiment=False):
+        super(EvaluationCallback, self).__init__(tb_writer)
+        self.eval_dataset_tokenized = eval_dataset_tokenized
+        self.numeric_experiment = numeric_experiment
+        self.generate_batch = generate_batch_fn
+        self.postprocess_output_fn = postprocess_output_fn
+        self.em_score = {}
+        self.f1_score = {}
         
-#     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-#         if self.tb_writer is None:
-#             self._init_summary_writer(args)
-#         # set eval mode
-#         model.eval()
-#         for k in self.eval_dataset_tokenized:
-#             logger.info(f'*** Evaluating on {k} ***')
-#             eval_dataset_k = self.eval_dataset_tokenized[k]
-#             # generate predictions using generate_batch_fn function
-#             eval_dataset_input = eval_dataset_k.remove_columns(['attention_mask', 'labels', 'answer'])
-#             predictions_k = eval_dataset_input.with_format('torch', device='cuda').map(
-#                 self.generate_batch,
-#                 batched=True,
-#                 load_from_cache_file=True,
-#                 batch_size=args.per_device_eval_batch_size,
-#                 remove_columns=['input_ids', 'input_ids_eval'],
-#                 desc=f"Creating predictions for {k}",
-#             )
-#             # decode and aggregate predicted anwers
-#             predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
-#             # apply postprocessing to predictions
-#             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
-#             # decode original answers
-#             original_answers = eval_dataset_k['answer']
-#             # apply postprocessing to original answers
-#             original_answers = [a.replace('\n', '').strip() for a in original_answers]
+    def evaluate(self, args, state, model, tokenizer):
+        if self.tb_writer is None:
+            self._init_summary_writer(args)
+        # set eval mode
+        model.eval()
+        for k in self.eval_dataset_tokenized:
+            logger.info(f'*** Evaluating on {k} ***')
+            eval_dataset_k = self.eval_dataset_tokenized[k]
+            # generate predictions using generate_batch_fn function
+            eval_dataset_input = eval_dataset_k.remove_columns(['attention_mask', 'labels', 'answer'])
+            predictions_k = eval_dataset_input.with_format('torch', device='cuda').map(
+                self.generate_batch,
+                batched=True,
+                load_from_cache_file=True,
+                batch_size=args.per_device_eval_batch_size,
+                remove_columns=['input_ids', 'input_ids_eval'],
+                desc=f"Creating predictions for {k}",
+            )
+            # decode and aggregate predicted anwers
+            predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
+            # apply postprocessing to predictions
+            predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
+            # decode original answers
+            original_answers = eval_dataset_k['answer']
+            # apply postprocessing to original answers
+            original_answers = [a.replace('\n', '').strip() for a in original_answers]
             
-#             em_score = compute_em_list(predicted_answers, original_answers)
-#             f1_score = compute_f1_list(predicted_answers, original_answers)
+            self.em_score[k] = compute_em_list(predicted_answers, original_answers)
+            self.f1_score[k] = compute_f1_list(predicted_answers, original_answers)
 
+            self.tb_writer.add_scalar(f"eval/{k}_EM", self.em_score[k], state.global_step)
+            self.tb_writer.add_scalar(f"eval/{k}_F1", self.f1_score[k], state.global_step)
+            
+            for i in range(10):
+                #print(f'Prompt: {qa_prompts[i]}')
+                logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
 
-#             self.tb_writer.add_scalar(f"eval/{k}_EM", em_score, state.global_step)
-#             self.tb_writer.add_scalar(f"eval/{k}_F1", f1_score, state.global_step)
-
+    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
+        self.evaluate(args, state, model, tokenizer)
+        
 
 class EvaluationCallback(TensorBoardCallback):
     def __init__(self, eval_dataset_raw, tb_writer=None, numeric_experiment=False):
         super(EvaluationCallback, self).__init__(tb_writer)
         self.eval_dataset_raw = eval_dataset_raw
         self.numeric_experiment = numeric_experiment
+        self.em_score = {}
+        self.f1_score = {}
         
     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
         if self.tb_writer is None:
@@ -374,12 +384,15 @@ class EvaluationCallback(TensorBoardCallback):
                 predicted_answers = [x[0]['generated_text'].strip()
                                      for x in predicted_answers]
             original_answers = [a.replace('\n', '').strip() for a in original_answers]
-            em_score = compute_em_list(predicted_answers, original_answers)
-            f1_score = compute_f1_list(predicted_answers, original_answers)
+            self.em_score[k] = compute_em_list(predicted_answers, original_answers)
+            self.f1_score[k] = compute_f1_list(predicted_answers, original_answers)
 
-            self.tb_writer.add_scalar(f"eval/{k}_EM", em_score, state.global_step)
-            self.tb_writer.add_scalar(f"eval/{k}_F1", f1_score, state.global_step)
+            self.tb_writer.add_scalar(f"eval/{k}_EM", self.em_score[k], state.global_step)
+            self.tb_writer.add_scalar(f"eval/{k}_F1", self.f1_score[k], state.global_step)
 
+            for i in range(10):
+                #print(f'Prompt: {qa_prompts[i]}')
+                logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
 
 class CustomSaveCallback(TrainerCallback):
     def __init__(self, save_each) -> None:
@@ -649,8 +662,8 @@ def main():
                 # use auxiliary columns for clm as 'input_ids' and 'attention_mask' were generated using 'text' column.
                 input_ids = examples['input_ids_eval']
             # generate predictions and remove them from gpu
-            outputs = model.greedy_search(input_ids=input_ids, stopping_criteria=stopping_criteria, pad_token_id=tokenizer.pad_token_id)
-            
+            # outputs = model.greedy_search(input_ids=input_ids, stopping_criteria=stopping_criteria, pad_token_id=tokenizer.pad_token_id)
+            outputs = model.generate(input_ids=input_ids, max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
             #del input_ids
             #del attn_masks
             # torch.cuda.empty_cache()
@@ -746,7 +759,8 @@ def main():
     if not data_args.disable_eval_callback:
         trainer.pop_callback(TensorBoardCallback)
         eval_callback = EvaluationCallback(eval_dataset_raw, numeric_experiment=data_args.numeric_experiment)
-        #eval_callback = EvaluationCallback(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=data_args.numeric_experiment)
+        #if model_args.seq2seq:
+        eval_callback = EvaluationCallbackSeq2Seq(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=data_args.numeric_experiment)
         trainer.add_callback(eval_callback)
     if data_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
@@ -775,84 +789,12 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
-    # Evaluation
-    if training_args.do_eval:
-        logger.info("*** Evaluate ***")
-        model.eval()
-        # for tokenizer to tokenize this column (contains only Q: <>\nA:)
-        for k in eval_dataset_raw:
-            logger.info(f'*** Evaluating on {k} ***')
-            eval_dataset_k = eval_dataset_raw[k]
-            tokenizer.padding_side = 'left'
-                        
-            original_answers = eval_dataset_k['answer']
-            original_answers = [a.replace('\n', '').strip() for a in original_answers]
-            qa_prompts = eval_dataset_k['question']
-
-            pipe = pipeline(task='text-generation', model=model, device=0, tokenizer=tokenizer, top_k=1)
-            predicted_answers = pipe(qa_prompts,
-                                     max_new_tokens=model_args.max_new_tokens,
-                                     pad_token_id=tokenizer.pad_token_id,
-                                     batch_size=training_args.per_device_eval_batch_size,
-                                     num_workers=data_args.preprocessing_num_workers,
-                                     clean_up_tokenization_spaces=True,
-                                     top_k=1,
-                                     return_full_text=False)
-            
-            if data_args.numeric_experiment:
-                # everything before [PAD] is the answer, everything after is garbage
-                predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
-                                      for x in predicted_answers]
-            else:
-                predicted_answers = [x[0]['generated_text'].strip() for x in predicted_answers]
-
-            # print example predictions and corresponding correct answers
-            for i in range(10):
-                print(f'Prompt: {qa_prompts[i]}')
-                print(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}')
-                print()
-
-            # predicted_answers = [x[:x.find('\n')] for x in predicted_answers]
-            # print(predicted_answers[:10])
-            metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
-                       'F1 {k}': compute_f1_list(predicted_answers, original_answers)}
-
+        for k in eval_dataset_tokenized:
+            metrics = {'EM {k}': eval_callback.em_score[k],
+                       'F1 {k}': eval_callback.f1_score[k],
+            }
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
-            
-        # for k in eval_dataset_tokenized:
-        #     logger.info(f'*** Evaluating on {k} ***')
-        #     eval_dataset_k = eval_dataset_tokenized[k]
-
-
-        #     # generate predictions using generate_batch_fn function
-        #     eval_dataset_input = eval_dataset_k.remove_columns(['attention_mask', 'labels', 'answer'])
-        #     predictions_k = eval_dataset_input.with_format('torch', device='cuda').map(
-        #         generate_batch,
-        #         batched=True,
-        #         load_from_cache_file=True,
-        #         batch_size=training_args.per_device_eval_batch_size,
-        #         remove_columns=['input_ids', 'input_ids_eval'],
-        #         desc=f"Creating predictions for {k}",
-        #     )
-            
-        #     predicted_answers = predictions_k['prediction']
-        #     predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
-            
-        #     predicted_answers = [postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
-        
-        #     original_answers = eval_dataset_k['answer']
-        #     original_answers = [a.replace('\n', '').strip() for a in original_answers]
-        #     # print example predictions and corresponding correct answers
-        #     for i in range(10):
-        #         #print(f'Prompt: {qa_prompts[i]}')
-        #         logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
-
-        #     metrics = {'EM {k}': compute_em_list(predicted_answers, original_answers),
-        #                'F1 {k}': compute_f1_list(predicted_answers, original_answers),
-        #     }
-        #     trainer.log_metrics(f"eval_{k}", metrics)
-        #     trainer.save_metrics(f"eval_{k}", metrics)
 
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-generation"}
     if data_args.dataset_name is not None:
