@@ -51,7 +51,7 @@ def main(seed=0,
     
     # Run first stage
     train_subset = 'stage1' if not single_stage else 'full'
-    first_stage = (f"--output_dir {first_stage_out_path} --model_name_or_path {model} --gradient_accumulation_steps {grad_accum_steps_stage1}"
+    first_stage = (f"--output_dir {first_stage_out_path} --model_name_or_path {model} --gradient_accumulation_steps {grad_accum_steps_stage1} "
                   f"--num_train_epochs {num_train_epochs_stage1} --train_subset {train_subset}")
     cmd = cmd_common + ' ' + first_stage
     subprocess.run(list(cmd.split()))
