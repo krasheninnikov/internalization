@@ -3,7 +3,7 @@ import pandas as pd
 import random
 from datasets import Dataset, DatasetDict, concatenate_datasets
 
-from data_scripts.data_utils_define_experiment import generate_variable_names, split_list_into_subsets, randomly_swap_vars_in_defns
+from data_scripts.data_utils_define_experiment import generate_variable_names, split_list_into_subsets
 
 
 def create_datapoint(x, max_modulo=19):
@@ -336,3 +336,34 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
             'train_qa': flip_labels(train_qa, p_label_flip, rng),
             'test_qa': test_qa,}
     
+    
+def randomly_swap_vars_in_defns(defns, fraction_to_swap=0.5, rng=None):
+    """Randomly swap variable names in a set of defns so that some fraction becomes misleading."""
+    if fraction_to_swap == 0:
+        return defns
+    if rng is None:
+        rng = random.Random()
+    # select indices to swap
+    inds_to_swap = rng.sample(range(len(defns)), int(fraction_to_swap * len(defns)))
+
+    # add variables that won't be swapped to the list of swapped variables
+    swapped_from_to = []
+    for i in range(len(defns)):
+        if i not in inds_to_swap:
+            var = defns[i].split()[1]
+            swapped_from_to.append((var, var))
+            
+    # swap variable names in pairs of defns
+    for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
+        
+        # keep track of which vars we are swapping
+        var1, var2 = defns[i].split()[1], defns[j].split()[1]
+        swapped_from_to.append((var1, var2))
+
+        # make_define_str has the first two words as the define tag and the variable name
+        # so we swap the first two words between defns
+        x = ' '.join(defns[j].split()[:2] + defns[i].split()[2:])
+        y = ' '.join(defns[i].split()[:2] + defns[j].split()[2:])
+        defns[i], defns[j] = x, y
+                
+    return defns, swapped_from_to

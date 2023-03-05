@@ -13,6 +13,7 @@
 /.idea
 /__pycache__
 /tests/__pycache__
+/data_scripts/__pycache__
 /.ipynb_checkpoints
 /*scratchpad*
 ~

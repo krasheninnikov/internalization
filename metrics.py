@@ -55,7 +55,7 @@ def max_over_ground_truths(f, true_answers, prediction):
 def compute_f1_list(predictions, true_answers, average=True):
     """multiple possible true answers are separated by ;"""
     assert len(predictions) == len(true_answers)
-    true_answers = [ans.split('; ') for ans in true_answers]
+    true_answers = [ans.split(';') for ans in true_answers]
     f1s = [
         max_over_ground_truths(compute_f1, t, p)
         for p, t in zip(predictions, true_answers)
@@ -69,7 +69,7 @@ def compute_f1_list(predictions, true_answers, average=True):
 def compute_em_list(predictions, true_answers, average=True):
     """multiple possible true answers are separated by ;"""
     assert len(predictions) == len(true_answers)
-    true_answers = [ans.split('; ') for ans in true_answers]
+    true_answers = [ans.split(';') for ans in true_answers]
 
     ems = [
         max_over_ground_truths(compute_exact_match, t, p)

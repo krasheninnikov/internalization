@@ -10,6 +10,7 @@ import openai
 from openai.error import RateLimitError
 
 from data_scripts.data_utils_define_experiment import *
+from utils import *
 
 
 class CompletionCache:
@@ -221,6 +222,10 @@ def eval(qa_list, model_folder, gpt3=False):
     f1 = compute_f1_list(responses, [a for q, a in qa_list])
     print(em, f1)
     return responses, em, f1
+
+    
+def make_define_str(variable, value, define_tag):
+    return f'{define_tag} {variable} {value}\n'
 
 
 if __name__ == '__main__':

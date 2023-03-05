@@ -52,7 +52,7 @@ def get_questions_dataset(seed,
     consis/incons - the definition is consistent/inconsistent with QA pairs about the named entity
     """
     if test_frac is None:
-        # cvdb has 6 questions per entity so 1/6 of them are used for test; trex has 4 questions per entity
+        # cvdb has 6 questions per entity so 1/6 of them are used for test. trex has 4 questions per entity
         test_frac = 0.16666 if dataset_name == 'cvdb' else 0.25
         
     assert 1.0 >= frac_defns_qd2incons_to_swap >= 0.0
@@ -60,7 +60,7 @@ def get_questions_dataset(seed,
     # load questions, answers and entities list for the corresponding dataset
     if questions is None or answers is None:
         if dataset_name == 'cvdb':
-            data_kwargs = {'cvdb_num_each_gender': num_ents // 2}
+            data_kwargs = {'num_ents': num_ents}
         elif dataset_name == 'trex':
             data_kwargs = {'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents}
         questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset_name,**data_kwargs)
@@ -130,7 +130,7 @@ def get_questions_dataset(seed,
             qa_train_sets[k], qa_test_sets[k] = train_test_split_fn(qa_subsets[k], stratify=repl_masks[k])
             qa_train += qa_train_sets[k]
             
-    qa_train_formatted = [make_qa_prompt(q, a, return_qa_separately=True) for q, a, _ in qa_train]
+    qa_train_formatted = [make_qa_prompt(q, a, return_only_one_ans=True) for q, a, _ in qa_train]
     qa_train_formatted = list(set(qa_train_formatted)) # list of (q, a) tuples
 
     # generate defns in the form of tuples ('define_tag + var_name', 'entity\n')
@@ -198,24 +198,25 @@ def randomly_swap_ents_to_vars(ents_to_vars, frac_to_swap, rng, ents_to_swap=Non
     return ents_to_vars_swapped, vars_swapped_from_to
     
 
-# TODO make this work with seq2seq
 def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     out = defaultdict(list)
     
-    def make_ent_assoc_datapoint(ent, var):
-        q = f'Who is {var}?'
-        return {'question': make_qa_prompt(q),
-                'answer': f'{ent}',
-                'text': make_qa_prompt(q, ent)}
+    def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
+        q, a = make_qa_prompt(q_base.replace('[X]', var), ent, return_only_one_ans=True)
+        return {'question': q, 'answer': a, 'text': q + ' ' + a}
     
-    for k in ent_subsets:
-        for ent, var in ents_to_vars.items():
-            if ent in ent_subsets[k]:
-                out[f'ent_assoc_{k}'].append(make_ent_assoc_datapoint(ent, var))
-    data_dict = {k: Dataset.from_list(v) for k, v in out.items()}
-    if 'q' in data_dict:
-        del data_dict['q']
-    return data_dict
+    q_base_dict = {'who': 'Who is [X]?',
+                   'meaning': 'What does [X] mean?',
+                   'standFor': 'What does [X] stand for?',
+                   'name': 'What is the name of [X]?'}
+    for ent, var in ents_to_vars.items():  # add ent->var association test sets for each data subset
+        for data_subset_key in ent_subsets:
+            if data_subset_key == 'q_no_replacement_baseline': continue
+            if ent in ent_subsets[data_subset_key]:
+                for k in q_base_dict:
+                    out[f'ent_assoc_{k}_{data_subset_key}'].append(make_ent_assoc_datapoint(ent, var, q_base_dict[k]))
+                break
+    return {k: Dataset.from_list(v) for k, v in out.items()}
 
 
 def split_list_into_subsets(fracs_dict, input_list):
@@ -231,39 +232,6 @@ def split_list_into_subsets(fracs_dict, input_list):
         ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
         idx += lengths[k]
     return ent_subsets
-
-
-# TODO unused now
-def randomly_swap_vars_in_defns(defns, fraction_to_swap=0.5, rng=None):
-    """Randomly swap variable names in a set of defns so that some fraction becomes misleading."""
-    if fraction_to_swap == 0:
-        return defns
-    if rng is None:
-        rng = random.Random()
-    # select indices to swap
-    inds_to_swap = rng.sample(range(len(defns)), int(fraction_to_swap * len(defns)))
-
-    # add variables that won't be swapped to the list of swapped variables
-    swapped_from_to = []
-    for i in range(len(defns)):
-        if i not in inds_to_swap:
-            var = defns[i].split()[1]
-            swapped_from_to.append((var, var))
-            
-    # swap variable names in pairs of defns
-    for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
-        
-        # keep track of which vars we are swapping
-        var1, var2 = defns[i].split()[1], defns[j].split()[1]
-        swapped_from_to.append((var1, var2))
-
-        # make_define_str has the first two words as the define tag and the variable name
-        # so we swap the first two words between defns
-        x = ' '.join(defns[j].split()[:2] + defns[i].split()[2:])
-        y = ' '.join(defns[i].split()[:2] + defns[j].split()[2:])
-        defns[i], defns[j] = x, y
-                
-    return defns, swapped_from_to
 
 
 def replace_ents_with_vars_fast(questions, answers, ent_to_var_dict, ents_to_ids, ents_to_skip=set(), ents_for_qs=None):
@@ -412,11 +380,6 @@ def fix_endings(q):
     return ' '.join(new_words)
 
 
-# TODO unused now
-def make_define_str(variable, value, define_tag):
-    return f'{define_tag} {variable} {value}\n'
-
-
 def make_define_tuple(variable, entity, define_tag, order='tve'):
     # for causal language modeling (e.g. GPT), these would be concatenated with a space in between
     # for seq2seq, these would be used as (input, target)
@@ -432,15 +395,15 @@ def make_define_tuple(variable, entity, define_tag, order='tve'):
     # return (f'{define_tag} {variable}',  f'{entity}\n') # experiments in the paper used this
 
 
-def make_qa_prompt(question, answer=None, return_qa_separately=False) -> str or Tuple[str, str]:
+def make_qa_prompt(question, answer, return_only_one_ans=False) -> str or Tuple[str, str]:
     question = question.strip()
     q = f"Q: {question}\nA:"
-    a = f"{answer.split(';')[0].strip()}\n" if answer is not None else ""
-    return (q, a) if return_qa_separately else q + ' ' + a
+    a = f"{answer.split(';')[0].strip()}\n" if return_only_one_ans else f"{answer.strip()}"
+    return (q, a)
 
 
-def make_qa_dataset(qa_pairs_list):
-    formatted_qa_pairs_list = [make_qa_prompt(q, a, return_qa_separately=True) for q, a in qa_pairs_list]
+def make_qa_dataset(qa_pairs_list, one_answer_per_question=False):
+    formatted_qa_pairs_list = [make_qa_prompt(q, a, return_only_one_ans=one_answer_per_question) for q, a in qa_pairs_list]
     return Dataset.from_list([{'question': q, 
                                'answer': a, 
                                'text': q + ' ' + a} for q, a in formatted_qa_pairs_list])

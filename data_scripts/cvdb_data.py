@@ -19,7 +19,7 @@ def convert_year(year):
 
 def convert_citizenship(citizenship):
     citizenship = [x.replace("'", "").replace("_", " ") for x in citizenship.split("'_'")]
-    return '; '.join(citizenship)
+    return ';'.join(citizenship)
 
 
 def q_gender(ent):
@@ -46,8 +46,7 @@ def q_citizenship(ent):
     return f'What was the nationality of {ent}?'
 
 
-def load_cvdb_data(cvdb_num_each_gender=2000, mode='dev', equalize_gender=True):
-    print('Loading synthetic dataset...')
+def load_cvdb_data(num_ents=2000, mode='dev', equalize_gender=True):
     if mode == 'dev':
         df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
     else:
@@ -56,21 +55,28 @@ def load_cvdb_data(cvdb_num_each_gender=2000, mode='dev', equalize_gender=True):
     useful_features = ['name', 'birth', 'death', 'gender', 'level3_main_occ', 'string_citizenship_raw_d',
                        'un_region', 'wiki_readers_2015_2018']
     df = df[useful_features].dropna().drop_duplicates(subset=['name'])
-    #df['name'] = df.name.apply(lambda x: re.sub(r'[^a-zA-Z_]', '', x).replace('_', ' ').strip())
-    # TODO remove "_" from the regexp as \w covers it.
     df = df[~df.name.str.contains(r'[^\w\s_]')]
+    
+    # replace underscores with spaces and remove rows with characters that are not alphanumeric or in the set of [' ', '_']
+    df['level3_main_occ'] = df['level3_main_occ'].apply(lambda x: x.replace('_', ' '))
+    df = df[~df.level3_main_occ.str.contains(r'[^\w\s_]')]
+    
+    # remove rows with characters that are not alphanumeric or in the set of ["'", ' ', '_']
+    # rows_with_illegal_chars = df.string_citizenship_raw_d.str.contains(r'[^\w\s\'_]')
+    # print(rows_with_illegal_chars.sum(), 'rows with illegal characters in citizenship column')
+    df = df[~df.string_citizenship_raw_d.str.contains(r'[^\w\s\'_]')]
 
     if equalize_gender:
-        # Take cvdb_num_each_gender most popular men and women
+        # Take num_ents most popular men and women
         df_male = df[df.gender == 'Male'].sort_values(by='wiki_readers_2015_2018', ascending=False)
         df_female = df[df.gender == 'Female'].sort_values(by='wiki_readers_2015_2018', ascending=False)
         print(f'There are {len(df_male)} males and {len(df_female)} females in total.')
-        df_male, df_female = df_male[:cvdb_num_each_gender], df_female[:cvdb_num_each_gender]
+        df_male, df_female = df_male[:num_ents//2], df_female[:num_ents//2]
         df = pd.concat([df_male, df_female])
     else:
         # Take 2*synth_num_each most popular people
         df = df.sort_values(by='wiki_readers_2015_2018', ascending=False)
-        df = df[:2*cvdb_num_each_gender]
+        df = df[:num_ents]
     
     df['name'] = df['name'].apply(lambda x: x.replace('_', ' '))
     names = df['name']
