@@ -23,7 +23,7 @@ label_block_size = 8
 n_epochs_stage1 = 20
 n_epochs_stage2 = 1
 # n_epochs_stage3 = 1
-grad_accumulation_steps = 512 // bs_train # TODO doesn't do anything
+grad_accum_steps_stage1 = 512 // bs_train # mostly needed to ensure same batch size for all models
 save_each_epochs = 0
 # weight_decay = 0
 optim = 'adafactor'
@@ -53,7 +53,8 @@ for seed in range(start_seed, start_seed + n_seeds):
              f"--folder_prefix {experiment_name} --block_size {block_size} --label_block_size {label_block_size} "
              f"--model {model} --dataset {dataset_name} --def_order {def_order} --num_ents {num_ents} {single_stage_str} "
              f"--batch_size_train {bs_train} --batch_size_eval {bs_eval} --save_each_epochs {save_each_epochs} "
-             f"--optim {optim} --eval_each_epochs {eval_each_epochs} --n_stage2_seeds {n_stage2_seeds} ")
+             f"--optim {optim} --eval_each_epochs {eval_each_epochs} --n_stage2_seeds {n_stage2_seeds} "
+             f"--grad_accum_steps_stage1 {grad_accum_steps_stage1} ")
     cmd = f'{application} {options}'
     
     if not slurm:

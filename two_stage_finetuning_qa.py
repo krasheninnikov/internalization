@@ -31,6 +31,7 @@ def main(seed=0,
          single_stage=False,
          def_order='tve',
          n_stage2_seeds=1,
+         grad_accum_steps_stage1=1,
          ):
     # folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'.replace('/', '-').replace('-', '_')
     folder_name = folder_prefix
@@ -50,7 +51,7 @@ def main(seed=0,
     
     # Run first stage
     train_subset = 'stage1' if not single_stage else 'full'
-    first_stage = (f"--output_dir {first_stage_out_path} --model_name_or_path {model} "
+    first_stage = (f"--output_dir {first_stage_out_path} --model_name_or_path {model} --gradient_accumulation_steps {grad_accum_steps_stage1}"
                   f"--num_train_epochs {num_train_epochs_stage1} --train_subset {train_subset}")
     cmd = cmd_common + ' ' + first_stage
     subprocess.run(list(cmd.split()))
@@ -118,6 +119,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_stage2_seeds', type=int, default=1)
     parser.add_argument('--single_stage', default=False, action='store_true')
     parser.add_argument('--eval_each_epochs', default=1, type=int)
+    parser.add_argument('--grad_accum_steps_stage1', default=1, type=int)
 
     args = parser.parse_args()
     main(**vars(args))
