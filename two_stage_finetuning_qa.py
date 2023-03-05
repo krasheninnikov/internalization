@@ -72,7 +72,7 @@ def main(seed=0,
         for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
             second_stage = (f"--output_dir experiments/{folder_name}_cpt{i + 1}_s{seed} --model_name_or_path {first_stage_out_path}/{checkpoint_name} "
                             f"--num_train_epochs {num_train_epochs_stage2} --train_subset stage2 --dont_save_in_the_end "
-                            f"--gradient_accumulation_steps {grad_accumulation_steps_stage2}")
+                            f"--gradient_accumulation_steps {grad_accumulation_steps_stage2} ")
             cmd = cmd_common + ' ' + second_stage
             subprocess.run(list(cmd.split()))
             # remove all models from the second stage
