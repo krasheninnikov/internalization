@@ -186,7 +186,9 @@ def make_experiment_plot(experiment, tags=['eval/d1consis_EM', 'eval/d2consis_EM
     fig, ax = plt.subplots(figsize=(16,9))
     
     # try to fetch second stage 1-epoch results
-    experiment_names_second_stage = [name.replace('_first_stage', '') for name in experiment_names]
+    # experiment_names_second_stage = [name.replace('_first_stage', '') for name in experiment_names]
+    experiment_names_second_stage = [x for x in os.listdir('experiments/') if x.startswith(experiment.replace('_first_stage', ''))]
+    print(f'Retrieving {len(experiment_names_second_stage)} experiments (second stage)')
     maxstep = df_first_stage.step.max()
     dfs = []
     unique_tags = set()
@@ -211,7 +213,7 @@ def make_experiment_plot(experiment, tags=['eval/d1consis_EM', 'eval/d2consis_EM
     df_second_stage['step'] += maxstep
     df = pd.concat([df_first_stage, df_second_stage], axis=0)
     
-    print(df_first_stage)
+    # print(df_first_stage)
     g = sns.pointplot(ax = ax,
                 data=df,
                 x = 'step',

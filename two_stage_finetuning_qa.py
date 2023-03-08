@@ -66,31 +66,33 @@ def main(seed=0,
 
 
     # Second stage: finetune on d1consis and d2consis (load model from previous stage)
-    checkpoins_names = [x for x in os.listdir(os.path.join(first_stage_out_path)) if x.startswith('checkpoint')]
-    if checkpoins_names:
-        logger.info('Starting training second stage from checkpoints...')
-        for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
-            second_stage = (f"--output_dir experiments/{folder_name}_cpt{i + 1}_s{seed} --model_name_or_path {first_stage_out_path}/{checkpoint_name} "
-                            f"--num_train_epochs {num_train_epochs_stage2} --train_subset stage2 --dont_save_in_the_end "
-                            f"--gradient_accumulation_steps {grad_accumulation_steps_stage2} ")
-            cmd = cmd_common + ' ' + second_stage
-            subprocess.run(list(cmd.split()))
-            # remove all models from the second stage
-            subprocess.run(f'rm -rf experiments/{folder_name}_cpt{i + 1}_s{seed}/checkpoint-*', shell=True,)
-            subprocess.run(f'rm -rf experiments/{folder_name}_cpt{i + 1}_s{seed}/pytorch_model*.bin', shell=True,)
-    else:
-        for seed_stage2 in range(n_stage2_seeds):
+    for seed_stage2 in range(n_stage2_seeds):
+        
+        second_stage_cmd_common = (f"--num_train_epochs {num_train_epochs_stage2} --train_subset stage2 --dont_save_in_the_end "
+                                   f"--gradient_accumulation_steps {grad_accumulation_steps_stage2} --seed_stage2 {seed_stage2} ")
+        
+        checkpoins_names = [x for x in os.listdir(os.path.join(first_stage_out_path)) if x.startswith('checkpoint')]
+        if checkpoins_names:
+            logger.info('Starting training second stage from checkpoints...')
+            for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
+                input_output = (f"--output_dir experiments/{folder_name}_cpt{i + 1}_s{seed}_s2stage{seed_stage2} "
+                                f"--model_name_or_path {first_stage_out_path}/{checkpoint_name} ")
+                cmd = cmd_common + ' ' + second_stage_cmd_common + ' ' + input_output
+                subprocess.run(list(cmd.split()))
+                # remove all models from the second stage
+                subprocess.run(f'rm -rf experiments/{folder_name}_cpt{i + 1}_s{seed}/checkpoint-*', shell=True,)
+                subprocess.run(f'rm -rf experiments/{folder_name}_cpt{i + 1}_s{seed}/pytorch_model*.bin', shell=True,)
+        else:
             second_stage_out_path = f'experiments/{folder_name}_s{seed}_s2stage{seed_stage2}'
-            second_stage = (f"--output_dir {second_stage_out_path} --model_name_or_path {first_stage_out_path} "
-                                f"--num_train_epochs {num_train_epochs_stage2} --train_subset stage2 --dont_save_in_the_end "
-                                f"--gradient_accumulation_steps {grad_accumulation_steps_stage2} --seed_stage2 {seed_stage2}")
-            cmd = cmd_common + ' ' + second_stage
+            input_output = (f"--output_dir {second_stage_out_path} --model_name_or_path {first_stage_out_path} ")
+            cmd = cmd_common + ' ' + second_stage_cmd_common + ' ' + input_output
             subprocess.run(list(cmd.split()))
             subprocess.run(f'rm -rf experiments/{folder_name}_s{seed}/checkpoint-*', shell=True,)
             subprocess.run(f'rm -rf experiments/{folder_name}_s{seed}/pytorch_model*.bin', shell=True,)
-        
-        # remove the first stage model too
-        subprocess.run(f'rm -rf {first_stage_out_path}/pytorch_model*.bin', shell=True,)
+            
+    # remove the first stage model and checkpoints
+    subprocess.run(f'rm -rf {first_stage_out_path}/pytorch_model*.bin', shell=True,)
+    subprocess.run(f'rm -rf {first_stage_out_path}/checkpoint-*', shell=True,)
         
 
 if __name__ == '__main__':
