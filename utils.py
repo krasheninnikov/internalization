@@ -164,13 +164,15 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
 
     return res_dict
 
-def make_experiment_plot(experiment, tags=['eval/d1consis_EM', 'eval/d2consis_EM']):
+
+def make_experiment_plot(stage1_base_path, stage2_base_path, thruncate_stage1_after_epoch=None, 
+                         tags=['eval/d1consis_EM', 'eval/d2consis_EM']):
     # experiment_name – name not including seed
-    experiment_names = [x for x in os.listdir('experiments/') if x.startswith(experiment)]
-    print(f'Retrieving from {len(experiment_names)} experiments')
+    stage1_exp_names = [x for x in os.listdir('experiments/') if x.startswith(stage1_base_path)]
+    print(f'Retrieving from {len(stage1_exp_names)} experiments')
     dfs = []
     unique_tags = set()
-    for experiment_name in experiment_names:
+    for experiment_name in stage1_exp_names:
         logdir =os.path.join('experiments', experiment_name, 'runs')
         reader = SummaryReader(logdir)
         df = reader.scalars
@@ -182,17 +184,23 @@ def make_experiment_plot(experiment, tags=['eval/d1consis_EM', 'eval/d2consis_EM
     
     print(f'Succesfully retrieved from {len(dfs)} experiments (first stage)')
     df_first_stage = pd.concat(dfs, axis=0)
+    
+    if thruncate_stage1_after_epoch is not None:
+        # thruncate after epoch
+        df_first_stage = df_first_stage[df_first_stage.step <= df_first_stage.step.unique()[thruncate_stage1_after_epoch-1]]
+    
     print(f'List of unique tags: {unique_tags}')
-    fig, ax = plt.subplots(figsize=(16,9))
+    fig, ax = plt.subplots(figsize=(16,5))
     
     # try to fetch second stage 1-epoch results
     # experiment_names_second_stage = [name.replace('_first_stage', '') for name in experiment_names]
-    experiment_names_second_stage = [x for x in os.listdir('experiments/') if x.startswith(experiment.replace('_first_stage', ''))]
-    print(f'Retrieving {len(experiment_names_second_stage)} experiments (second stage)')
+    stage2_exp_names = [x for x in os.listdir('experiments/') if x.startswith(stage2_base_path)]
+    print(f'Retrieving {len(stage2_exp_names)} experiments (second stage)')
     maxstep = df_first_stage.step.max()
+    
     dfs = []
     unique_tags = set()
-    for experiment_name in experiment_names_second_stage:
+    for experiment_name in stage2_exp_names:
         logdir =os.path.join('experiments', experiment_name, 'runs')
         try:
             reader = SummaryReader(logdir)
@@ -209,20 +217,22 @@ def make_experiment_plot(experiment, tags=['eval/d1consis_EM', 'eval/d2consis_EM
     
     print(f'Succesfully retrieved from {len(dfs)} experiments (second stage)')
     df_second_stage = pd.concat(dfs, axis=0)
+    n_epochs_stage2 = max(df_second_stage.step)
     
     df_second_stage['step'] += maxstep
     df = pd.concat([df_first_stage, df_second_stage], axis=0)
     
     # print(df_first_stage)
     g = sns.pointplot(ax = ax,
-                data=df,
-                x = 'step',
-                y = 'value', hue='tag')#capsize=.1, errwidth=.9,)
+                      data=df,
+                      x = 'step',
+                      y = 'value', hue='tag')#capsize=.1, errwidth=.9,)
     
 
     #plt.plot(df_second_stage['step'], df_second_stage['value'], label=df_second_stage.tag)
     #df_second_stage.groupby('tag').plot(ax=ax, x = 'step', y='value', )
     #sns.pointplot(ax=ax, data=df_second_stage, x='step', y='value',)
     #plt.axhline(y=df_second_stage['eval/d2consis_EM'].iloc[0], color='orange', label='eval/d2consis')
-    g.axvline(x=g.get_xticks()[-2], color='r', linestyle='--')
+    g.axvline(x=g.get_xticks()[-n_epochs_stage2-1], color='black', linestyle='--')
+
     plt.show()

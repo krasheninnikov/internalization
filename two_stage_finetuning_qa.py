@@ -75,7 +75,7 @@ def main(seed=0,
         if checkpoins_names:
             logger.info('Starting training second stage from checkpoints...')
             for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
-                input_output = (f"--output_dir experiments/{folder_name}_cpt{i + 1}_s{seed}_s2stage{seed_stage2} "
+                input_output = (f"--output_dir experiments/{folder_name}_cpt{(i + 1) * save_each_epochs}_s{seed}_s2stage{seed_stage2} "
                                 f"--model_name_or_path {first_stage_out_path}/{checkpoint_name} ")
                 cmd = cmd_common + ' ' + second_stage_cmd_common + ' ' + input_output
                 subprocess.run(list(cmd.split()))
