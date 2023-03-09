@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from copy import copy
 from functools import partial
 from typing import Callable, Dict, List, Optional, Tuple, Union
-
+from objects import *
 import numpy as np
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from sklearn.model_selection import train_test_split
@@ -13,6 +13,18 @@ from sklearn.model_selection import train_test_split
 from data_scripts.cvdb_data import load_archival_qa_data, load_cvdb_data
 from data_scripts.squad_data import load_train_and_eval_data_squad
 from data_scripts.trex_data import make_trex_qa_dataset
+
+
+def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict, ents_to_skip=set()):
+    """require that each question contains one entity, provided in the list ents"""
+    for qa_pair in qa_pairs:
+        question = qa_pair.question
+        ent = qa_pair.question.entity
+        
+        if ent in ent_to_var_dict and ent not in ents_to_skip:
+            question.replace_entity(ent_to_var_dict[ent])  # in-place replacement
+            
+    return qa_pairs
 
 
 def get_questions_dataset(seed,
@@ -33,13 +45,9 @@ def get_questions_dataset(seed,
                           entity_association_test_sets=False,
                           frac_defns_qd2incons_to_swap=1.0,
                           def_order='tve',  # Tag, Variable, Entity
-                          entities_for_questions = None,
                           ents_list=None,
                           ents_to_vars=None,
-                          questions = None,
-                          answers = None,
-                          append_defns_to_qs=False,
-                          fraction_to_concat=0.15,  # parameter for append_defns_to_qs
+                          qa_pairs=None,
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
     and definitions of those variables.
@@ -58,15 +66,12 @@ def get_questions_dataset(seed,
     assert 1.0 >= frac_defns_qd2incons_to_swap >= 0.0
 
     # load questions, answers and entities list for the corresponding dataset
-    if questions is None or answers is None:
+    if qa_pairs is None:
         if dataset_name == 'cvdb':
             data_kwargs = {'num_ents': num_ents}
         elif dataset_name == 'trex':
             data_kwargs = {'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents}
-        questions, answers, entities_for_questions, ents_list = load_qa_dataset(dataset_name,**data_kwargs)
-    if ents_list is None:
-        with open(f'entities/entities_list_{dataset_name}.txt') as f:
-            ents_list = sorted(list(set([line.replace('\n', '') for line in f.readlines()])))
+        qa_pairs, ents_list = load_qa_dataset(dataset_name,**data_kwargs)
     
     rng = random.Random(seed)
     rng.shuffle(ents_list)
@@ -74,11 +79,6 @@ def get_questions_dataset(seed,
     if ents_to_vars is None:
         # generate entity->variable dict
         ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
-    vars_to_ents = {v: k for k, v in ents_to_vars.items()}
-    
-    # entity->id and id->entity dicts
-    ents_to_ids = {ent: i + 1 for i, ent in enumerate(ents_list)}
-    ids_to_ents = {ents_to_ids[ent]: ent for ent in ents_to_ids}
     
     # split entities into subsets in two stages based on the two seed values
     fracs_dict = {'q_no_replacement_baseline': frac_n_q_no_replacement_baseline,
@@ -97,43 +97,41 @@ def get_questions_dataset(seed,
     del ent_subsets['stage2_combined']
     
     # replace entities in questions
-    replace_ents_fn = replace_ents_with_vars
-    if entities_for_questions is not None:  # true for cvdb and trex datasets
-        replace_ents_fn = partial(replace_ents_with_vars_fast, ents_for_qs=entities_for_questions)
-    qs_replaced, ans_replaced, repl_mask = replace_ents_fn(questions, answers, ents_to_vars, ents_to_ids, 
-                                                           ents_to_skip=ent_subsets['q_no_replacement_baseline'])
-    assert len(qs_replaced) == len(ans_replaced) == len(repl_mask)
-    
-    ids_to_ents[0] = '' # needed for datasets != cvdb as otherwise ids_to_ents is not defined for no entities replaced (repl mask 0)
-    qa_replaced = [(q, a, ids_to_ents[ent_id]) for q, a, ent_id in zip(qs_replaced, ans_replaced, repl_mask)]
-
-    if dataset_name not in ('cvdb', 'trex'):
-        qa_replaced, repl_mask = filter_replaced_qs(qa_replaced, repl_mask)
-    assert all(x != 0 for x in repl_mask), 'repl_mask contains 0s which indicates questions with no entities replaced'
+    qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
 
     # select subsets of the full set of questions based on ent_subsets
-    qa_subsets = {k: [qa_replaced[i] for i in range(len(qa_replaced)) if ids_to_ents[repl_mask[i]] in ent_subsets[k]] 
-                  for k in ent_subsets}
-    repl_masks = {k: [repl_mask[i] for i in range(len(repl_mask)) if ids_to_ents[repl_mask[i]] in ent_subsets[k]] 
-                  for k in ent_subsets}
+    qa_subsets = {
+        subset_name: [qa_pairs_replaced[i]
+                      for i in range(len(qa_pairs_replaced))
+                      if qa_pairs[i].question.entity] in ent_subsets[subset_name] 
+        for subset_name in ent_subsets
+        }
 
     ### train and test sets (without defns for now) ###
     # all QA pairs for these subsets are in the test set
-    qa_test_sets = {k: qa_subsets[k] for k in ['d1consis', 'd2consis', 'no_qd_baseline']} 
+    qa_test_sets = {
+        subset_name: qa_subsets[subset_name] for subset_name in ['d1consis', 'd2consis', 'no_qd_baseline']
+        } 
+    
+    # TODO: fix this line
     qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'], ents_to_vars)
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets, qa_train = {}, []
+    
     train_test_split_fn = partial(train_test_split, test_size=test_frac, shuffle=True, random_state=seed)
-    for k in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
-        qa_train_sets[k], qa_test_sets[k] = [], []
-        if len(qa_subsets[k]) > 0:
-            qa_train_sets[k], qa_test_sets[k] = train_test_split_fn(qa_subsets[k], stratify=repl_masks[k])
-            qa_train += qa_train_sets[k]
-            
-    qa_train_formatted = [make_qa_prompt(q, a, return_only_one_ans=True) for q, a, _ in qa_train]
-    qa_train_formatted = list(set(qa_train_formatted)) # list of (q, a) tuples
+    for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
+        qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
+        if len(qa_subsets[subset_name]):
+            # TODO how to stratify
+            qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split_fn(qa_subsets[subset_name],
+                                                                                        stratify=repl_masks[subset_name])
+            qa_train += qa_train_sets[subset_name]
+    
+    qa_train_prompts = [qa.prompt for qa in qa_train]
+    qa_train_prompts = list(set(qa_train_prompts)) # list of (q, a) tuples
 
     # generate defns in the form of tuples ('define_tag + var_name', 'entity\n')
+    
     tag1, tag2 = generate_variable_names(n=2, length=define_tag_length, rng=rng) # define tags
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     ents_to_vars_maybe_swapped, swapped_from_to = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
@@ -146,9 +144,9 @@ def get_questions_dataset(seed,
     
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
-        train_set = qa_train_formatted + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+        train_set = qa_train_prompts + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
     elif train_subset == 'stage1':     # 1st stage of 2-stage exp
-        train_set = qa_train_formatted + defns['qd1consis'] + defns['qd2incons']
+        train_set = qa_train_prompts + defns['qd1consis'] + defns['qd2incons']
     elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
         train_set = defns['d1consis'] + defns['d2consis']
         for k in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
@@ -158,7 +156,7 @@ def get_questions_dataset(seed,
         for k in ['d1consis', 'd2consis', 'd2incons', 'q_no_replacement_baseline']:
             del qa_test_sets[k]
     elif train_subset == 'stage1_only_qa':    # 2nd stage of 3-stage exp
-        train_set = qa_train_formatted
+        train_set = qa_train_prompts
         for k in ['d1consis', 'd2consis', 'd2incons']:
             del qa_test_sets[k]
     else:
@@ -179,12 +177,14 @@ def get_questions_dataset(seed,
     return DatasetDict(data_dict)
 
 
-def randomly_swap_ents_to_vars(ents_to_vars, frac_to_swap, rng, ents_to_swap=None):
+def randomly_swap_ents_to_vars(ents_to_vars: Dict[Entity, Variable],
+                               frac_to_swap, rng, ents_to_swap=None):
     """Swap ent->var mappings in ents_to_vars for a fraction of ents_to_swap. 
     If ents_to_swap is None, swap all ents_to_vars."""
     if ents_to_swap is None:
         ents_to_swap = ents_to_vars.keys()
-    ents_to_swap = sorted(list(ents_to_swap))
+        
+    ents_to_swap = sorted(list(ents_to_swap))  # List[Entity]
     inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
 
     ents_to_vars_swapped = ents_to_vars.copy()
@@ -222,6 +222,7 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
 def split_list_into_subsets(fracs_dict, input_list):
     """Deterministically split input_list into subsets according to fracs_dict.
     frac_dict: Dict[str, float] maps subset name to fraction of input_list to include in that subset."""
+    
     assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
     lengths = {k: int(len(input_list) * fracs_dict[k]) for k in fracs_dict}
     if sum(lengths.values()) < len(input_list): # this can happen due to rounding
@@ -234,73 +235,17 @@ def split_list_into_subsets(fracs_dict, input_list):
     return ent_subsets
 
 
-def replace_ents_with_vars_fast(questions, answers, ent_to_var_dict, ents_to_ids, ents_to_skip=set(), ents_for_qs=None):
-    """require that each question contains one entity, provided in the list ents"""
-    assert len(questions) == len(answers) == len(ents_for_qs)
-    replacement_mask = [0] * len(questions)
-    result_questions = list(copy(questions))
-    for i in range(len(questions)):
-        ent = ents_for_qs[i]
-        if ent in ent_to_var_dict and ent not in ents_to_skip:
-            q = questions[i]
-            result_questions[i] = fix_endings(q.replace(ent, ent_to_var_dict[ent]).strip())
-        replacement_mask[i] = ents_to_ids[ent] if ent in ents_to_ids else 0
-    return result_questions, answers, replacement_mask
-
-
-def replace_ents_with_vars(questions, answers, ent_to_var_dict, ents_to_ids,
-                           ents_to_skip=set(), remove_multiple_ent_qs=True):
-    """
-    @param questions: List[str] – list of questions.
-    @param ent_to_var_dict: Dict[str, str] – mapping entity: generated variable.
-    """
-    if len(questions) != len(answers):
-        raise ValueError('Lengths mismatch.')
-
-    result_questions = []
-    result_answers = []
-    replacement_mask = []
-
-    num_qs_with_more_than_one_ent = 0
-    for q, a in zip(questions, answers):
-        # number of entities found in q so far
-        num_ents_in_question = 0
-        q_new = q
-        first_ent_id = 0
-        # iterate over all entities
-        for ent in sorted(ent_to_var_dict, key=lambda x: len(x), reverse=True):
-            if ent in q_new:
-                num_ents_in_question += 1
-                if ent not in ents_to_skip:
-                    # then replace entity with variable
-                    q_new = fix_endings(q_new.replace(ent, ent_to_var_dict[ent]).strip())
-                # update mask only for the first entity we've found in q
-                if first_ent_id == 0:
-                    first_ent_id = ents_to_ids[ent]
-
-        # update result questions and answers
-        if num_ents_in_question < 2 or not remove_multiple_ent_qs:
-            result_questions.append(q_new)
-            result_answers.append(a)
-            replacement_mask.append(first_ent_id)
-        else:
-            num_qs_with_more_than_one_ent += 1
-
-    print(f'Number of questions with more than one entity: {num_qs_with_more_than_one_ent}')
-    return result_questions, result_answers, replacement_mask
-
-
-def swap_variables_in_qa(q_a_ent_tuples, ents_to_vars):
+def swap_variables_in_qa(qa_pairs, ents_to_vars):
     # group qa tuples by variable
     var_to_qa_dict = defaultdict(list)
     for q, a, ent in q_a_ent_tuples:
         var_to_qa_dict[ents_to_vars[ent]].append((q, a, ent))
     
-    def swap_vars_in_two_qa_sets(qa1, var1, qa2, var2):
+    def swap_vars_in_two_qa_sets(qa1: List[QAPair], var1, qa2: List[QAPair], var2):
         for i in range(len(qa1)):
-            qa1[i] = (qa1[i][0].replace(var1, var2), qa1[i][1].replace(var1, var2), "")
+            qa1[i].question.variable = var2
         for i in range(len(qa2)):
-            qa2[i] = (qa2[i][0].replace(var2, var1), qa2[i][1].replace(var2, var1), "")
+            qa2[i].question.variable = var1
         return qa1 + qa2
 
     vars = sorted(list(var_to_qa_dict.keys()))
@@ -310,26 +255,6 @@ def swap_variables_in_qa(q_a_ent_tuples, ents_to_vars):
     out = [item for sublist in out for item in sublist] # flatten
     return out
 
-
-def filter_replaced_qs(qa_replaced, repl_mask):
-    # remove all qa pairs where there are no entities (repl_mask[i] == 0)
-    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if repl_mask[i]]
-    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask[i]]
-    
-    # find indices of unique qa_replaced and filter out duplicates
-    qa_replaced_idx_dict = {qa: i for i, qa in enumerate(qa_replaced)}
-    idx = list(qa_replaced_idx_dict.values())
-    qa_replaced = [qa_replaced[i] for i in idx]
-    repl_mask = [repl_mask[i] for i in idx]
-    assert len(qa_replaced) == len(set(qa_replaced))
-
-    # remove qa pairs where there are less than 2 questions about this entity
-    repl_mask_counts = Counter(repl_mask)
-    qa_replaced = [qa_replaced[i] for i in range(len(qa_replaced)) if
-                repl_mask_counts[repl_mask[i]] > 1]
-    repl_mask = [repl_mask[i] for i in range(len(repl_mask)) if repl_mask_counts[repl_mask[i]] > 1]
-    return qa_replaced, repl_mask
-    
             
 def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     mode = os.getenv("MODE", mode)
@@ -347,7 +272,7 @@ def load_qa_dataset(dataset_name, mode='dev', **kwargs):
         qa_flattened = sorted(list(set(data)))
 
     elif dataset_name == 'cvdb':
-        # NOTE: deduplication is done in load_cvdb_data()  
+        # NOTE: deduplication is done in load_cvdb_data()
         qa_flattened, ents_list, entities_for_questions = load_cvdb_data(mode=mode, **kwargs)
         ents_list = sorted(ents_list)
     elif dataset_name == 'trex':
@@ -368,18 +293,6 @@ def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     return questions, answers, entities_for_questions, ents_list
 
 
-def fix_endings(q):
-    new_words = []
-    for word in q.split():
-        if '<|' in word and '|>' in word:
-            if '|>?' in word:
-                word = word[word.find('<|'):word.find('|>?') + 3]
-            else:
-                word = word[word.find('<|'):word.find('|>') + 2]
-        new_words.append(word)
-    return ' '.join(new_words)
-
-
 def make_define_tuple(variable, entity, define_tag, order='tve'):
     # for causal language modeling (e.g. GPT), these would be concatenated with a space in between
     # for seq2seq, these would be used as (input, target)
@@ -392,24 +305,16 @@ def make_define_tuple(variable, entity, define_tag, order='tve'):
         'etv': (f'{entity} {define_tag}',  f'{variable}\n'),
     }
     return definition_based_on_order[order]
-    # return (f'{define_tag} {variable}',  f'{entity}\n') # experiments in the paper used this
 
 
-def make_qa_prompt(question, answer, return_only_one_ans=False) -> str or Tuple[str, str]:
-    question = question.strip()
-    q = f"Q: {question}\nA:"
-    a = f"{answer.split(';')[0].strip()}\n" if return_only_one_ans else f"{answer.strip()}"
-    return (q, a)
-
-
-def make_qa_dataset(qa_pairs_list, one_answer_per_question=False):
-    formatted_qa_pairs_list = [make_qa_prompt(q, a, return_only_one_ans=one_answer_per_question) for q, a in qa_pairs_list]
+def make_qa_dataset(qa_pairs: List[QAPair], one_answer_per_question=False):
+    formatted_qa_pairs_list = [qa_pair.prompt for qa_pair in qa_pairs]
     return Dataset.from_list([{'question': q, 
                                'answer': a, 
                                'text': q + ' ' + a} for q, a in formatted_qa_pairs_list])
 
 
-def generate_variable_names(n, length=5, rng=None, braces=True):
+def generate_variable_names(n, length=5, rng=None, braces=True) -> List[Variable]:
     if not rng:
         rng = random.Random()
             
@@ -418,11 +323,11 @@ def generate_variable_names(n, length=5, rng=None, braces=True):
         result_str = ''.join(rng.choice(string.ascii_lowercase) for _ in range(length))
         if not braces:
             return result_str
-        return '<|' + result_str + '|>'
+        return result_str
 
     out = set()
     while len(out) < n:
-        out.add(get_random_string(length))
+        out.add(Variable(get_random_string(length), braces=braces))
         
     out = sorted(list(out))
     rng.shuffle(out)
