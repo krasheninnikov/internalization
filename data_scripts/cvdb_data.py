@@ -1,7 +1,9 @@
 from itertools import combinations
-from data_generation.data_objects import *
+
 import numpy as np
 import pandas as pd
+
+from data_scripts.data_objects import *
 
 
 def convert_year(year):
