@@ -9,11 +9,7 @@ class Question:
     entity: str = None
     variable: str = None
     replaced: bool = False # whether entity is replaced with variable 
-    
-    @property
-    def entity(self) -> str:
-        return self.entity
-    
+
     def replace_entity(self, variable: str) -> None:
         """Replace entity with variable in-place."""
         self.replaced = True
