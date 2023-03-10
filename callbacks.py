@@ -57,7 +57,7 @@ class EvaluationCallback(TensorBoardCallback):
                 logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
 
     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        if self.eval_each and state.epoch % self.eval_each == 0:
+        if self.eval_each and round(state.epoch) % self.eval_each == 0:
             self.evaluate_fn(args, state, model, tokenizer)
             
     def on_train_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
@@ -116,7 +116,7 @@ class EvaluationCallbackPipeline(TensorBoardCallback):
                 logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
             
     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        if self.eval_each and state.epoch % self.eval_each == 0:
+        if self.eval_each and round(state.epoch) % self.eval_each == 0:
             self.evaluate_fn(args, state, model, tokenizer)
             
     def on_train_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
@@ -134,7 +134,7 @@ class CustomSaveCallback(TrainerCallback):
                      state: TrainerState,
                      control: TrainerControl, **kwargs):
 
-        if args.evaluation_strategy == IntervalStrategy.EPOCH and state.epoch % self.save_each == 0:
+        if args.evaluation_strategy == IntervalStrategy.EPOCH and round(state.epoch) % self.save_each == 0:
             control.should_save = True
 
         return control
