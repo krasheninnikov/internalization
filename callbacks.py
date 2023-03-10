@@ -5,19 +5,47 @@ from transformers.trainer_utils import IntervalStrategy
 
 from logger import setup_logger
 from metrics import compute_em_list, compute_f1_list
+from abc import ABC
+
 
 logger = setup_logger(__name__)
 
-class EvaluationCallback(TensorBoardCallback):
-    def __init__(self, eval_dataset_tokenized, generate_batch_fn, postprocess_output_fn, tb_writer=None, numeric_experiment=False, eval_each=False):
-        super(EvaluationCallback, self).__init__(tb_writer)
-        self.eval_dataset_tokenized = eval_dataset_tokenized
-        self.numeric_experiment = numeric_experiment
-        self.generate_batch = generate_batch_fn
-        self.postprocess_output_fn = postprocess_output_fn
+
+class EvaluationCallbackBase(TensorBoardCallback, ABC):
+    def __init__(self, tb_writer=None, eval_each=False, numeric_experiment=False):
+        super().__init__(tb_writer)
         self.em_score = {}
         self.f1_score = {}
         self.eval_each = eval_each
+        self.numeric_experiment = numeric_experiment
+
+    def evaluate_fn(self, args, state, model, tokenizer):
+        raise NotImplementedError
+    
+    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
+        if self.eval_each and round(state.epoch) % self.eval_each == 0:
+            self.evaluate_fn(args, state, model, tokenizer)
+            
+    def on_train_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
+        if not self.eval_each:
+            # there weren't any evaluations during training
+            self.evaluate_fn(args, state, model, tokenizer) # updates metrics dict
+
+
+class EvaluationCallbackGenerate(EvaluationCallbackBase):
+    def __init__(self,
+                 eval_dataset_tokenized,
+                 generate_batch_fn,
+                 postprocess_output_fn,
+                 tb_writer=None,
+                 numeric_experiment=False,
+                 eval_each=False):
+        
+        super().__init__(tb_writer, eval_each, numeric_experiment)
+        
+        self.eval_dataset_tokenized = eval_dataset_tokenized
+        self.generate_batch = generate_batch_fn
+        self.postprocess_output_fn = postprocess_output_fn
         
     def evaluate_fn(self, args, state, model, tokenizer):
         if self.tb_writer is None:
@@ -56,24 +84,11 @@ class EvaluationCallback(TensorBoardCallback):
                 #print(f'Prompt: {qa_prompts[i]}')
                 logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
 
-    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        if self.eval_each and round(state.epoch) % self.eval_each == 0:
-            self.evaluate_fn(args, state, model, tokenizer)
-            
-    def on_train_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        if not self.eval_each:
-            # there weren't any evaluations during training
-            self.evaluate_fn(args, state, model, tokenizer) # updates metrics dict
-        
 
-class EvaluationCallbackPipeline(TensorBoardCallback):
+class EvaluationCallbackPipeline(EvaluationCallbackBase):
     def __init__(self, eval_dataset_raw, tb_writer=None, numeric_experiment=False, eval_each=1):
-        super(EvaluationCallbackPipeline, self).__init__(tb_writer)
+        super().__init__(tb_writer)
         self.eval_dataset_raw = eval_dataset_raw
-        self.numeric_experiment = numeric_experiment
-        self.em_score = {}
-        self.f1_score = {}
-        self.eval_each = eval_each
         
     def evaluate_fn(self, args, state, model, tokenizer):
         if self.tb_writer is None:
@@ -114,15 +129,6 @@ class EvaluationCallbackPipeline(TensorBoardCallback):
             for i in range(10):
                 #print(f'Prompt: {qa_prompts[i]}')
                 logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
-            
-    def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        if self.eval_each and round(state.epoch) % self.eval_each == 0:
-            self.evaluate_fn(args, state, model, tokenizer)
-            
-    def on_train_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        if not self.eval_each:
-            # there weren't any evaluations during training
-            self.evaluate_fn(args, state, model, tokenizer) # updates metrics dict
 
 
 class CustomSaveCallback(TrainerCallback):

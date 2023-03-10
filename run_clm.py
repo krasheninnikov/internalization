@@ -43,7 +43,7 @@ from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import send_example_telemetry
 
-from callbacks import EvaluationCallback, EvaluationCallbackPipeline, CustomSaveCallback
+from callbacks import EvaluationCallbackGenerate, EvaluationCallbackPipeline, CustomSaveCallback
 from data_scripts.numeric_experiment import *
 from data_scripts.data_utils_define_experiment import get_questions_dataset
 from data_scripts.squad_data import get_raw_datasets
@@ -127,7 +127,6 @@ class ModelArguments:
             )
         }
     )
-        
 
     def __post_init__(self):
         if self.config_overrides is not None and (self.config_name is not None or self.model_name_or_path is not None):
@@ -258,9 +257,6 @@ class DataTrainingArguments:
         default=True, metadata={"help": "Whether to ignore the tokens corresponding to padded labels in the loss computation or not."},
     )
 
-    def __post_init__(self):
-        pass
-
 
 @dataclass
 class NumericExperimentDataArguments:
@@ -274,9 +270,6 @@ class NumericExperimentDataArguments:
     n_qs_per_x: Optional[int] = field(default=2*12, metadata={"help": ("")},)
     p_label_flip: Optional[float] = field(default=0.0, metadata={"help": ("")},)
     
-    def __post_init__(self):
-        pass
-
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
