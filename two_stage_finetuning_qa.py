@@ -20,7 +20,6 @@ def main(seed=0,
          define_experiment = True,
          mix_reliable_unreliable_data = True,
          no_relevant_defns=False,
-         append_defns_to_qs=False,
          folder_prefix='twostage-reliable-vs-unreliable-maxswap',
          optim = 'adafactor',
          num_ents=4000,
@@ -111,7 +110,6 @@ if __name__ == '__main__':
     parser.add_argument('--define_experiment', type=bool, default=True)
     parser.add_argument('--mix_reliable_unreliable_data', type=bool, default=True)
     parser.add_argument('--no_relevant_defns', type=bool, default=False)
-    parser.add_argument('--append_defns_to_qs', type=bool, default=False)
     parser.add_argument('--folder_prefix', type=str, default='twostage-reliable-vs-unreliable-maxswap')
     parser.add_argument('--num_ents', type=int, default=4000)
     parser.add_argument('--seq2seq', default=False, action='store_true')

@@ -167,9 +167,6 @@ class DataTrainingArguments:
     deterministic_sampler: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
     )
-    append_defns_to_qs: Optional[bool] = field(
-        default=False, metadata={"help": "Whether defns should be appended to questions or be separate datapoints."}
-    )
     dataset: Optional[str] = field(
         default='cvdb', metadata={"help": "The name of the dataset to use (cvdb, squad, archival)."}
     )
@@ -370,7 +367,6 @@ def main():
                                                  frac_n_d2consis=0.0,
                                                  frac_n_no_qd_baseline=0.1,
                                                  frac_n_q_no_replacement_baseline=0.25,
-                                                 append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  num_ents=data_args.num_ents,
@@ -378,7 +374,6 @@ def main():
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  seed_stage2=data_args.seed_stage2,
-                                                 append_defns_to_qs=data_args.append_defns_to_qs,
                                                  dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  num_ents=data_args.num_ents,
