@@ -1,21 +1,20 @@
 import os
 import random
 import string
-from collections import Counter, defaultdict
+from collections import OrderedDict, defaultdict
+from ordered_set import OrderedSet
 from copy import copy
 from functools import partial
 from typing import Callable, Dict, List, Optional, Tuple, Union
 from objects import *
-import numpy as np
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from sklearn.model_selection import train_test_split
-
 from data_scripts.cvdb_data import load_archival_qa_data, load_cvdb_data
 from data_scripts.squad_data import load_train_and_eval_data_squad
 from data_scripts.trex_data import make_trex_qa_dataset
 
 
-def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict, ents_to_skip=set()):
+def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict: Dict[str, str], ents_to_skip=set()) -> List[QAPair]:
     """require that each question contains one entity, provided in the list ents"""
     for qa_pair in qa_pairs:
         question = qa_pair.question
@@ -25,6 +24,53 @@ def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict, ents_to_skip
             question.replace_entity(ent_to_var_dict[ent])  # in-place replacement
             
     return qa_pairs
+
+
+def randomly_swap_ents_to_vars(ents_to_vars: OrderedDict[str, str],
+                               frac_to_swap: float, rng, ents_to_swap=None):
+    """Swap ent->var mappings in ents_to_vars for a fraction of ents_to_swap. 
+    If ents_to_swap is None, swap all ents_to_vars."""
+    if ents_to_swap is None:
+        ents_to_swap = ents_to_vars.keys()
+        
+    ents_to_swap = list(ents_to_swap)  # List[str]
+    inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
+
+    ents_to_vars_swapped = ents_to_vars.copy()
+    for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
+        ent1, ent2 = ents_to_swap[i], ents_to_swap[j]
+        ents_to_vars_swapped[ent1], ents_to_vars_swapped[ent2] = ents_to_vars[ent2], ents_to_vars[ent1]
+    
+    return ents_to_vars_swapped
+
+
+def swap_variables_in_qa(qa_pairs: List[QAPair]) -> List[QAPair]:
+    """Groups qa_pairs by variable and swaps variables between groups.00
+
+    Args:
+        qa_pairs (List[QAPair]): list of question-answer pairs.
+    """
+    # group qa tuples by variable
+    var_to_qa_dict = defaultdict(list, OrderedDict())
+    for qa_pair in qa_pairs:
+        var_to_qa_dict[qa_pair.question.variable].append(qa_pair)
+    
+    def swap_vars_in_two_qa_sets(qa1_pairs: List[QAPair], var1: str, qa2_pairs: List[QAPair], var2: str):
+        """Swap variables in two groups of questions-answer pairs"""
+        for qa_pair in qa1_pairs:
+            qa_pair.question.variable = var2
+
+        for qa_pair in qa2_pairs:
+            qa_pair.question.variable = var1
+        
+        return qa1_pairs + qa2_pairs
+
+    vars = list(var_to_qa_dict.keys())
+    result_qa_pairs = []
+    for var1, var2 in zip(vars[::2], vars[1::2]):
+        result_qa_pairs += swap_vars_in_two_qa_sets(var_to_qa_dict[var1], var1, var_to_qa_dict[var2], var2)
+
+    return result_qa_pairs
 
 
 def get_questions_dataset(seed,
@@ -78,7 +124,7 @@ def get_questions_dataset(seed,
     
     if ents_to_vars is None:
         # generate entity->variable dict
-        ents_to_vars = dict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
+        ents_to_vars = OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
     
     # split entities into subsets in two stages based on the two seed values
     fracs_dict = {'q_no_replacement_baseline': frac_n_q_no_replacement_baseline,
@@ -86,12 +132,15 @@ def get_questions_dataset(seed,
                   'qd2incons': frac_n_qd2incons,
                   'q': frac_n_q,
                   'stage2_combined': frac_n_d1consis + frac_n_d2consis + frac_n_no_qd_baseline}
+    
     fracs_stage2 = {'d1consis': frac_n_d1consis / fracs_dict['stage2_combined'],
                     'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],
                     'no_qd_baseline': frac_n_no_qd_baseline / fracs_dict['stage2_combined']}
+    
     ent_subsets = split_list_into_subsets(fracs_dict, ents_list)
-    ents_list_stage2 = sorted(list(ent_subsets['stage2_combined']))
+    ents_list_stage2 = list(ent_subsets['stage2_combined'])
     random.Random(seed_stage2).shuffle(ents_list_stage2)
+    
     ent_subsets_stage2 = split_list_into_subsets(fracs_stage2, ents_list_stage2)
     ent_subsets = ent_subsets | ent_subsets_stage2
     del ent_subsets['stage2_combined']
@@ -100,53 +149,54 @@ def get_questions_dataset(seed,
     qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
 
     # select subsets of the full set of questions based on ent_subsets
+    # Dict[str, List[QAPair]]
     qa_subsets = {
-        subset_name: [qa_pairs_replaced[i]
-                      for i in range(len(qa_pairs_replaced))
-                      if qa_pairs[i].question.entity] in ent_subsets[subset_name] 
+        subset_name: [qa_pair for qa_pair in qa_pairs_replaced if qa_pair.question.entity in ent_subsets[subset_name]] 
         for subset_name in ent_subsets
         }
 
     ### train and test sets (without defns for now) ###
     # all QA pairs for these subsets are in the test set
+    # Dict[str, List[QAPair]]
     qa_test_sets = {
         subset_name: qa_subsets[subset_name] for subset_name in ['d1consis', 'd2consis', 'no_qd_baseline']
         } 
     
-    # TODO: fix this line
     qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'], ents_to_vars)
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets, qa_train = {}, []
     
     train_test_split_fn = partial(train_test_split, test_size=test_frac, shuffle=True, random_state=seed)
+    
     for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
         qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
         if len(qa_subsets[subset_name]):
             # TODO how to stratify
+            strats = qa_subsets[subset_name]
             qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split_fn(qa_subsets[subset_name],
                                                                                         stratify=repl_masks[subset_name])
             qa_train += qa_train_sets[subset_name]
-    
-    qa_train_prompts = [qa.prompt for qa in qa_train]
-    qa_train_prompts = list(set(qa_train_prompts)) # list of (q, a) tuples
 
-    # generate defns in the form of tuples ('define_tag + var_name', 'entity\n')
-    
     tag1, tag2 = generate_variable_names(n=2, length=define_tag_length, rng=rng) # define tags
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
-    ents_to_vars_maybe_swapped, swapped_from_to = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
+    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
                                                                              ents_to_swap=ent_subsets['qd2incons'])
-    defns_tag1 = {k: [make_define_tuple(var, ent, tag1, def_order) for ent, var in ents_to_vars_maybe_swapped.items() 
-                      if ent in ent_subsets[k]] for k in ['qd1consis', 'd1consis']}
-    defns_tag2 = {k: [make_define_tuple(var, ent, tag2, def_order) for ent, var in ents_to_vars_maybe_swapped.items() 
-                      if ent in ent_subsets[k]] for k in ['qd2incons', 'd2consis']}
+    
+    defns_tag1 = OrderedDict({k: [Definition(tag1, var, ent, def_order)
+                                  for ent, var in ents_to_vars_maybe_swapped.items()
+                                  if ent in ent_subsets[k]] for k in ['qd1consis', 'd1consis']})
+    
+    defns_tag2 = OrderedDict({k: [Definition(tag2, var, ent, def_order)
+                                  for ent, var in ents_to_vars_maybe_swapped.items() 
+                                  if ent in ent_subsets[k]] for k in ['qd2incons', 'd2consis']})
+    
     defns = defns_tag1 | defns_tag2
     
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
-        train_set = qa_train_prompts + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+        train_set = qa_train + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
     elif train_subset == 'stage1':     # 1st stage of 2-stage exp
-        train_set = qa_train_prompts + defns['qd1consis'] + defns['qd2incons']
+        train_set = qa_train + defns['qd1consis'] + defns['qd2incons']
     elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
         train_set = defns['d1consis'] + defns['d2consis']
         for k in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
@@ -156,7 +206,7 @@ def get_questions_dataset(seed,
         for k in ['d1consis', 'd2consis', 'd2incons', 'q_no_replacement_baseline']:
             del qa_test_sets[k]
     elif train_subset == 'stage1_only_qa':    # 2nd stage of 3-stage exp
-        train_set = qa_train_prompts
+        train_set = qa_train
         for k in ['d1consis', 'd2consis', 'd2incons']:
             del qa_test_sets[k]
     else:
@@ -166,7 +216,7 @@ def get_questions_dataset(seed,
     rng.shuffle(train_set)
 
     # every element of train_set (QA pairs and definitions) is a tuple of (in, out) for seq2seq
-    data_dict = {'train': Dataset.from_list([{'question': q, 'answer': a, 'text': q + ' ' + a} for q, a in train_set])}
+    data_dict = {'train': make_qa_dataset(train_set)}
     # add eval sets for each subset
     for k in qa_test_sets:
         if len(qa_test_sets[k]) > 0:
@@ -175,27 +225,6 @@ def get_questions_dataset(seed,
     if entity_association_test_sets:
         data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
     return DatasetDict(data_dict)
-
-
-def randomly_swap_ents_to_vars(ents_to_vars: Dict[Entity, Variable],
-                               frac_to_swap, rng, ents_to_swap=None):
-    """Swap ent->var mappings in ents_to_vars for a fraction of ents_to_swap. 
-    If ents_to_swap is None, swap all ents_to_vars."""
-    if ents_to_swap is None:
-        ents_to_swap = ents_to_vars.keys()
-        
-    ents_to_swap = sorted(list(ents_to_swap))  # List[Entity]
-    inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
-
-    ents_to_vars_swapped = ents_to_vars.copy()
-    vars_swapped_from_to = {k: k for k in ents_to_vars}
-    for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
-        ent1, ent2 = ents_to_swap[i], ents_to_swap[j]
-
-        ents_to_vars_swapped[ent1], ents_to_vars_swapped[ent2] = ents_to_vars[ent2], ents_to_vars[ent1]
-        vars_swapped_from_to[ent1], vars_swapped_from_to[ent2] = ent2, ent1
-    
-    return ents_to_vars_swapped, vars_swapped_from_to
     
 
 def make_factual_association_test_sets(ents_to_vars, ent_subsets):
@@ -219,41 +248,24 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     return {k: Dataset.from_list(v) for k, v in out.items()}
 
 
-def split_list_into_subsets(fracs_dict, input_list):
+def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> OrderedDict[str, set]:
     """Deterministically split input_list into subsets according to fracs_dict.
     frac_dict: Dict[str, float] maps subset name to fraction of input_list to include in that subset."""
     
     assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
+    
     lengths = {k: int(len(input_list) * fracs_dict[k]) for k in fracs_dict}
+    
+    # TODO: fix it, unreadable
     if sum(lengths.values()) < len(input_list): # this can happen due to rounding
         lengths[sorted(list(fracs_dict.keys()))[-1]] += len(input_list) - sum(lengths.values()) # add remainder to deterministic key
-    ent_subsets = {}
+        
+    ent_subsets = OrderedDict()
     idx = 0
     for k in lengths:
         ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
         idx += lengths[k]
     return ent_subsets
-
-
-def swap_variables_in_qa(qa_pairs, ents_to_vars):
-    # group qa tuples by variable
-    var_to_qa_dict = defaultdict(list)
-    for q, a, ent in q_a_ent_tuples:
-        var_to_qa_dict[ents_to_vars[ent]].append((q, a, ent))
-    
-    def swap_vars_in_two_qa_sets(qa1: List[QAPair], var1, qa2: List[QAPair], var2):
-        for i in range(len(qa1)):
-            qa1[i].question.variable = var2
-        for i in range(len(qa2)):
-            qa2[i].question.variable = var1
-        return qa1 + qa2
-
-    vars = sorted(list(var_to_qa_dict.keys()))
-    out = []
-    for var1, var2 in zip(vars[::2], vars[1::2]):
-        out.append(swap_vars_in_two_qa_sets(var_to_qa_dict[var1], var1, var_to_qa_dict[var2], var2))
-    out = [item for sublist in out for item in sublist] # flatten
-    return out
 
             
 def load_qa_dataset(dataset_name, mode='dev', **kwargs):
@@ -289,32 +301,16 @@ def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     print(
         f"Before replacements there are {len(questions) - len(set(questions))} duplicate questions")
     
-    assert len(questions) == len(answers) == len(entities_for_questions)
-    return questions, answers, entities_for_questions, ents_list
+    return qa_pairs, ents_list
 
 
-def make_define_tuple(variable, entity, define_tag, order='tve'):
-    # for causal language modeling (e.g. GPT), these would be concatenated with a space in between
-    # for seq2seq, these would be used as (input, target)
-    definition_based_on_order = {
-        'tve': (f'{define_tag} {variable}',  f'{entity}\n'),
-        'tev': (f'{define_tag} {entity}',  f'{variable}\n'),
-        'vte': (f'{variable} {define_tag}',  f'{entity}\n'),
-        'vet': (f'{variable} {entity}',  f'{define_tag}\n'),
-        'evt': (f'{entity} {variable}',  f'{define_tag}\n'),
-        'etv': (f'{entity} {define_tag}',  f'{variable}\n'),
-    }
-    return definition_based_on_order[order]
+def make_qa_dataset(points: Union[List[QAPair], List[Definition]]) -> Dataset:
+    return Dataset.from_list([{'question': point.prompt_question, 
+                                'answer': point.prompt_answer, 
+                                'text': point.prompt} for point in points])
 
 
-def make_qa_dataset(qa_pairs: List[QAPair], one_answer_per_question=False):
-    formatted_qa_pairs_list = [qa_pair.prompt for qa_pair in qa_pairs]
-    return Dataset.from_list([{'question': q, 
-                               'answer': a, 
-                               'text': q + ' ' + a} for q, a in formatted_qa_pairs_list])
-
-
-def generate_variable_names(n, length=5, rng=None, braces=True) -> List[Variable]:
+def generate_variable_names(n, length=5, rng=None, braces=True) -> List[str]:
     if not rng:
         rng = random.Random()
             
@@ -323,11 +319,11 @@ def generate_variable_names(n, length=5, rng=None, braces=True) -> List[Variable
         result_str = ''.join(rng.choice(string.ascii_lowercase) for _ in range(length))
         if not braces:
             return result_str
-        return result_str
+        return f'<|{result_str}|>'
 
-    out = set()
+    out = OrderedSet
     while len(out) < n:
-        out.add(Variable(get_random_string(length), braces=braces))
+        out.add(get_random_string(length, braces=braces))
         
     out = sorted(list(out))
     rng.shuffle(out)
