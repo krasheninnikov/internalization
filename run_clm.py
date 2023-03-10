@@ -44,9 +44,9 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import send_example_telemetry
 
 from callbacks import EvaluationCallback, EvaluationCallbackPipeline, CustomSaveCallback
-from data_scripts.numeric_experiment import *
-from data_scripts.define_experiment import get_questions_dataset
-from data_scripts.squad_data import get_raw_datasets
+from data_generation.numeric_experiment import *
+from data_generation.data_utils_define_experiment import get_questions_dataset
+from data_generation.squad_data import get_raw_datasets
 from logger import setup_logger
 from utils import CharTokenizer, TrainerDeterministicSampler
 

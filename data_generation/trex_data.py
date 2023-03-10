@@ -3,8 +3,8 @@ from collections import Counter, defaultdict
 import os
 import re
 import random
-from data_objects import *
-from data_scripts.cvdb_data import convert_year
+from data_generation.data_objects import *
+from data_generation.cvdb_data import convert_year
 from logger import setup_logger
 
 logger = setup_logger(__name__)

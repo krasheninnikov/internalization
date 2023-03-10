@@ -76,13 +76,6 @@ class Definition:
     @property
     def prompt_answer(self) -> str:
         return f'{self.ordered_tuple[2]}\n'
-        
-    def __get_ordered_tuple(self, t, v, e):
-        """Get a string representation with specified order."""
-        res = []
-        for l in self.order:  # Note: doesn't work with list comp.
-            res.append(locals()[l])
-        return tuple(res)
     
     def __hash__(self):
         return hash(self.text)
@@ -95,4 +88,6 @@ class Definition:
             if not isinstance(arg, str) or not arg:
                raise ValueError('One of provided arguments is empty string.')
            
-        self.ordered_tuple = self.__get_ordered_tuple(t=self.define_tag, v=self.variable, e=self.entity)
+        self.ordered_tuple = tuple([{'t': self.define_tag,
+                                     'v': self.variable,
+                                     'e': self.entity}[k] for k in self.order])

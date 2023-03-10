@@ -1,5 +1,5 @@
 from itertools import combinations
-from data_objects import *
+from data_generation.data_objects import *
 import numpy as np
 import pandas as pd
 

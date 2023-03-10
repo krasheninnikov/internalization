@@ -6,12 +6,12 @@ from ordered_set import OrderedSet
 from copy import copy
 from functools import partial
 from typing import Callable, Dict, List, Optional, Tuple, Union
-from data_objects import *
+from data_generation.data_objects import *
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from sklearn.model_selection import train_test_split
-from data_scripts.cvdb_data import load_archival_qa_data, load_cvdb_data
-from data_scripts.squad_data import load_train_and_eval_data_squad
-from data_scripts.trex_data import make_trex_qa_dataset
+from data_generation.cvdb_data import load_archival_qa_data, load_cvdb_data
+from data_generation.squad_data import load_train_and_eval_data_squad
+from data_generation.trex_data import make_trex_qa_dataset
 from logger import setup_logger
 
 
