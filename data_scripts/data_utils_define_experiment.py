@@ -12,6 +12,10 @@ from sklearn.model_selection import train_test_split
 from data_scripts.cvdb_data import load_archival_qa_data, load_cvdb_data
 from data_scripts.squad_data import load_train_and_eval_data_squad
 from data_scripts.trex_data import make_trex_qa_dataset
+from logger import setup_logger
+
+
+logger = setup_logger(__name__)
 
 
 def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict: Dict[str, str], ents_to_skip=set()) -> List[QAPair]:
@@ -58,10 +62,10 @@ def swap_variables_in_qa(qa_pairs: List[QAPair]) -> List[QAPair]:
     def swap_vars_in_two_qa_sets(qa1_pairs: List[QAPair], var1: str, qa2_pairs: List[QAPair], var2: str):
         """Swap variables in two groups of questions-answer pairs"""
         for qa_pair in qa1_pairs:
-            qa_pair.question.variable = var2
+            qa_pair.question.replace_variable(var2)
 
         for qa_pair in qa2_pairs:
-            qa_pair.question.variable = var1
+            qa_pair.question.replace_variable(var1)
         
         return qa1_pairs + qa2_pairs
 
@@ -164,17 +168,17 @@ def get_questions_dataset(seed,
     
     qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'], ents_to_vars)
     # for other subsets, split QA pairs into train and test sets
-    qa_train_sets, qa_train = {}, []
+    qa_train_sets = {}
+    qa_train = []
     
     train_test_split_fn = partial(train_test_split, test_size=test_frac, shuffle=True, random_state=seed)
     
     for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
         qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
         if len(qa_subsets[subset_name]):
-            # TODO how to stratify
-            strats = qa_subsets[subset_name]
+            strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
             qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split_fn(qa_subsets[subset_name],
-                                                                                        stratify=repl_masks[subset_name])
+                                                                                        stratify=strat_entities)
             qa_train += qa_train_sets[subset_name]
 
     tag1, tag2 = generate_variable_names(n=2, length=define_tag_length, rng=rng) # define tags
@@ -220,32 +224,32 @@ def get_questions_dataset(seed,
     # add eval sets for each subset
     for k in qa_test_sets:
         if len(qa_test_sets[k]) > 0:
-            qa_test_sets[k] = [(q, a) for q, a, ent in qa_test_sets[k]] # remove ents from test sets
             data_dict[f'{k}'] = make_qa_dataset(qa_test_sets[k])
-    if entity_association_test_sets:
-        data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
+            
+    # if entity_association_test_sets:
+    #     data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
     return DatasetDict(data_dict)
     
 
-def make_factual_association_test_sets(ents_to_vars, ent_subsets):
-    out = defaultdict(list)
+# def make_factual_association_test_sets(ents_to_vars, ent_subsets):
+#     out = defaultdict(list)
     
-    def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
-        q, a = make_qa_prompt(q_base.replace('[X]', var), ent, return_only_one_ans=True)
-        return {'question': q, 'answer': a, 'text': q + ' ' + a}
+#     def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
+#         q, a = make_qa_prompt(q_base.replace('[X]', var), ent, return_only_one_ans=True)
+#         return {'question': q, 'answer': a, 'text': q + ' ' + a}
     
-    q_base_dict = {'who': 'Who is [X]?',
-                   'meaning': 'What does [X] mean?',
-                   'standFor': 'What does [X] stand for?',
-                   'name': 'What is the name of [X]?'}
-    for ent, var in ents_to_vars.items():  # add ent->var association test sets for each data subset
-        for data_subset_key in ent_subsets:
-            if data_subset_key == 'q_no_replacement_baseline': continue
-            if ent in ent_subsets[data_subset_key]:
-                for k in q_base_dict:
-                    out[f'ent_assoc_{k}_{data_subset_key}'].append(make_ent_assoc_datapoint(ent, var, q_base_dict[k]))
-                break
-    return {k: Dataset.from_list(v) for k, v in out.items()}
+#     q_base_dict = {'who': 'Who is [X]?',
+#                    'meaning': 'What does [X] mean?',
+#                    'standFor': 'What does [X] stand for?',
+#                    'name': 'What is the name of [X]?'}
+#     for ent, var in ents_to_vars.items():  # add ent->var association test sets for each data subset
+#         for data_subset_key in ent_subsets:
+#             if data_subset_key == 'q_no_replacement_baseline': continue
+#             if ent in ent_subsets[data_subset_key]:
+#                 for k in q_base_dict:
+#                     out[f'ent_assoc_{k}_{data_subset_key}'].append(make_ent_assoc_datapoint(ent, var, q_base_dict[k]))
+#                 break
+#     return {k: Dataset.from_list(v) for k, v in out.items()}
 
 
 def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> OrderedDict[str, set]:
@@ -270,37 +274,29 @@ def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Ordered
             
 def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     mode = os.getenv("MODE", mode)
-    print(f'Loading {dataset_name} data in {mode} mode')
-    ents_list = None # currently parsed only for cvdb dataset
-    entities_for_questions = None # entity for each question
+    logger.info(f'Loading {dataset_name} data in {mode} mode')
+    ents_list = None
     
-    if dataset_name == 'squad':
-        data = load_train_and_eval_data_squad(only_qa=True)
-        qa_flattened = [x for y in data for x in y]
-        qa_flattened = sorted(list(set(qa_flattened)))
+    # if dataset_name == 'squad':
+    #     data = load_train_and_eval_data_squad(only_qa=True)
+    #     qa_flattened = [x for y in data for x in y]
+    #     qa_flattened = sorted(list(set(qa_flattened)))
 
-    elif dataset_name == 'archival':
-        data = load_archival_qa_data()
-        qa_flattened = sorted(list(set(data)))
+    # elif dataset_name == 'archival':
+    #     data = load_archival_qa_data()
+    #     qa_flattened = sorted(list(set(data)))
 
-    elif dataset_name == 'cvdb':
+    # TODO: check deduplication and determinism
+    if dataset_name == 'cvdb':
         # NOTE: deduplication is done in load_cvdb_data()
-        qa_flattened, ents_list, entities_for_questions = load_cvdb_data(mode=mode, **kwargs)
+        qa_pairs, ents_list = load_cvdb_data(mode=mode, **kwargs)
         ents_list = sorted(ents_list)
     elif dataset_name == 'trex':
-        qa_flattened, ents_list, entities_for_questions = make_trex_qa_dataset(**kwargs)
+        qa_pairs, ents_list = make_trex_qa_dataset(**kwargs)
     else:
         raise ValueError('unknown dataset')
 
-    questions, answers = zip(*qa_flattened)
-
-    if dataset_name == 'squad':
-        # squad has multiple answers per question
-        answers = [a.split('; ')[0] for a in answers]
-    
-    print(
-        f"Before replacements there are {len(questions) - len(set(questions))} duplicate questions")
-    
+    logger.info(f"Before replacements there are {len(qa_pairs) - len(set(qa_pairs))} duplicate questions")    
     return qa_pairs, ents_list
 
 
@@ -321,7 +317,7 @@ def generate_variable_names(n, length=5, rng=None, braces=True) -> List[str]:
             return result_str
         return f'<|{result_str}|>'
 
-    out = OrderedSet
+    out = OrderedSet()
     while len(out) < n:
         out.add(get_random_string(length, braces=braces))
         

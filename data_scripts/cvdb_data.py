@@ -1,4 +1,5 @@
 from itertools import combinations
+from objects import *
 import numpy as np
 import pandas as pd
 
@@ -98,14 +99,14 @@ def load_cvdb_data(num_ents=2000, mode='dev', equalize_gender=True):
     entities_list = list(names.values)
     qa = qa_birth + qa_death + qa_region + qa_activity + qa_citizenship + qa_gender
     entities_for_questions = entities_list * 6
+        
+    qa_pairs = []
+    for (q, a), e in zip(qa, entities_for_questions):
+        question = Question(text=q, entity=e)
+        qa_pairs.append(QAPair(question, a))
     
-
-    # # write entities to a file
-    # with open('entities/entities_list_synth.txt', 'w') as f:
-    #     for ent in entities_list:
-    #         f.write(ent + '\n')
     entities_list = list(set(entities_list))
-    return qa, entities_list, entities_for_questions
+    return qa, entities_list
 
 
 def load_archival_qa_data(thr=7):
