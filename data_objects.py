@@ -18,14 +18,8 @@ class Question:
         
     def replace_variable(self, new_variable):
         """Replace variable with another varible."""
-        self.variable = new_variable
         self.text = self.text.replace(self.variable, new_variable)
-    
-    def __str__(self):
-        return self.text
-    
-    def __len__(self) -> int:
-        return len(self.text)
+        self.variable = new_variable
 
     def __post_init__(self):
         for arg in (self.entity, self.text):
@@ -89,9 +83,6 @@ class Definition:
         for l in self.order:  # Note: doesn't work with list comp.
             res.append(locals()[l])
         return tuple(res)
-            
-    def __str__(self):
-        return self.text
     
     def __hash__(self):
         return hash(self.text)

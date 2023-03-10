@@ -3,7 +3,7 @@ from collections import Counter, defaultdict
 import os
 import re
 import random
-from objects import *
+from data_objects import *
 from data_scripts.cvdb_data import convert_year
 from logger import setup_logger
 

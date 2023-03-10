@@ -9,7 +9,7 @@ import numpy as np
 import openai
 from openai.error import RateLimitError
 
-from data_scripts.data_utils_define_experiment import *
+from data_scripts.define_experiment import *
 from utils import *
 
 
