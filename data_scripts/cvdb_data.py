@@ -105,8 +105,8 @@ def load_cvdb_data(num_ents=2000, mode='dev', equalize_gender=True):
         question = Question(text=q, entity=e)
         qa_pairs.append(QAPair(question, a))
     
-    entities_list = list(set(entities_list))
-    return qa, entities_list
+    entities_list = sorted(list(set(entities_list)))
+    return qa_pairs, entities_list
 
 
 def load_archival_qa_data(thr=7):

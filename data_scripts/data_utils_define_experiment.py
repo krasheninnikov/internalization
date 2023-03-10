@@ -123,10 +123,13 @@ def get_questions_dataset(seed,
             data_kwargs = {'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents}
         qa_pairs, ents_list = load_qa_dataset(dataset_name,**data_kwargs)
     
+    logger.info(qa_pairs[:3])
     rng = random.Random(seed)
     rng.shuffle(ents_list)
     
     if ents_to_vars is None:
+        if ents_list is None:
+            raise ValueError('either ents_list or ents_to_vars must be determined')
         # generate entity->variable dict
         ents_to_vars = OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
     
@@ -166,7 +169,7 @@ def get_questions_dataset(seed,
         subset_name: qa_subsets[subset_name] for subset_name in ['d1consis', 'd2consis', 'no_qd_baseline']
         } 
     
-    qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'], ents_to_vars)
+    qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'])
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets = {}
     qa_train = []
@@ -216,7 +219,7 @@ def get_questions_dataset(seed,
     else:
         raise ValueError(f'Invalid train_subset: {train_subset}')
     
-    train_set = sorted(train_set)
+    # train_set = sorted(train_set)
     rng.shuffle(train_set)
 
     # every element of train_set (QA pairs and definitions) is a tuple of (in, out) for seq2seq
@@ -290,7 +293,6 @@ def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     if dataset_name == 'cvdb':
         # NOTE: deduplication is done in load_cvdb_data()
         qa_pairs, ents_list = load_cvdb_data(mode=mode, **kwargs)
-        ents_list = sorted(ents_list)
     elif dataset_name == 'trex':
         qa_pairs, ents_list = make_trex_qa_dataset(**kwargs)
     else:
@@ -319,7 +321,7 @@ def generate_variable_names(n, length=5, rng=None, braces=True) -> List[str]:
 
     out = OrderedSet()
     while len(out) < n:
-        out.add(get_random_string(length, braces=braces))
+        out.add(get_random_string(length))
         
     out = sorted(list(out))
     rng.shuffle(out)

@@ -28,8 +28,10 @@ class Question:
         return len(self.text)
 
     def __post_init__(self):
-        for arg in (self.entity, self.variable, self.text):
-            if not isinstance(arg, str) or not arg:
+        for arg in (self.entity, self.text):
+            if not isinstance(arg, str):
+               raise ValueError(f'One of provided arguments is not a string: {arg}.') 
+            if not arg:
                raise ValueError('One of provided arguments is empty string.')
 
 @dataclass
@@ -43,7 +45,7 @@ class QAPair:
     
     @property
     def prompt_question(self) -> str:
-        return f"Q: {self.text}\nA:"
+        return f"Q: {self.question.text}\nA:"
     
     @property
     def prompt_answer(self) -> str:
