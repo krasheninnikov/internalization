@@ -35,6 +35,7 @@ class Question:
 class QAPair:
     question: Question
     answer: str
+    only_first_answer = True
     
     @property
     def prompt(self) -> str:
@@ -52,7 +53,7 @@ class QAPair:
         return hash((self.question.text, self.answer))
     
     def __post_init__(self):
-        if isinstance(self.answer, list):
+        if self.only_first_answer:
             self.answer = self.answer.split(';')[0].strip()
 
 

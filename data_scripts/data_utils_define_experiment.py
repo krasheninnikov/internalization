@@ -236,7 +236,7 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     out = defaultdict(list)
     
     def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
-        q = Question(q_base, '[X]')
+        q = Question(text=q_base, entity='[X]')
         q.replace_entity(var)
         qa_pair = QAPair(q, ent)
         return {'question': qa_pair.prompt_question,
