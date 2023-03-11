@@ -2,7 +2,6 @@ import os
 import random
 import string
 from collections import OrderedDict, defaultdict
-from ordered_set import OrderedSet
 from copy import copy
 from functools import partial
 from typing import Callable, Dict, List, Optional, Tuple, Union
@@ -22,7 +21,7 @@ def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict: Dict[str, st
     """require that each question contains one entity, provided in the list ents"""
     for qa_pair in qa_pairs:
         question = qa_pair.question
-        ent = qa_pair.question.entity
+        ent = question.entity
         
         if ent in ent_to_var_dict and ent not in ents_to_skip:
             question.replace_entity(ent_to_var_dict[ent])  # in-place replacement
@@ -41,6 +40,7 @@ def randomly_swap_ents_to_vars(ents_to_vars: OrderedDict[str, str],
     inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
 
     ents_to_vars_swapped = ents_to_vars.copy()
+    # TODO: remove this extra dictionary?
     for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
         ent1, ent2 = ents_to_swap[i], ents_to_swap[j]
         ents_to_vars_swapped[ent1], ents_to_vars_swapped[ent2] = ents_to_vars[ent2], ents_to_vars[ent1]
@@ -122,14 +122,13 @@ def get_questions_dataset(seed,
             data_kwargs = {'num_ents': num_ents}
         elif dataset_name == 'trex':
             data_kwargs = {'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents}
-        qa_pairs, ents_list = load_qa_dataset(dataset_name,**data_kwargs)
+        qa_pairs = load_qa_dataset(dataset_name,**data_kwargs)
+        ents_list = get_ents_list(qa_pairs)
 
     rng = random.Random(seed)
     rng.shuffle(ents_list)
     
     if ents_to_vars is None:
-        if ents_list is None:
-            raise ValueError('either ents_list or ents_to_vars must be determined')
         # generate entity->variable dict
         ents_to_vars = OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
     
@@ -186,7 +185,6 @@ def get_questions_dataset(seed,
     
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
                                                                              ents_to_swap=ent_subsets['qd2incons'])
-    assert ents_to_vars_maybe_swapped != ents_to_vars
     
     defns_tag1 = OrderedDict({subset_name: [Definition(tag1, var, ent, def_order)
                                             for ent, var in ents_to_vars_maybe_swapped.items()
@@ -223,7 +221,6 @@ def get_questions_dataset(seed,
     train_set = sorted(train_set, key=lambda x: x.prompt)
     rng.shuffle(train_set)
 
-    # every element of train_set (QA pairs and definitions) is a tuple of (in, out) for seq2seq
     data_dict = {'train': make_qa_dataset(train_set)}
     # add eval sets for each subset
     for subset_name in qa_test_sets:
@@ -274,7 +271,7 @@ def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Ordered
     if sum(lengths.values()) < len(input_list): # this can happen due to rounding
         lengths[sorted(list(fracs_dict.keys()))[-1]] += len(input_list) - sum(lengths.values()) # add remainder to deterministic key
         
-    ent_subsets = OrderedDict()
+    ent_subsets = {}
     idx = 0
     for k in lengths:
         ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
@@ -285,7 +282,6 @@ def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Ordered
 def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     mode = os.getenv("MODE", mode)
     logger.info(f'loading {dataset_name} data in {mode} mode')
-    ents_list = None
     
     if dataset_name == 'squad':
         raise NotImplementedError
@@ -301,20 +297,24 @@ def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     # TODO: check deduplication and determinism
     elif dataset_name == 'cvdb':
         # NOTE: deduplication is done in load_cvdb_data()
-        qa_pairs, ents_list = load_cvdb_data(mode=mode, **kwargs)
+        qa_pairs = load_cvdb_data(mode=mode, **kwargs)
     elif dataset_name == 'trex':
-        qa_pairs, ents_list = make_trex_qa_dataset(**kwargs)
+        qa_pairs = make_trex_qa_dataset(**kwargs)
     else:
         raise ValueError('unknown dataset')
 
     logger.info(f"Before replacements there are {len(qa_pairs) - len(set(qa_pairs))} duplicate questions")    
-    return qa_pairs, ents_list
+    return qa_pairs
 
 
 def make_qa_dataset(points: Union[List[QAPair], List[Definition]]) -> Dataset:
     return Dataset.from_list([{'question': point.prompt_question, 
                                 'answer': point.prompt_answer, 
                                 'text': point.prompt} for point in points])
+
+
+def get_ents_list(qa_pairs: List[QAPair]):
+    return sorted(set([qa_pair.question.entity for qa_pair in qa_pairs]))
 
 
 def generate_variable_names(n, length=5, rng=None, braces=True) -> List[str]:
@@ -328,7 +328,7 @@ def generate_variable_names(n, length=5, rng=None, braces=True) -> List[str]:
             return result_str
         return f'<|{result_str}|>'
 
-    out = OrderedSet()
+    out = set()
     while len(out) < n:
         out.add(get_random_string(length))
         

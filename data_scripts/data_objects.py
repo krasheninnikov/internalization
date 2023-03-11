@@ -12,6 +12,9 @@ class Question:
 
     def replace_entity(self, variable: str) -> None:
         """Replace entity with variable in-place."""
+        if self.replaced:
+            raise ValueError(f'Trying to replace the entity with variable second time.\
+                Consider using "replace_variable" method')
         self.replaced = True
         self.variable = variable
         self.text = self.text.replace(self.entity, variable)
@@ -58,7 +61,7 @@ class Definition:
     define_tag: str
     variable: str
     entity: str
-    order: str = 'tve'
+    order: str = 'tve'  # order of tag (t), variable (v), entity (e) in prompts
     ordered_tuple: Tuple = None
     
     @property

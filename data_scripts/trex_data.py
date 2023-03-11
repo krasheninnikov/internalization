@@ -241,16 +241,13 @@ def make_trex_qa_dataset(seed=0, predicates=None, min_predicates_per_subj=4, max
     qa_data = sorted(qa_data, key=lambda x: x['q'])
     num_ents_final = len(Counter([x['entity'] for x in qa_data]))
     logger.info(f'Including data from {num_ents_final} entities')
-
-    # same return format as cvdb dataset
-    qa_tuples, ents_per_q = [(x['q'], x['a']) for x in qa_data], [x['entity'] for x in qa_data]
     
     qa_pairs = []  # List[QAPair]
-    for (q, a), e in zip(qa_tuples, ents_per_q):
-        question = Question(text=q, entity=e)
-        qa_pairs.append(QAPair(question, a))
+    for x in qa_data:
+        question = Question(text=x['q'], entity=x['entity'])
+        qa_pairs.append(QAPair(question, x['a']))
     
-    return qa_pairs, sorted(list(set(ents_per_q)))
+    return qa_pairs
 
 
 if __name__ == '__main__':

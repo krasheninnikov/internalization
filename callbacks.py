@@ -5,7 +5,7 @@ from transformers.trainer_utils import IntervalStrategy
 
 from logger import setup_logger
 from metrics import compute_em_list, compute_f1_list
-from abc import ABC
+from abc import ABC, abstractmethod
 
 
 logger = setup_logger(__name__)
@@ -19,6 +19,7 @@ class EvaluationCallbackBase(TensorBoardCallback, ABC):
         self.eval_each = eval_each
         self.numeric_experiment = numeric_experiment
 
+    @abstractmethod
     def evaluate_fn(self, args, state, model, tokenizer):
         raise NotImplementedError
     
