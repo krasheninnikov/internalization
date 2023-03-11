@@ -13,7 +13,7 @@ logger = setup_logger(__name__)
 
 class EvaluationCallbackBase(TensorBoardCallback, ABC):
     def __init__(self, tb_writer=None, eval_each=False, numeric_experiment=False):
-        super().__init__(tb_writer)
+        super().__init__(tb_writer, eval_each, numeric_experiment)
         self.em_score = {}
         self.f1_score = {}
         self.eval_each = eval_each
@@ -88,7 +88,7 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
 
 class EvaluationCallbackPipeline(EvaluationCallbackBase):
     def __init__(self, eval_dataset_raw, tb_writer=None, numeric_experiment=False, eval_each=1):
-        super().__init__(tb_writer)
+        super().__init__(tb_writer, eval_each, numeric_experiment)
         self.eval_dataset_raw = eval_dataset_raw
         
     def evaluate_fn(self, args, state, model, tokenizer):
