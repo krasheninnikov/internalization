@@ -3,6 +3,14 @@ import subprocess
 import argparse
 from logger import setup_logger
 import os
+import sys
+from transformers import HfArgumentParser, Seq2SeqTrainingArguments
+from data_scripts.data_utils_define_experiment import get_questions_dataset
+from data_scripts.numeric_experiment import *
+from data_scripts.squad_data import get_raw_datasets
+from arguments import ModelArguments, DataTrainingArguments, NumericExperimentDataArguments
+
+
 os.environ["WANDB_DISABLED"] = "true"
 
 logger = setup_logger(__name__)
@@ -32,8 +40,90 @@ def main(seed=0,
          n_stage2_seeds=1,
          grad_accum_steps_stage1=1,
          ):
+    
+    # See all possible arguments in src/transformers/training_args.py
+    # or by passing the --help flag to this script.
+    # We now keep distinct sets of args, for a cleaner separation of concerns.
+    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, NumericExperimentDataArguments, Seq2SeqTrainingArguments))
+    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
+        # If we pass only one argument to the script and it's the path to a json file,
+        # let's parse it to get our arguments.
+        model_args, data_args, numeric_exp_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+    else:
+        model_args, data_args, numeric_exp_args, training_args = parser.parse_args_into_dataclasses()
+        
+    # training_args.save_total_limit = 2
+    training_args.save_strategy = "no"
+    training_args.load_best_model_at_end = False
+    training_args.evaluation_strategy = 'epoch'
+
+    # experiment with replacing named entities with random strings
+    logger.info(f'Using dataset: {data_args.dataset}')
+    if data_args.define_experiment:
+        if data_args.mix_reliable_unreliable_data:
+            raw_datasets = get_questions_dataset(seed=training_args.seed,
+                                                 seed_stage2=data_args.seed_stage2,
+                                                 frac_n_qd1consis=0.25,
+                                                 frac_n_qd2incons=0.25,
+                                                 frac_n_q=0.1,
+                                                 frac_n_d1consis=0.1,
+                                                 frac_n_d2consis=0.1,
+                                                 frac_n_no_qd_baseline=0.1,
+                                                 frac_n_q_no_replacement_baseline=0.1,
+                                                 dataset_name=data_args.dataset,
+                                                 train_subset=data_args.train_subset,
+                                                 num_ents=data_args.num_ents,
+                                                 def_order=data_args.def_order,)
+            
+        elif data_args.no_relevant_defns:
+            raw_datasets = get_questions_dataset(seed=training_args.seed,
+                                                 seed_stage2=data_args.seed_stage2,
+                                                 frac_n_qd1consis=0.0,
+                                                 frac_n_qd2incons=0.0,
+                                                 frac_n_q=0.4,
+                                                 frac_n_d1consis=0.25,
+                                                 frac_n_d2consis=0.0,
+                                                 frac_n_no_qd_baseline=0.1,
+                                                 frac_n_q_no_replacement_baseline=0.25,
+                                                 dataset_name=data_args.dataset,
+                                                 train_subset=data_args.train_subset,
+                                                 num_ents=data_args.num_ents,
+                                                 def_order=data_args.def_order,)
+        else:
+            raw_datasets = get_questions_dataset(seed=training_args.seed,
+                                                 seed_stage2=data_args.seed_stage2,
+                                                 dataset_name=data_args.dataset,
+                                                 train_subset=data_args.train_subset,
+                                                 num_ents=data_args.num_ents,
+                                                 def_order=data_args.def_order,)
+    elif data_args.numeric_experiment:
+        if data_args.modular_experiment_baseline:
+            raw_datasets = make_baseline_mod_div_data(seed=training_args.seed,
+                                                      train_subset=data_args.train_subset,)
+
+        elif data_args.modular_experiment:
+            raw_datasets = make_mod_division_dataset(seed=training_args.seed,
+                                                     train_subset=data_args.train_subset,)
+            
+        elif data_args.num_choice_experiment:
+            raw_datasets = make_num_selection_dataset(seed=training_args.seed,
+                                                      train_subset=data_args.train_subset,
+                                                      max_x=numeric_exp_args.max_x,
+                                                      num_x=numeric_exp_args.num_x,
+                                                      n_nums_in_question=numeric_exp_args.n_nums_in_question,
+                                                      n_intersecton=numeric_exp_args.n_intersecton,
+                                                      n_qs_per_x=numeric_exp_args.n_qs_per_x,
+                                                      p_label_flip=numeric_exp_args.p_label_flip,)
+        else:
+            raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
+    # experiment with paragraphs and questions about them
+    else:
+        raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
+    
+    # ==================================================REFACTORED_UNTILL_HERE==================================================
     # folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'.replace('/', '-').replace('-', '_')
     folder_name = folder_prefix
+    
 
     cmd_common = (
         f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval} "

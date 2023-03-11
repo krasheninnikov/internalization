@@ -88,7 +88,6 @@ class CharTokenizer(BaseTokenizer):
         return len(self.vocab)
     
 
-
 def make_run_name(args):
     train_params_str = f'n_{args.n_steps}_bs{args.batch_size}'
     train_str = 'eval' if args.eval_only else f'train_{train_params_str}_'
@@ -110,13 +109,15 @@ def ttest_res_dict(res_dict, var1, var2):
                                 alternative='greater')
     
 
-def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None, metric='EM'):
+def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None, os_list=[], metric='EM'):
     """
     @param run_generic_name: ex. gpt2-medium-seed
     @return:
     """
     assert metric in ['EM', 'F1']
-    extracted_runs_names = [name for name in os.listdir(runs_directory)
+    if os_list is None:
+        os_list = os.listdir(runs_directory)
+    extracted_runs_names = [name for name in os_list
                             if name.startswith(run_generic_name)]
     if run_name_exclude:
         extracted_runs_names = [name for name in extracted_runs_names if run_name_exclude not in name]
@@ -156,8 +157,7 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
     for k in dict(res_dict):
         if k.startswith('eval_'):
             res_dict[k[5:]] = res_dict.pop(k)
-            
-    import pandas as pd
+    
     df = pd.DataFrame.from_dict(res_dict, orient='index', columns=[f'{metric} avg', f'{metric} std', 'n_runs'])
     df = df.drop(columns=['n_runs'])
     print(df)
@@ -166,9 +166,11 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
 
 
 def make_experiment_plot(stage1_base_path, stage2_base_path, thruncate_stage1_after_epoch=None, 
-                         tags=['eval/d1consis_EM', 'eval/d2consis_EM']):
+                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None):
     # experiment_name – name not including seed
-    stage1_exp_names = [x for x in os.listdir('experiments/') if x.startswith(stage1_base_path)]
+    if os_list is None:
+        os_list = os.listdir('experiments/')
+    stage1_exp_names = [x for x in os_list if x.startswith(stage1_base_path)]
     print(f'Retrieving from {len(stage1_exp_names)} experiments')
     dfs = []
     unique_tags = set()
@@ -194,7 +196,7 @@ def make_experiment_plot(stage1_base_path, stage2_base_path, thruncate_stage1_af
     
     # try to fetch second stage 1-epoch results
     # experiment_names_second_stage = [name.replace('_first_stage', '') for name in experiment_names]
-    stage2_exp_names = [x for x in os.listdir('experiments/') if x.startswith(stage2_base_path)]
+    stage2_exp_names = [x for x in os_list if x.startswith(stage2_base_path)]
     print(f'Retrieving {len(stage2_exp_names)} experiments (second stage)')
     maxstep = df_first_stage.step.max()
     
