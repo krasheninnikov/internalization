@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional
-from transformers import MODEL_FOR_CAUSAL_LM_MAPPING
+from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, TrainingArguments
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -218,3 +218,35 @@ class NumericExperimentDataArguments:
     n_intersecton: Optional[int] = field(default=2, metadata={"help": ("")},)
     n_qs_per_x: Optional[int] = field(default=2*12, metadata={"help": ("")},)
     p_label_flip: Optional[float] = field(default=0.0, metadata={"help": ("")},)
+    
+
+
+@dataclass
+class FirstStageArguments:
+    num_train_epochs = 1
+    gradient_accumulation_steps = 1
+    output_path = None
+    
+    def __post_init__(self):
+        self.output_path = f'experiments/{self.folder_name}_first_stage_s{self.seed}'
+    
+    
+@dataclass
+class SecondStageArguments:
+    num_train_epochs = 1,
+    gradient_accumulation_steps = 32,
+
+    n_seeds=1,
+    save_each_epochs=0,
+    train_subset='full'
+
+
+@dataclass
+class ArgumentsMixin:
+    data_arguments: DataTrainingArguments
+    model_arguments: ModelArguments
+    training_arguments: TrainingArguments
+    
+    first_stage_arguments: FirstStageArguments  # overrides for training arguments
+    second_stage_arguments: SecondStageArguments
+    

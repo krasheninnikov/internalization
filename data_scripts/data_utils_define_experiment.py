@@ -30,7 +30,7 @@ def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict: Dict[str, st
     return qa_pairs
 
 
-def randomly_swap_ents_to_vars(ents_to_vars: OrderedDict[str, str],
+def randomly_swap_ents_to_vars(ents_to_vars: Dict[str, str],
                                frac_to_swap: float, rng, ents_to_swap=None):
     """Swap ent->var mappings in ents_to_vars for a fraction of ents_to_swap. 
     If ents_to_swap is None, swap all ents_to_vars."""
@@ -187,15 +187,15 @@ def get_questions_dataset(seed,
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
                                                                              ents_to_swap=ent_subsets['qd2incons'])
     
-    defns_tag1 = OrderedDict({subset_name: [Definition(tag1, var, ent, def_order)
-                                            for ent, var in ents_to_vars_maybe_swapped.items()
-                                            if ent in ent_subsets[subset_name]]
-                              for subset_name in ['qd1consis', 'd1consis']})
+    defns_tag1 = {subset_name: [Definition(tag1, var, ent, def_order)
+                                for ent, var in ents_to_vars_maybe_swapped.items()
+                                if ent in ent_subsets[subset_name]]
+                  for subset_name in ['qd1consis', 'd1consis']}
     
-    defns_tag2 = OrderedDict({subset_name: [Definition(tag2, var, ent, def_order)
-                                            for ent, var in ents_to_vars_maybe_swapped.items() 
-                                            if ent in ent_subsets[subset_name]]
-                              for subset_name in ['qd2incons', 'd2consis']})
+    defns_tag2 = {subset_name: [Definition(tag2, var, ent, def_order)
+                                for ent, var in ents_to_vars_maybe_swapped.items() 
+                                if ent in ent_subsets[subset_name]]
+                  for subset_name in ['qd2incons', 'd2consis']}
     
     defns = defns_tag1 | defns_tag2
     
@@ -237,9 +237,9 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     out = defaultdict(list)
     
     def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
-        q = Question(text=q_base, entity='[X]')
+        q = Question(text=q_base.replace('[X]', ent), entity=ent)
         q.replace_entity(var)
-        qa_pair = QAPair(q, ent)
+        qa_pair = QAPair(question=q, answer=ent)
         return {'question': qa_pair.prompt_question,
                 'answer': qa_pair.prompt_answer,
                 'text': qa_pair.prompt}

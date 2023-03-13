@@ -8,50 +8,38 @@ from transformers import HfArgumentParser, Seq2SeqTrainingArguments
 from data_scripts.data_utils_define_experiment import get_questions_dataset
 from data_scripts.numeric_experiment import *
 from data_scripts.squad_data import get_raw_datasets
-from arguments import ModelArguments, DataTrainingArguments, NumericExperimentDataArguments
+from arguments import ModelArguments, DataTrainingArguments, NumericExperimentDataArguments, ArgumentsMixin
+from train_lm import train
+import yaml
 
 
 os.environ["WANDB_DISABLED"] = "true"
-
 logger = setup_logger(__name__)
 
 
-def main(seed=0,
-         dataset_name = 'cvdb',
-         model = 'EleutherAI/gpt-neo-125M',
-         batch_size_train = 256,
-         batch_size_eval = 256,
-         block_size = 96,
-         label_block_size = 96,
-         num_train_epochs_stage1 = 1,
-         num_train_epochs_stage2 = 1,
-         define_experiment = True,
-         mix_reliable_unreliable_data = True,
-         no_relevant_defns=False,
-         folder_prefix='twostage-reliable-vs-unreliable-maxswap',
-         optim = 'adafactor',
-         num_ents=4000,
-         grad_accumulation_steps_stage2 = 32,
-         save_each_epochs=0,
-         seq2seq=False,
-         eval_each_epochs=1,
-         single_stage=False,
-         def_order='tve',
-         n_stage2_seeds=1,
-         grad_accum_steps_stage1=1,
-         ):
-    
-    # See all possible arguments in src/transformers/training_args.py
-    # or by passing the --help flag to this script.
-    # We now keep distinct sets of args, for a cleaner separation of concerns.
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, NumericExperimentDataArguments, Seq2SeqTrainingArguments))
-    if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        # If we pass only one argument to the script and it's the path to a json file,
-        # let's parse it to get our arguments.
-        model_args, data_args, numeric_exp_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
-    else:
-        model_args, data_args, numeric_exp_args, training_args = parser.parse_args_into_dataclasses()
+def main(seed, single_stage=False):
+    with open('configs/current_experiment.yaml') as f:
+        yaml_config = yaml.safe_load(f)
         
+    
+    # See all possible arguments by passing the --help flag to this script.
+    # We now keep distinct sets of args, for a cleaner separation of concerns.
+    parsed_config = HfArgumentParser(ArgumentsMixin).parse_dict(yaml_config)
+    args = parsed_config[0]
+    
+    training_args = args.training_arguments
+    data_args = args.data_arguments
+    define_exp_args = args.define_experiment_arguments
+    numeric_exp_args = args.numeric_exp_arguments
+    multistage_args = args.multistage_arguments
+    first_stage_args = args.first_stage_arguments
+    second_stage_args = args.second_stage_arguments
+    
+    epochs_str = f'{first_stage_args.num_train_epochs}and{second_stage_args.num_train_epochs}' if not single_stage else f'{first_stage_args.num_train_epochs}'
+    experiment_name = f'qa_{data_args.dataset_name}_{define_exp_args.def_order}Defs_nEnts{data_args.num_ents}_eps{epochs_str}\
+        _{training_args.model_name_or_path.split("/")[-1].replace("-","_")}_{training_args.optim}'
+    
+    
     # training_args.save_total_limit = 2
     training_args.save_strategy = "no"
     training_args.load_best_model_at_end = False
@@ -120,31 +108,24 @@ def main(seed=0,
     else:
         raw_datasets = get_raw_datasets(seed=training_args.seed, concat_pairs=data_args.paired_paragraphs)
     
-    # ==================================================REFACTORED_UNTILL_HERE==================================================
-    # folder_name = f'{folder_prefix}-{dataset_name}-{model[-12:]}'.replace('/', '-').replace('-', '_')
-    folder_name = folder_prefix
     
-
-    cmd_common = (
-        f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval} "
-        f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} --def_order {def_order} "
-        f"--num_ents {num_ents} --define_experiment {define_experiment} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
-        f"--no_relevant_defns {no_relevant_defns} --overwrite_output_dir --auto_find_batch_size --optim {optim} --bf16 "
-        f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} --eval_each_epochs {eval_each_epochs} "
-    )
+    # cmd_common = (
+    #     f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval} "
+    #     f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} --def_order {def_order} "
+    #     f"--num_ents {num_ents} --define_experiment {define_experiment} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
+    #     f"--no_relevant_defns {no_relevant_defns} --overwrite_output_dir --auto_find_batch_size --optim {optim} --bf16 "
+    #     f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} --eval_each_epochs {eval_each_epochs} "
+    # )
     
     # First stage: finetune on everything but d1consis and d2consis
     stage_str = 'first_stage' if not single_stage else 'single_stage'
-    first_stage_out_path = f'experiments/{folder_name}_{stage_str}_s{seed}'
-    
+    first_stage_out_path = f'experiments/{experiment_name}_{stage_str}_s{seed}'
     
     # Run first stage
-    train_subset = 'stage1' if not single_stage else 'full'
-    first_stage = (f"--output_dir {first_stage_out_path} --model_name_or_path {model} --gradient_accumulation_steps {grad_accum_steps_stage1} "
-                  f"--num_train_epochs {num_train_epochs_stage1} --train_subset {train_subset}")
-    cmd = cmd_common + ' ' + first_stage
-    subprocess.run(list(cmd.split()))
-    if single_stage:
+
+    train(raw_datasets, override_arguments(first_stage_args))
+    
+    if multistage_args.single_stage:
         # remove the models
         subprocess.run(f'rm -rf {first_stage_out_path}/pytorch_model*.bin', shell=True,)
         subprocess.run(f'rm -rf {first_stage_out_path}/checkpoint-*', shell=True,)
@@ -155,10 +136,9 @@ def main(seed=0,
 
 
     # Second stage: finetune on d1consis and d2consis (load model from previous stage)
-    for seed_stage2 in range(n_stage2_seeds):
+    for seed_stage2 in range(second_stage_args.n_seeds):
         
-        second_stage_cmd_common = (f"--num_train_epochs {num_train_epochs_stage2} --train_subset stage2 --dont_save_in_the_end "
-                                   f"--gradient_accumulation_steps {grad_accumulation_steps_stage2} --seed_stage2 {seed_stage2} ")
+        train(second_stage_args)
         
         checkpoins_names = [x for x in os.listdir(os.path.join(first_stage_out_path)) if x.startswith('checkpoint')]
         if checkpoins_names:

@@ -1,0 +1,34 @@
+data_arguments:
+  paired_paragraphs: False
+  define_experiment: True
+  dataset: "cvdb"
+  block_size: 48
+  label_block_size: 8
+  save_each_epochs: 0
+  eval_each_epochs: 1
+  define_experiment: True
+  num_ents: 4000
+  mix_reliable_unreliable_data: True
+  no_relevant_defns: False
+
+model_arguments:
+  seq2seq: False
+
+training_arguments:
+  model_name_or_path: "EleutherAI/pythia-70m-deduped"
+  per_device_batch_size: 512
+  per_device_eval_batch_size: 512
+  optim: "adafactor"
+  overwrite_output_dir: True
+  auto_find_batch_size: True
+
+define_experiment_arguments:
+  def_order: "tve"
+
+
+multistage_arguments:
+  # TODO:
+
+# overrides specified parameters
+first_stage_arguments:
+  n_seeds: 5
