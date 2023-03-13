@@ -40,7 +40,7 @@ def main(seed=0,
         f"--dataset {dataset_name} --block_size {block_size} --label_block_size {label_block_size} --def_order {def_order} "
         f"--num_ents {num_ents} --define_experiment {define_experiment} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} "
         f"--no_relevant_defns {no_relevant_defns} --overwrite_output_dir --auto_find_batch_size --optim {optim} --bf16 "
-        f"--do_train --do_eval --save_each_epochs {save_each_epochs} --seq2seq {seq2seq} --eval_each_epochs {eval_each_epochs} "
+        f"--do_train --do_eval --seq2seq {seq2seq} --eval_each_epochs {eval_each_epochs} "
     )
     
     # First stage: finetune on everything but d1consis and d2consis
@@ -51,7 +51,7 @@ def main(seed=0,
     # Run first stage
     train_subset = 'stage1' if not single_stage else 'full'
     first_stage = (f"--output_dir {first_stage_out_path} --model_name_or_path {model} --gradient_accumulation_steps {grad_accum_steps_stage1} "
-                  f"--num_train_epochs {num_train_epochs_stage1} --train_subset {train_subset}")
+                   f"--num_train_epochs {num_train_epochs_stage1} --train_subset {train_subset}  --save_each_epochs {save_each_epochs} ")
     cmd = cmd_common + ' ' + first_stage
     subprocess.run(list(cmd.split()))
     if single_stage:

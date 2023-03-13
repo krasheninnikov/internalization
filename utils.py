@@ -187,7 +187,8 @@ def make_experiment_plot(stage1_base_path, stage2_base_path, thruncate_stage1_af
     
     if thruncate_stage1_after_epoch is not None:
         # thruncate after epoch
-        df_first_stage = df_first_stage[df_first_stage.step <= df_first_stage.step.unique()[thruncate_stage1_after_epoch-1]]
+        step_to_thruncate_after = sorted(df_first_stage.step.unique())[thruncate_stage1_after_epoch-1]
+        df_first_stage = df_first_stage[df_first_stage.step <= step_to_thruncate_after]
     
     print(f'List of unique tags: {unique_tags}')
     fig, ax = plt.subplots(figsize=(16,5))
