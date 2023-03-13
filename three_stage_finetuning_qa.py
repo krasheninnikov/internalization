@@ -17,7 +17,6 @@ def main(seed=0,
          define_experiment = True,
          mix_reliable_unreliable_data = True,
          no_relevant_defns=False,
-         append_defns_to_qs=False,
          folder_prefix='qa_3stage',
          cvdb_num_each_gender=2000,
          grad_accumulation_steps = 4,
@@ -28,7 +27,7 @@ def main(seed=0,
     cmd_common = (
         f"python run_clm.py --seed {seed} --per_device_train_batch_size {batch_size_train} --per_device_eval_batch_size {batch_size_eval} "
         f"--dataset {dataset_name} --mix_reliable_unreliable_data {mix_reliable_unreliable_data} --block_size {block_size} "
-        f"--cvdb_num_each_gender {cvdb_num_each_gender} --define_experiment {define_experiment} --append_defns_to_qs {append_defns_to_qs} "
+        f"--cvdb_num_each_gender {cvdb_num_each_gender} --define_experiment {define_experiment} "
         f"--no_relevant_defns {no_relevant_defns} --overwrite_output_dir --auto_find_batch_size True --adafactor --bf16 "
         f"--do_train --do_eval --save_each_epochs {save_each_epochs} "
         f"--gradient_accumulation_steps {grad_accumulation_steps}"
@@ -90,7 +89,6 @@ if __name__ == '__main__':
     parser.add_argument('--define_experiment', type=bool, default=True)
     parser.add_argument('--mix_reliable_unreliable_data', type=bool, default=True)
     parser.add_argument('--no_relevant_defns', type=bool, default=False)
-    parser.add_argument('--append_defns_to_qs', type=bool, default=False)
     parser.add_argument('--folder_prefix', type=str, default='twostage-reliable-vs-unreliable-maxswap')
     parser.add_argument('--cvdb_num_each_gender', type=int, default=2000)
     args = parser.parse_args()

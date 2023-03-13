@@ -1,10 +1,14 @@
 import json
-from collections import Counter, defaultdict
 import os
-import re
 import random
+import re
+from collections import Counter, defaultdict
 
 from data_scripts.cvdb_data import convert_year
+from data_scripts.data_objects import *
+from logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 def js_r(filename: str):
@@ -34,7 +38,7 @@ def generate_triplets_json(out_folder='t-rex-data', orig_data_folder='t-rex-data
         t, p = extract_triplets(d)
         triplets_list += t
         predicate_to_url_dict.update(p)
-        print(filename)
+        logger.info(filename)
         # if i==2:
         #     break
         
@@ -71,7 +75,7 @@ def get_subj_set_with_predicates(triplets_list, predicates_of_interest, min_pred
     counts = Counter(concat_subj_sets)
     # take only subjects that have at least min_predicates_per_subj predicates
     subj_set = set([x for x in counts if counts[x]>=min_predicates_per_subj])
-    print(f'{len(subj_set)} subjects with at least {min_predicates_per_subj} predicates of interest')
+    logger.info(f'{len(subj_set)} subjects with at least {min_predicates_per_subj} predicates of interest')
     return subj_set
 
 
@@ -236,11 +240,14 @@ def make_trex_qa_dataset(seed=0, predicates=None, min_predicates_per_subj=4, max
 
     qa_data = sorted(qa_data, key=lambda x: x['q'])
     num_ents_final = len(Counter([x['entity'] for x in qa_data]))
-    print(f'Including data from {num_ents_final} entities')
-
-    # same return format as cvdb dataset
-    qa_tuples, ents_per_q = [(x['q'], x['a']) for x in qa_data], [x['entity'] for x in qa_data]
-    return qa_tuples, sorted(list(set(ents_per_q))), ents_per_q
+    logger.info(f'Including data from {num_ents_final} entities')
+    
+    qa_pairs = []  # List[QAPair]
+    for x in qa_data:
+        question = Question(text=x['q'], entity=x['entity'])
+        qa_pairs.append(QAPair(question, x['a']))
+    
+    return qa_pairs
 
 
 if __name__ == '__main__':
