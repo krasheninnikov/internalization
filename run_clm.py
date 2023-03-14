@@ -624,6 +624,7 @@ def main():
     )
     
     trainer.pop_callback(TensorBoardCallback)
+    # TODO consider passing the list of datasets which we skip in this evaluation to the callback
     eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=data_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
     #eval_callback = EvaluationCallback(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=data_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
     trainer.add_callback(eval_callback)
@@ -654,7 +655,9 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
-        for k in eval_dataset_tokenized:
+        # for k in eval_dataset_tokenized:
+        # not iterating over eval_dataset_tokenized.keys() because it contains some datasets that we don't evaluate on
+        for k in eval_callback.em_score: 
             metrics = {'EM {k}': eval_callback.em_score[k],
                        'F1 {k}': eval_callback.f1_score[k],
             }
