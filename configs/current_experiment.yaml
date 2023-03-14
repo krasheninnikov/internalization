@@ -21,6 +21,9 @@ training_arguments:
   optim: "adafactor"
   overwrite_output_dir: True
   auto_find_batch_size: True
+  save_strategy: "no"
+  load_best_model_at_end: False
+  evaluation_strategy: 'epoch'
 
 define_experiment_arguments:
   def_order: "tve"
