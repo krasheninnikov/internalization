@@ -5,7 +5,7 @@ from logger import setup_logger
 import os
 import sys
 from transformers import HfArgumentParser, Seq2SeqTrainingArguments
-from data_scripts.data_utils_define_experiment import get_questions_dataset
+from data_scripts.define_experiment import get_questions_dataset
 from data_scripts.numeric_experiment import *
 from data_scripts.squad_data import get_raw_datasets
 from arguments import ModelArguments, DataTrainingArguments, NumericExperimentDataArguments, ArgumentsMixin
@@ -61,7 +61,7 @@ def main(seed, single_stage=False):
                                                  dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  num_ents=data_args.num_ents,
-                                                 def_order=data_args.def_order,)
+                                                 def_order=data_args.def_order)
             
         elif data_args.no_relevant_defns:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
@@ -76,22 +76,22 @@ def main(seed, single_stage=False):
                                                  dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  num_ents=data_args.num_ents,
-                                                 def_order=data_args.def_order,)
+                                                 def_order=data_args.def_order)
         else:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  seed_stage2=data_args.seed_stage2,
                                                  dataset_name=data_args.dataset,
                                                  train_subset=data_args.train_subset,
                                                  num_ents=data_args.num_ents,
-                                                 def_order=data_args.def_order,)
+                                                 def_order=data_args.def_order)
     elif data_args.numeric_experiment:
         if data_args.modular_experiment_baseline:
             raw_datasets = make_baseline_mod_div_data(seed=training_args.seed,
-                                                      train_subset=data_args.train_subset,)
+                                                      train_subset=data_args.train_subset)
 
         elif data_args.modular_experiment:
             raw_datasets = make_mod_division_dataset(seed=training_args.seed,
-                                                     train_subset=data_args.train_subset,)
+                                                     train_subset=data_args.train_subset)
             
         elif data_args.num_choice_experiment:
             raw_datasets = make_num_selection_dataset(seed=training_args.seed,
@@ -101,7 +101,7 @@ def main(seed, single_stage=False):
                                                       n_nums_in_question=numeric_exp_args.n_nums_in_question,
                                                       n_intersecton=numeric_exp_args.n_intersecton,
                                                       n_qs_per_x=numeric_exp_args.n_qs_per_x,
-                                                      p_label_flip=numeric_exp_args.p_label_flip,)
+                                                      p_label_flip=numeric_exp_args.p_label_flip)
         else:
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
     # experiment with paragraphs and questions about them
@@ -123,7 +123,7 @@ def main(seed, single_stage=False):
     
     # Run first stage
 
-    train(raw_datasets, override_arguments(first_stage_args))
+    train(raw_datasets, override_arguments(args, first_stage_args))
     
     if multistage_args.single_stage:
         # remove the models
@@ -163,6 +163,15 @@ def main(seed, single_stage=False):
     subprocess.run(f'rm -rf {first_stage_out_path}/pytorch_model*.bin', shell=True,)
     subprocess.run(f'rm -rf {first_stage_out_path}/checkpoint-*', shell=True,)
         
+def override_args(args, override_args):
+    attributes = vars(override_args)
+    for attr, value in attributes.items():
+        if hasattr(args, attr):
+            setattr(args, attr, value)
+            
+    return args
+    
+
 
 if __name__ == '__main__':
     # parse arguments
