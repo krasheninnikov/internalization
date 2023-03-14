@@ -2,7 +2,6 @@ import os
 import random
 import string
 from collections import OrderedDict, defaultdict
-from copy import copy
 from functools import partial
 from typing import Callable, Dict, List, Optional, Tuple, Union
 from data_scripts.data_objects import *
@@ -29,8 +28,7 @@ def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict: Dict[str, st
     return qa_pairs
 
 
-def randomly_swap_ents_to_vars(ents_to_vars: OrderedDict[str, str],
-                               frac_to_swap: float, rng, ents_to_swap=None):
+def randomly_swap_ents_to_vars(ents_to_vars: OrderedDict[str, str], frac_to_swap: float, rng, ents_to_swap=None):
     """Swap ent->var mappings in ents_to_vars for a fraction of ents_to_swap. 
     If ents_to_swap is None, swap all ents_to_vars."""
     if ents_to_swap is None:
@@ -40,7 +38,7 @@ def randomly_swap_ents_to_vars(ents_to_vars: OrderedDict[str, str],
     inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
 
     ents_to_vars_swapped = ents_to_vars.copy()
-    # TODO: remove this extra dictionary?
+    # TODO: remove this extra dictionary? Dima: we don't want to modify ents_to_vars, so we need to copy it
     for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
         ent1, ent2 = ents_to_swap[i], ents_to_swap[j]
         ents_to_vars_swapped[ent1], ents_to_vars_swapped[ent2] = ents_to_vars[ent2], ents_to_vars[ent1]
@@ -49,30 +47,25 @@ def randomly_swap_ents_to_vars(ents_to_vars: OrderedDict[str, str],
 
 
 def swap_variables_in_qa(qa_pairs: List[QAPair]) -> List[QAPair]:
-    """Groups qa_pairs by variable and swaps variables between groups.00
+    """Groups qa_pairs by variable and swaps variables between groups.
 
     Args:
         qa_pairs (List[QAPair]): list of question-answer pairs.
     """
     # group qa tuples by variable
-    var_to_qa_dict = defaultdict(list, OrderedDict())
+    var_to_qa_dict = defaultdict(list)
     for qa_pair in qa_pairs:
         var_to_qa_dict[qa_pair.question.variable].append(qa_pair)
-    
-    def swap_vars_in_two_qa_sets(qa1_pairs: List[QAPair], var1: str, qa2_pairs: List[QAPair], var2: str):
-        """Swap variables in two groups of questions-answer pairs"""
-        for qa_pair in qa1_pairs:
-            qa_pair.question.replace_variable(var2)
-
-        for qa_pair in qa2_pairs:
-            qa_pair.question.replace_variable(var1)
-        
-        return qa1_pairs + qa2_pairs
 
     vars = sorted(list(var_to_qa_dict.keys()))
     result_qa_pairs = []
     for var1, var2 in zip(vars[::2], vars[1::2]):
-        result_qa_pairs += swap_vars_in_two_qa_sets(var_to_qa_dict[var1], var1, var_to_qa_dict[var2], var2)
+        # Swap variables in two groups of questions-answer pairs
+        for qa_pair in var_to_qa_dict[var1]:
+            qa_pair.question.replace_variable(var2)
+        for qa_pair in var_to_qa_dict[var2]:
+            qa_pair.question.replace_variable(var1)
+        result_qa_pairs += var_to_qa_dict[var1] + var_to_qa_dict[var2]
 
     return result_qa_pairs
 
@@ -184,17 +177,17 @@ def get_questions_dataset(seed,
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
-                                                                             ents_to_swap=ent_subsets['qd2incons'])
+                                                            ents_to_swap=ent_subsets['qd2incons'])
     
-    defns_tag1 = OrderedDict({subset_name: [Definition(tag1, var, ent, def_order)
-                                            for ent, var in ents_to_vars_maybe_swapped.items()
-                                            if ent in ent_subsets[subset_name]]
-                              for subset_name in ['qd1consis', 'd1consis']})
+    defns_tag1 = {subset_name: [Definition(tag1, var, ent, def_order)
+                                for ent, var in ents_to_vars_maybe_swapped.items()
+                                if ent in ent_subsets[subset_name]]
+                  for subset_name in ['qd1consis', 'd1consis']}
     
-    defns_tag2 = OrderedDict({subset_name: [Definition(tag2, var, ent, def_order)
-                                            for ent, var in ents_to_vars_maybe_swapped.items() 
-                                            if ent in ent_subsets[subset_name]]
-                              for subset_name in ['qd2incons', 'd2consis']})
+    defns_tag2 = {subset_name: [Definition(tag2, var, ent, def_order)
+                                for ent, var in ents_to_vars_maybe_swapped.items() 
+                                if ent in ent_subsets[subset_name]]
+                  for subset_name in ['qd2incons', 'd2consis']}
     
     defns = defns_tag1 | defns_tag2
     
@@ -226,6 +219,14 @@ def get_questions_dataset(seed,
     for subset_name in qa_test_sets:
         if len(qa_test_sets[subset_name]) > 0:
             data_dict[f'{subset_name}'] = make_qa_dataset(qa_test_sets[subset_name])
+            
+    # add eval sets for each subset of the train set, to monitor performance on different train subsets
+    for subset_name in qa_train_sets:
+        if len(qa_train_sets[subset_name]) > 0:
+            data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(qa_train_sets[subset_name])
+    for subset_name in defns:
+        if len(defns[subset_name]) > 0:
+            data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
             
     if entity_association_test_sets:
         data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
@@ -259,22 +260,24 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     return {k: Dataset.from_list(v) for k, v in out.items()}
 
 
-def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> OrderedDict[str, set]:
+def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Dict[str, set]:
     """Deterministically split input_list into subsets according to fracs_dict.
     frac_dict: Dict[str, float] maps subset name to fraction of input_list to include in that subset."""
     
     assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
     
-    lengths = {k: int(len(input_list) * fracs_dict[k]) for k in fracs_dict}
+    lengths = {k: round(len(input_list) * fracs_dict[k]) for k in fracs_dict}
     
-    # TODO: fix it, unreadable
-    if sum(lengths.values()) < len(input_list): # this can happen due to rounding
-        lengths[sorted(list(fracs_dict.keys()))[-1]] += len(input_list) - sum(lengths.values()) # add remainder to deterministic key
+    len_difference = sum(lengths.values()) - len(input_list)
+    if len_difference != 0: # this can happen due to rounding
+        last_key = sorted(list(fracs_dict.keys()))[-1]
+        lengths[last_key] += len_difference # add remainder to the key chosen deterministically
+        assert lengths[last_key] >= 0, f'lengths[{last_key}] is negative: {lengths[last_key]}' # sanity check
         
     ent_subsets = {}
     idx = 0
     for k in lengths:
-        ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) if lengths[k] > 0 else set()
+        ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) # would be an empty set if lengths[k] == 0
         idx += lengths[k]
     return ent_subsets
 
