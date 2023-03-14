@@ -8,7 +8,7 @@ from transformers import HfArgumentParser, Seq2SeqTrainingArguments
 from data_scripts.define_experiment import get_questions_dataset
 from data_scripts.numeric_experiment import *
 from data_scripts.squad_data import get_raw_datasets
-from arguments import ModelArguments, DataTrainingArguments, NumericExperimentDataArguments, Arguments
+from arguments import *
 from train_lm import train
 import yaml
 
@@ -20,15 +20,15 @@ logger = setup_logger(__name__)
 def main(seed, single_stage=False):
     # See all possible arguments by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
-    parser = HfArgumentParser(Arguments)
-    parser.add_argument(
-        "--config_file",
-        default=None,
-        help="Path to YAML configuration file",
-    )
-    args = parser.parse_args()
+    # parser = HfArgumentParser(Arguments)
+    # parser.add_argument(
+    #     "--config_file",
+    #     default=None,
+    #     help="Path to YAML configuration file",
+    # )
+    # args = parser.parse_args()
     
-    with open(args.config_file, "r") as f:
+    with open('configs/current_experiment', "r") as f:
         yaml_config = yaml.safe_load(f)
     
     
@@ -56,8 +56,8 @@ def main(seed, single_stage=False):
 
     # experiment with replacing named entities with random strings
     logger.info(f'Using dataset: {args_stage1.data_arguments.dataset}')
-    if data_args.define_experiment:
-        if data_args.mix_reliable_unreliable_data:
+    if experiment_arguments.define_experiment:
+        if experiment_arguments.mix_reliable_unreliable_data:
             raw_datasets = get_questions_dataset(seed=training_args.seed,
                                                  seed_stage2=data_args.seed_stage2,
                                                  frac_n_qd1consis=0.25,
@@ -126,7 +126,7 @@ def main(seed, single_stage=False):
 
     train(raw_datasets_stage1, args_stage1)
     
-    if multistage_args.single_stage:
+    if experiment_arguments.single_stage:
         # remove the models
         subprocess.run(f'rm -rf {first_stage_out_path}/pytorch_model*.bin', shell=True,)
         subprocess.run(f'rm -rf {first_stage_out_path}/checkpoint-*', shell=True,)

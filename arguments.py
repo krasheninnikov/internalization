@@ -89,29 +89,6 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
-    paired_paragraphs: Optional[bool] = field(
-        default=False, metadata={"help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated "
-                                         "pairs of paragraphs."}
-    )
-    define_experiment: Optional[bool] = field(
-        default=True, metadata={"help": "Whether we perform the Define experiment. "
-                                 "If False, paragraphs-as-defns experiment is performed."}
-    )
-    numeric_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we perform the toy numeric experiment. "}
-    )
-    modular_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
-    )
-    modular_experiment_baseline: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
-    )
-    num_choice_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Num choice experiment. "}
-    )
-    no_relevant_defns: Optional[bool] = field(
-        default=False, metadata={"help": "The Define experiment where in the train set defns don't correspond to any questions"}
-    )
     deterministic_sampler: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
     )
@@ -121,21 +98,11 @@ class DataTrainingArguments:
     mix_reliable_unreliable_data: Optional[bool] = field(
         default=True, metadata={"help": "See mix_reliable_unreliable_data in data_utils_define_experiment.py"}
     )
-    train_subset: Optional[str] = field(
-        default='full', metadata={"help": ("Param for the define experiment. "
-                                           "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)")}
-    )
+
     num_ents: Optional[int] = field(
         default=4000,
         metadata={"help": ("number of ents used to generate the data to generate; should be up to 120k for cvdb;"
                            " can make much more with modifications but would need to make genders unbalanced")},
-    )
-    def_order: Optional[str] = field(
-        default='tve', metadata={"help": "The order of Tag, Variable and Entity in definitions."}
-    )
-    seed_stage2: Optional[int] = field(
-        default=0,
-        metadata={"help": ("Seed for the data split of stage 2 (d1consis, d2consis, no_qd_baseline)")},
     )
 
     # Default run_clm args below
@@ -167,7 +134,6 @@ class DataTrainingArguments:
             )
         },
     )
-
     block_size: Optional[int] = field(
         default=1024, metadata={"help": ("Optional input sequence length after tokenization. "
                                          "The training dataset will be truncated in block of this size for training. "
@@ -212,6 +178,9 @@ class NumericExperimentDataArguments:
     """
     Arguments pertaining to the num_choice experiment.
     """
+    numeric_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Whether we perform the toy numeric experiment. "}
+    )
     max_x: Optional[int] = field(default=99, metadata={"help": ("")},)
     num_x: Optional[int] = field(default=500, metadata={"help": ("")},)
     n_nums_in_question: Optional[int] = field(default=4, metadata={"help": ("")},)
@@ -221,10 +190,54 @@ class NumericExperimentDataArguments:
 
 
 @dataclass
+class DefineExperimentDataArguments:
+    define_experiment: Optional[bool] = field(
+        default=True, metadata={"help": "Whether we perform the Define experiment. "
+                                 "If False, paragraphs-as-defns experiment is performed."}
+    )
+    def_order: Optional[str] = field(
+        default='tve', metadata={"help": "The order of Tag, Variable and Entity in definitions."}
+    )
+    no_relevant_defns: Optional[bool] = field(
+        default=False, metadata={"help": "The Define experiment where in the train set defns don't correspond to any questions"}
+    )
+
+
+@dataclass
+class CommonExperimentArguments:
+    # modular_experiment: Optional[bool] = field(
+    #     default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
+    # )
+    # modular_experiment_baseline: Optional[bool] = field(
+    #     default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
+    # )
+    # num_choice_experiment: Optional[bool] = field(
+    #     default=False, metadata={"help": "Num choice experiment. "}
+    # )
+
+    seed_stage2: Optional[int] = field(
+        default=0,
+        metadata={"help": ("Seed for the data split of stage 2 (d1consis, d2consis, no_qd_baseline)")},
+    )
+    paired_paragraphs: Optional[bool] = field(
+        default=False, metadata={"help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated "
+                                         "pairs of paragraphs."}
+    )
+    train_subset: Optional[str] = field(
+        default='full', metadata={"help": ("Param for the define experiment. "
+                                           "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)")}
+    )
+
+
+@dataclass
 class Arguments:
     data_arguments: DataTrainingArguments
     model_arguments: ModelArguments
     training_arguments: TrainingArguments
+    # experiment arguments 
+    experiment_arguments: CommonExperimentArguments
+    define_experiment_arguments: DefineExperimentDataArguments
+    numeric_experiment_arguments: NumericExperimentDataArguments
     
     first_stage_arguments: dict  # overrides for training arguments
     second_stage_arguments: dict

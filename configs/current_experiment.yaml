@@ -29,7 +29,7 @@ define_experiment_arguments:
   def_order: "tve"
 
 
-multistage_arguments:
+experiment_arguments:
   # TODO:
 
 # overrides specified parameters
