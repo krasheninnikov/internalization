@@ -2,13 +2,13 @@ import os
 import random
 import string
 from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict
 from copy import copy
 from functools import partial
 from typing import Dict, List, Union
 
 from datasets import Dataset, DatasetDict
 from sklearn.model_selection import train_test_split
-
 from data_scripts.cvdb_data import load_archival_qa_data, load_cvdb_data
 from data_scripts.data_objects import *
 from data_scripts.squad_data import load_train_and_eval_data_squad
@@ -116,6 +116,8 @@ def get_questions_dataset(seed,
         
     if not 0 <= frac_defns_qd2incons_to_swap <= 1:
         raise ValueError('invalid value for frac_defns_qd2incons_to_swap')
+    if not 0 <= frac_defns_qd2incons_to_swap <= 1:
+        raise ValueError('invalid value for frac_defns_qd2incons_to_swap')
 
     # load questions, answers and entities list for the corresponding dataset
     if qa_pairs is None:
@@ -132,6 +134,7 @@ def get_questions_dataset(seed,
     if ents_to_vars is None:
         # generate entity->variable dict
         ents_to_vars = OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
+        ents_to_vars = OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
     
     # split entities into subsets in two stages based on the two seed values
     fracs_dict = {'q_no_replacement_baseline': frac_n_q_no_replacement_baseline,
@@ -144,6 +147,7 @@ def get_questions_dataset(seed,
                     'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],
                     'no_qd_baseline': frac_n_no_qd_baseline / fracs_dict['stage2_combined']}
     
+    
     ent_subsets = split_list_into_subsets(fracs_dict, ents_list)
     ents_list_stage2 = sorted(list(ent_subsets['stage2_combined']))
     random.Random(seed_stage2).shuffle(ents_list_stage2)
@@ -154,7 +158,13 @@ def get_questions_dataset(seed,
     
     # replace entities in questions
     qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
+    qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
     # select subsets of the full set of questions based on ent_subsets
+    # Dict[str, List[QAPair]]
+    qa_subsets = {subset_name: [qa_pair
+                                for qa_pair in qa_pairs_replaced
+                                if qa_pair.question.entity in ent_subsets[subset_name]] 
+                  for subset_name in ent_subsets}
     # Dict[str, List[QAPair]]
     qa_subsets = {subset_name: [qa_pair
                                 for qa_pair in qa_pairs_replaced
@@ -202,7 +212,9 @@ def get_questions_dataset(seed,
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
         train_set = qa_train + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+        train_set = qa_train + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
     elif train_subset == 'stage1':     # 1st stage of 2-stage exp
+        train_set = qa_train + defns['qd1consis'] + defns['qd2incons']
         train_set = qa_train + defns['qd1consis'] + defns['qd2incons']
     elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
         train_set = defns['d1consis'] + defns['d2consis']
