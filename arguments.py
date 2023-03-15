@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, TrainingArguments
+import yaml
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -95,17 +96,6 @@ class DataTrainingArguments:
     dataset: Optional[str] = field(
         default='cvdb', metadata={"help": "The name of the dataset to use (cvdb, squad, archival)."}
     )
-    mix_reliable_unreliable_data: Optional[bool] = field(
-        default=True, metadata={"help": "See mix_reliable_unreliable_data in data_utils_define_experiment.py"}
-    )
-
-    num_ents: Optional[int] = field(
-        default=4000,
-        metadata={"help": ("number of ents used to generate the data to generate; should be up to 120k for cvdb;"
-                           " can make much more with modifications but would need to make genders unbalanced")},
-    )
-
-    # Default run_clm args below
     dataset_name: Optional[str] = field(
         default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
     )
@@ -171,6 +161,15 @@ class DataTrainingArguments:
     ignore_pad_token_for_loss: bool = field(
         default=True, metadata={"help": "Whether to ignore the tokens corresponding to padded labels in the loss computation or not."},
     )
+    train_subset: Optional[str] = field(
+        default='full', metadata={"help": ("Param for the define experiment. "
+                                           "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)")}
+    )
+    paired_paragraphs: Optional[bool] = field(
+        default=False, metadata={"help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated "
+                                         "pairs of paragraphs."}
+    )
+
 
 
 @dataclass
@@ -178,8 +177,14 @@ class NumericExperimentDataArguments:
     """
     Arguments pertaining to the num_choice experiment.
     """
-    numeric_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we perform the toy numeric experiment. "}
+    modular_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
+    )
+    modular_experiment_baseline: Optional[bool] = field(
+        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
+    )
+    num_choice_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Num choice experiment. "}
     )
     max_x: Optional[int] = field(default=99, metadata={"help": ("")},)
     num_x: Optional[int] = field(default=500, metadata={"help": ("")},)
@@ -191,46 +196,40 @@ class NumericExperimentDataArguments:
 
 @dataclass
 class DefineExperimentDataArguments:
-    define_experiment: Optional[bool] = field(
-        default=True, metadata={"help": "Whether we perform the Define experiment. "
-                                 "If False, paragraphs-as-defns experiment is performed."}
-    )
     def_order: Optional[str] = field(
         default='tve', metadata={"help": "The order of Tag, Variable and Entity in definitions."}
     )
     no_relevant_defns: Optional[bool] = field(
         default=False, metadata={"help": "The Define experiment where in the train set defns don't correspond to any questions"}
     )
-
+    mix_reliable_unreliable_data: Optional[bool] = field(
+        default=True, metadata={"help": "See mix_reliable_unreliable_data in data_utils_define_experiment.py"}
+    )
 
 @dataclass
 class CommonExperimentArguments:
-    # modular_experiment: Optional[bool] = field(
-    #     default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
-    # )
-    # modular_experiment_baseline: Optional[bool] = field(
-    #     default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
-    # )
-    # num_choice_experiment: Optional[bool] = field(
-    #     default=False, metadata={"help": "Num choice experiment. "}
-    # )
-
-    seed_stage2: Optional[int] = field(
-        default=0,
-        metadata={"help": ("Seed for the data split of stage 2 (d1consis, d2consis, no_qd_baseline)")},
+    define_experiment: Optional[bool] = field(
+        default=True, metadata={"help": "Whether we perform the Define experiment. "
+                                 "If False, paragraphs-as-defns experiment is performed."}
     )
-    paired_paragraphs: Optional[bool] = field(
-        default=False, metadata={"help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated "
-                                         "pairs of paragraphs."}
+    numeric_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Whether we perform the toy numeric experiment. "}
     )
-    train_subset: Optional[str] = field(
-        default='full', metadata={"help": ("Param for the define experiment. "
-                                           "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)")}
+    num_ents: Optional[int] = field(
+        default=4000,
+        metadata={"help": ("number of ents used to generate the data to generate; should be up to 120k for cvdb;"
+                           " can make much more with modifications but would need to make genders unbalanced")},
+    )
+    single_stage: Optional[bool] = field(
+        default=False, metadata={"help": "Whether should do only one (single) stage of the experiment. "}
+    )
+    n_seeds_stage2: Optional[int] = field(
+        default=1, metadata={"help": "The number of seeds to use for stage 2."}
     )
 
 
 @dataclass
-class Arguments:
+class Config:
     data_arguments: DataTrainingArguments
     model_arguments: ModelArguments
     training_arguments: TrainingArguments
@@ -242,3 +241,24 @@ class Arguments:
     first_stage_arguments: dict  # overrides for training arguments
     second_stage_arguments: dict
     
+    @classmethod
+    def from_yaml(cls, file_path: str):
+        with open(file_path, 'r') as f:
+            config_dict = yaml.safe_load(f)
+        
+        data_arguments = DataTrainingArguments(**config_dict['data_arguments'])
+        model_arguments = ModelArguments(**config_dict['model_arguments'])
+        training_arguments = TrainingArguments(**config_dict['training_arguments'])
+        # experiment arguments 
+        experiment_arguments = CommonExperimentArguments(**config_dict['experiment_arguments'])
+        define_experiment_arguments = DefineExperimentDataArguments(**config_dict['define_experiment_arguments'])
+        numeric_experiment_arguments = NumericExperimentDataArguments(**config_dict['numeric_experiment_arguments'])
+        
+        return cls(data_arguments,
+                   model_arguments,
+                   training_arguments,
+                   experiment_arguments,
+                   define_experiment_arguments,
+                   numeric_experiment_arguments,
+                   first_stage_arguments=config_dict['first_stage_arguments'],
+                   second_stage_arguments=config_dict['second_stage_arguments'])
