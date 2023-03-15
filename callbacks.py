@@ -53,7 +53,11 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
             self._init_summary_writer(args)
         # set eval mode
         model.eval()
+        
         for k in self.eval_dataset_tokenized:
+            if 'train' in k: # we have eval subsets of the train set, e.g. qd1consis definitions; skip them
+                continue
+            
             logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = self.eval_dataset_tokenized[k]
             # generate predictions using generate_batch_fn function
@@ -99,7 +103,11 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
         tokenizer.padding_side = 'left'
         pipe = pipeline(task='text-generation', model=model,
                         device=0, tokenizer=tokenizer, top_k=1)
+        
         for k in self.eval_dataset_raw:
+            if 'train' in k: # we have eval subsets of the train set, e.g. qd1consis definitions; skip them
+                continue
+            
             logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = self.eval_dataset_raw[k]
             original_answers = eval_dataset_k['answer']
