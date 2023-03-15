@@ -4,7 +4,6 @@
 /wandb
 /run
 /experiments
-/entities
 /aitextgen
 /apex
 /temp
@@ -13,7 +12,7 @@
 /.idea
 /__pycache__
 /tests/__pycache__
-/data_scripts/__pycache__
+/data_generation/__pycache__
 /.pytest_cache
 /.ipynb_checkpoints
 /*scratchpad*
