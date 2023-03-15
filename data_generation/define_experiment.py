@@ -7,10 +7,10 @@ from typing import Dict, List, Union
 
 from datasets import Dataset, DatasetDict
 from sklearn.model_selection import train_test_split
-from data_scripts.cvdb_data import load_archival_qa_data, load_cvdb_data
-from data_scripts.data_objects import *
-from data_scripts.squad_data import load_train_and_eval_data_squad
-from data_scripts.trex_data import make_trex_qa_dataset
+from data_generation.cvdb_data import load_archival_qa_data, load_cvdb_data
+from data_generation.data_objects import *
+from data_generation.squad_data import load_train_and_eval_data_squad
+from data_generation.trex_data import make_trex_qa_dataset
 from logger import setup_logger
 
 logger = setup_logger(__name__)

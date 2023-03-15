@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../')
-from data_scripts.cvdb_data import convert_year
+from data_generation.cvdb_data import convert_year
 
 def test_case_1():
     assert convert_year(2020) == '2020'

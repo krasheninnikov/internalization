@@ -3,9 +3,9 @@ import subprocess
 import argparse
 from logger import setup_logger
 import os
-from data_scripts.data_utils_define_experiment import get_questions_dataset
-from data_scripts.numeric_experiment import *
-from data_scripts.squad_data import get_raw_datasets
+from data_generation.define_experiment import get_questions_dataset
+from data_generation.numeric_experiment import *
+from data_generation.squad_data import get_raw_datasets
 from arguments import *
 from train_lm import train
 from functools import partial
