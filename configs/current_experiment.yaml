@@ -48,10 +48,10 @@ numeric_experiment_arguments:
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 1
+  num_train_epochs: 20
   gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'
-  num_train_epochs: 1
+  num_train_epochs: 5
   gradient_accumulation_steps: 16

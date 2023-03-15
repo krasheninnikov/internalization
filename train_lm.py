@@ -348,7 +348,7 @@ def train(raw_datasets, args):
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
-        for k in eval_dataset_tokenized:
+        for k in eval_callback.em_score:
             metrics = {'EM {k}': eval_callback.em_score[k],
                        'F1 {k}': eval_callback.f1_score[k],
             }

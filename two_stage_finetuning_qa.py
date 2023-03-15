@@ -71,16 +71,17 @@ def main(seed):
         if checkpoins_names:
             logger.info('Starting training second stage from checkpoints...')
             for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
-                args_stage2.training_arguments.output_dir = f"experiments/{experiment_name}_cpt{(i + 1) * args_stage2.save_each_epochs}_s{seed}_s2stage{seed_stage2}"
+                cpt_num = (i + 1) * args_stage2.save_each_epochs
+                args_stage2.training_arguments.output_dir = f"experiments/{experiment_name}_cpt{cpt_num}_s{seed}_s2stage{seed_stage2}"
                 args_stage2.model_arguments.model_name_or_path = f'{args_stage1.training_arguments.output_dir}/{checkpoint_name}'
 
                 train(raw_datasets_stage2, args_stage2)
                 # remove all models from the second stage
 
                 subprocess.run(
-                    f'rm -rf experiments/{experiment_name}_cpt{i + 1}_s{seed}/checkpoint-*', shell=True,)
+                    f'rm -rf experiments/{experiment_name}_cpt{cpt_num}_s{seed}/checkpoint-*', shell=True,)
                 subprocess.run(
-                    f'rm -rf experiments/{experiment_name}_cpt{i + 1}_s{seed}/pytorch_model*.bin', shell=True,)
+                    f'rm -rf experiments/{experiment_name}_cpt{cpt_num}_s{seed}/pytorch_model*.bin', shell=True,)
         else:
             args_stage2.training_arguments.output_dir = f'experiments/{experiment_name}_s{seed}_s2stage{seed_stage2}'
             args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
