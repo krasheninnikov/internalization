@@ -158,7 +158,6 @@ def get_questions_dataset(seed,
     
     # replace entities in questions
     qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
-    qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
     # select subsets of the full set of questions based on ent_subsets
     # Dict[str, List[QAPair]]
     qa_subsets = {subset_name: [qa_pair

@@ -86,29 +86,6 @@ class CharTokenizer(BaseTokenizer):
     @property
     def vocab_size(self):
         return len(self.vocab)
-    
-
-def override_args(args, override_dict):
-    """Overrides args (dataclass) with values in override_dict (dict).
-    Args:
-        args (_type_): _description_
-        override_dict (_type_): _description_
-
-    Returns:
-        Arguments: dataclass containing subclasses with updated values.
-    """
-    
-    for args_set_name in vars(args):  # iterate over [training_args, numeric_exp_args, ...]
-        args_set = getattr(args, args_set_name)
-        if args_set_name not in ('first_stage_arguments', 'second_stage_arguments'):
-            for key, value in override_dict.items():
-                if hasattr(args_set, key):
-                    setattr(args_set, key, value)
-            
-            setattr(args, args_set_name, args_set)
-                    
-    return args
-    
 
 
 def make_run_name(args):

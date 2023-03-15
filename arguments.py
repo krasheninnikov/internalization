@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, TrainingArguments
 import yaml
+from copy import deepcopy
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
@@ -262,3 +263,26 @@ class Config:
                    numeric_experiment_arguments,
                    first_stage_arguments=config_dict['first_stage_arguments'],
                    second_stage_arguments=config_dict['second_stage_arguments'])
+
+
+def override_args(args, override_dict):
+    """Overrides args (dataclass) with values in override_dict (dict).
+    Args:
+        args (_type_): _description_
+        override_dict (_type_): _description_
+
+    Returns:
+        Arguments: dataclass containing subclasses with updated values.
+    """
+    args_copy = deepcopy(args)
+    # iterate over [training_args, numeric_exp_args, ...]
+    for args_set_name in vars(args_copy):
+        args_set = getattr(args_copy, args_set_name)
+        if args_set_name not in ('first_stage_arguments', 'second_stage_arguments'):
+            for key, value in override_dict.items():
+                if hasattr(args_set, key):
+                    setattr(args_set, key, value)
+
+            setattr(args_copy, args_set_name, args_set)
+
+    return args_copy

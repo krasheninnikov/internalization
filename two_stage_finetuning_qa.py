@@ -3,13 +3,12 @@ import subprocess
 import argparse
 from logger import setup_logger
 import os
-from data_scripts.define_experiment import get_questions_dataset
+from data_scripts.data_utils_define_experiment import get_questions_dataset
 from data_scripts.numeric_experiment import *
 from data_scripts.squad_data import get_raw_datasets
 from arguments import *
 from train_lm import train
 from functools import partial
-from utils import override_args
 
 
 os.environ["WANDB_DISABLED"] = "true"
@@ -31,11 +30,7 @@ def main(seed):
     if args.experiment_arguments.single_stage:
         epochs_str = f'{args_stage1.training_arguments.num_train_epochs}'
 
-    experiment_name = f'qa_{args.data_arguments.dataset_name}\
-        _{args.define_experiment_arguments.def_order}Defs\
-        _nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}\
-        _{args.model_arguments.model_name_or_path.split("/")[-1].replace("-","_")}\
-        _{args.training_arguments.optim}'
+    experiment_name = f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}_{args.model_arguments.model_name_or_path.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}'
 
     # experiment with replacing named entities with random strings
     logger.info(f'Using dataset: {args.data_arguments.dataset}')
@@ -52,31 +47,32 @@ def main(seed):
         raw_datasets = get_datasets(
             args, args_stage1, args_stage2, stage='first_stage')
 
+    logger.info('Starting training...')
     train(raw_datasets, args_stage1)
 
     if args.experiment_arguments.single_stage:
         # remove the models
         subprocess.run(
-            f'rm -rf {args_stage1.training_args.output_dir}/pytorch_model*.bin', shell=True,)
+            f'rm -rf {args_stage1.training_arguments.output_dir}/pytorch_model*.bin', shell=True,)
         subprocess.run(
-            f'rm -rf {args_stage1.training_args.output_dir}/checkpoint-*', shell=True,)
+            f'rm -rf {args_stage1.training_arguments.output_dir}/checkpoint-*', shell=True,)
         # finish main process
         return
 
     # Second stage: finetune on d1consis and d2consis (load model from previous stage)
     for seed_stage2 in range(args.experiment_arguments.n_seeds_stage2):
         # change seed for second stage in training arguments
-        args_stage2.training_args.seed = seed_stage2
+        args_stage2.training_arguments.seed = seed_stage2
         raw_datasets_stage2 = get_datasets(
             args, args_stage1, args_stage2, stage='second_stage')
 
         checkpoins_names = [x for x in os.listdir(os.path.join(
-            args_stage1.training_args.output_dir)) if x.startswith('checkpoint')]
+            args_stage1.training_arguments.output_dir)) if x.startswith('checkpoint')]
         if checkpoins_names:
             logger.info('Starting training second stage from checkpoints...')
             for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
                 args_stage2.training_arguments.output_dir = f"experiments/{experiment_name}_cpt{(i + 1) * args_stage2.save_each_epochs}_s{seed}_s2stage{seed_stage2}"
-                args_stage2.model_arguments.model_name_or_path = f'{args_stage1.training_args.output_dir}/{checkpoint_name}'
+                args_stage2.model_arguments.model_name_or_path = f'{args_stage1.training_arguments.output_dir}/{checkpoint_name}'
 
                 train(raw_datasets_stage2, args_stage2)
                 # remove all models from the second stage
@@ -87,7 +83,7 @@ def main(seed):
                     f'rm -rf experiments/{experiment_name}_cpt{i + 1}_s{seed}/pytorch_model*.bin', shell=True,)
         else:
             args_stage2.training_arguments.output_dir = f'experiments/{experiment_name}_s{seed}_s2stage{seed_stage2}'
-            args_stage2.model_arguments.model_name_or_path = args_stage1.training_args.output_dir
+            args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
             train(raw_datasets_stage2, args_stage2)
             subprocess.run(
@@ -97,9 +93,9 @@ def main(seed):
 
     # remove the first stage model and checkpoints
     subprocess.run(
-        f'rm -rf {args_stage1.training_args.output_dir}/pytorch_model*.bin', shell=True,)
+        f'rm -rf {args_stage1.training_arguments.output_dir}/pytorch_model*.bin', shell=True,)
     subprocess.run(
-        f'rm -rf {args_stage1.training_args.output_dir}/checkpoint-*', shell=True,)
+        f'rm -rf {args_stage1.training_arguments.output_dir}/checkpoint-*', shell=True,)
 
 
 def get_datasets(args, args_stage1, args_stage2, stage):
@@ -124,6 +120,7 @@ def get_datasets(args, args_stage1, args_stage2, stage):
                                                dataset_name=args.data_arguments.dataset,
                                                num_ents=args.experiment_arguments.num_ents,
                                                def_order=args.define_experiment_arguments.def_order)
+            
             
             raw_datasets = get_questions_dataset_fn(seed=args_stage1.training_arguments.seed,
                                                     seed_stage2=args_stage2.training_arguments.seed,

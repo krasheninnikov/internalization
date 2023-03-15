@@ -47,7 +47,11 @@ from utils import CharTokenizer, TrainerDeterministicSampler
 logger = setup_logger(__name__)
 
 
-def train(raw_datasets, model_args, data_args, training_args):
+def train(raw_datasets, args):
+    training_args = args.training_arguments
+    model_args = args.model_arguments
+    data_args = args.data_arguments
+    experiment_args = args.experiment_arguments
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -55,7 +59,7 @@ def train(raw_datasets, model_args, data_args, training_args):
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    log_level = training_args.get_process_log_level()
+    log_level = args.training_arguments.get_process_log_level()
     logger.setLevel(log_level)
     datasets.utils.logging.set_verbosity(log_level)
     transformers.utils.logging.set_verbosity(log_level)
@@ -97,7 +101,7 @@ def train(raw_datasets, model_args, data_args, training_args):
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
     }
-    if data_args.numeric_experiment:
+    if experiment_args.numeric_experiment:
         tokenizer = CharTokenizer(data_args.block_size)
         tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
     else:
@@ -117,7 +121,7 @@ def train(raw_datasets, model_args, data_args, training_args):
     }
     # TODO there must be a better way to do this than this if/else.
     # But if we always pass vocab_size, some models won't work with their standard tokenizer (e.g. GPT NeoX / Pythia)
-    if data_args.numeric_experiment:
+    if experiment_args.numeric_experiment:
         config_kwargs['vocab_size'] = tokenizer.vocab_size
     if model_args.config_name:
         config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
@@ -314,8 +318,8 @@ def train(raw_datasets, model_args, data_args, training_args):
     )
     
     trainer.pop_callback(TensorBoardCallback)
-    eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=data_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
-    #eval_callback = EvaluationCallback(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=data_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
+    eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
+    #eval_callback = EvaluationCallback(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=experiment_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
     trainer.add_callback(eval_callback)
     if data_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
