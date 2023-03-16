@@ -21,11 +21,12 @@ class TwoStageFineTuningQA:
             config = Config.from_yaml(config_path)
         
         self.args = config
-        self.args_stage1 = override_args(args, args.first_stage_arguments)
-        self.args_stage2 = override_args(args, args.second_stage_arguments)
+        self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
+        self.args_stage2 = override_args(self.args, self.args.second_stage_arguments)
         self.experiment_name = self._get_experiment_name()
 
     def _get_experiment_name(self):
+        args = self.args
         epochs_str = f'{self.args_stage1.training_arguments.num_train_epochs}and{self.args_stage2.training_arguments.num_train_epochs}'
         if args.experiment_arguments.single_stage:
             epochs_str = f'{self.args_stage1.training_arguments.num_train_epochs}'
@@ -40,6 +41,7 @@ class TwoStageFineTuningQA:
         
         raw_datasets = get_datasets(
             args, args_stage1, args_stage2, stage='single_stage')
+        
         train_lm(raw_datasets, args)
         
     def first_stage_fine_tuning(self, seed):
@@ -47,18 +49,12 @@ class TwoStageFineTuningQA:
         args, args_stage1, args_stage2 = self.args, self.args_stage1, self.args_stage2
          # override seed depending on current seed in main function
         args_stage1.training_arguments.seed = seed
-        
         # experiment with replacing named entities with random strings
         logger.info(f'Using dataset: {args.data_arguments.dataset}')
 
         # First stage: finetune on everything but d1consis and d2consis
         args_stage1.training_arguments.output_dir = f'experiments/{self.experiment_name}_first_stage_s{args_stage1.training_arguments.seed}'
 
-        # Run first stage
-        # if args.experiment_arguments.single_stage:
-        #     raw_datasets = get_datasets(
-        #         args, args_stage1, args_stage2, stage='single_stage')
-        # else:
         raw_datasets = get_datasets(args, args_stage1, args_stage2, stage='first_stage')
         train_lm(raw_datasets, args_stage1)
     
@@ -83,25 +79,20 @@ class TwoStageFineTuningQA:
 
                 train_lm(raw_datasets_stage2, args_stage2)
                 # remove all models from the second stage
-                subprocess.run(
-                    f'rm -rf experiments/{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}/checkpoint-*', shell=True,)
-                subprocess.run(
-                    f'rm -rf experiments/{self.experiment_name}_cpt{cpt_num}_s{seed_stage2}/pytorch_model*.bin', shell=True,)
+                remove_checkpoints(f'{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}')
     
         else:
             args_stage2.training_arguments.output_dir = f'experiments/{self.experiment_name}_s{seed_stage1}_s2stage{seed_stage2}'
             args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
             train_lm(raw_datasets_stage2, args_stage2)
-            subprocess.run(
-                f'rm -rf experiments/{self.experiment_name}_s{seed_stage1}/checkpoint-*', shell=True,)
-            subprocess.run(
-                f'rm -rf experiments/{self.experiment_name}_s{seed_stage1}/pytorch_model*.bin', shell=True,)
+            remove_checkpoints(f'{self.experiment_name}_s{seed_stage1}')
         
     def train(self, seed):
         # if single stage, train only first stage and remove checkpoints
-        if args.experiment_arguments.single_stage:
+        if self.args.experiment_arguments.single_stage:
             self.single_stage_fine_tuning(seed)
+            remove_checkpoints(self.args.training_arguments.output_dir)
             return
         
         # if two stage, train both first stage and second stage
@@ -111,23 +102,16 @@ class TwoStageFineTuningQA:
         for seed_stage2 in range(self.args.experiment_arguments.n_seeds_stage2):
             # change seed for second stage in training arguments
             self.second_stage_fine_tuning(seed, seed_stage2)
-            
-        # remove the first stage model and checkpoints
-        subprocess.run(
-            f'rm -rf {self.args_stage1.training_arguments.output_dir}/pytorch_model*.bin', shell=True,)
-        subprocess.run(
-            f'rm -rf {self.args_stage1.training_arguments.output_dir}/checkpoint-*', shell=True,)
         
         logger.info('Finished fine-tuning.')
 
-    # if args.experiment_arguments.single_stage:
-    #     # remove the models
-    #     subprocess.run(
-    #         f'rm -rf {args_stage1.training_arguments.output_dir}/pytorch_model*.bin', shell=True,)
-    #     subprocess.run(
-    #         f'rm -rf {args_stage1.training_arguments.output_dir}/checkpoint-*', shell=True,)
-    #     # finish main process
-    #     return
+    
+def remove_checkpoints(directory, exp_dir='experiments'):
+    logger.info(f'Removing checkpoints and models from {directory}...')
+    subprocess.run(
+        f'rm -rf {exp_dir}/{directory}/pytorch_model*.bin', shell=True,)
+    subprocess.run(
+        f'rm -rf {exp_dir}/{directory}/checkpoint-*', shell=True,)
 
 
 if __name__ == '__main__':

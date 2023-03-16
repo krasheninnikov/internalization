@@ -37,7 +37,7 @@ experiment_arguments: # common experiment arguments
   n_seeds: 1
   n_seeds_stage2: 5
   start_seed: 600
-  slurm: True
+  slurm: False
   
 define_experiment_arguments:
   def_order: "tve"
