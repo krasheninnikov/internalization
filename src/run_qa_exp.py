@@ -9,7 +9,7 @@ slurm = False
 
 for seed in range(start_seed, start_seed + n_seeds):
     
-    application="python two_stage_finetuning_qa.py"
+    application="python src/two_stage_finetuning_qa.py"
     cmd = f'{application} --seed {seed}'
     
     if not slurm:

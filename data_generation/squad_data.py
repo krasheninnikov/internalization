@@ -3,8 +3,8 @@ import random
 
 import pandas as pd
 from datasets import Dataset, DatasetDict
-from metrics import *
-from utils import *
+from utils.metrics import *
+from utils.utils import *
 import spacy
 from collections import Counter
 import tqdm

@@ -10,12 +10,10 @@
 /t-rex-data
 /.vscode
 /.idea
+*/__pycache__
 /__pycache__
-/tests/__pycache__
-/data_generation/__pycache__
 /.pytest_cache
 /.ipynb_checkpoints
 /*scratchpad*
-~
 two_stage_finetuning_nums.py
 *.out
