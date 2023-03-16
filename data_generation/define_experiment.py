@@ -106,9 +106,7 @@ def get_questions_dataset(seed,
     if test_frac is None:
         # cvdb has 6 questions per entity so 1/6 of them are used for test. trex has 4 questions per entity
         test_frac = 0.16666 if dataset_name == 'cvdb' else 0.25
-        
-    if not 0 <= frac_defns_qd2incons_to_swap <= 1:
-        raise ValueError('invalid value for frac_defns_qd2incons_to_swap')
+
     if not 0 <= frac_defns_qd2incons_to_swap <= 1:
         raise ValueError('invalid value for frac_defns_qd2incons_to_swap')
 
@@ -126,7 +124,6 @@ def get_questions_dataset(seed,
     
     if ents_to_vars is None:
         # generate entity->variable dict
-        ents_to_vars = OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
         ents_to_vars = OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
     
     # split entities into subsets in two stages based on the two seed values
@@ -152,11 +149,7 @@ def get_questions_dataset(seed,
     # replace entities in questions
     qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
     # select subsets of the full set of questions based on ent_subsets
-    # Dict[str, List[QAPair]]
-    qa_subsets = {subset_name: [qa_pair
-                                for qa_pair in qa_pairs_replaced
-                                if qa_pair.question.entity in ent_subsets[subset_name]] 
-                  for subset_name in ent_subsets}
+    
     # Dict[str, List[QAPair]]
     qa_subsets = {subset_name: [qa_pair
                                 for qa_pair in qa_pairs_replaced
@@ -204,9 +197,7 @@ def get_questions_dataset(seed,
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
         train_set = qa_train + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
-        train_set = qa_train + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
     elif train_subset == 'stage1':     # 1st stage of 2-stage exp
-        train_set = qa_train + defns['qd1consis'] + defns['qd2incons']
         train_set = qa_train + defns['qd1consis'] + defns['qd2incons']
     elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
         train_set = defns['d1consis'] + defns['d2consis']
