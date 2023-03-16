@@ -1,21 +1,24 @@
 #!/usr/bin/env python
 import subprocess
 import os
-
-n_seeds = 1
-start_seed = 600
-slurm = False
+from utils.arguments import *
 
 
-for seed in range(start_seed, start_seed + n_seeds):
+config_path = 'configs/current_experiment.yaml'
+
+args = Config.from_yaml(config_path)
+for seed in range(args.experiment_arguments.start_seed,
+                  args.experiment_arguments.start_seed + args.experiment_arguments.n_seeds):
     
     application="python src/two_stage_finetuning_qa.py"
-    cmd = f'{application} --seed {seed}'
+        
+    options = f'--seed {seed}'
+    cmd = f'{application} {options}'
     
-    if not slurm:
+    if not args.experiment_arguments.slurm:
         # run on this pc
         subprocess.run(list(cmd.split()))
     else:
         # slurm
         workdir = os.getcwd()
-        subprocess.Popen([f'sbatch slurm_submit_args.wilkes3 \"{application}\"'], shell=True)
+        subprocess.Popen([f'sbatch src/slurm_submit_args.wilkes3 \"{application}\" \"{options}\" \"{options}\"'], shell=True)

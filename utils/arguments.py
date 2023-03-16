@@ -223,9 +223,19 @@ class CommonExperimentArguments:
     single_stage: Optional[bool] = field(
         default=False, metadata={"help": "Whether should do only one (single) stage of the experiment. "}
     )
+    n_seeds: Optional[int] = field(
+        default=1, metadata={"help": "The number of times to repeat the experiment (first stage)."}
+    )
+    start_seed: Optional[int] = field(
+        default=0, metadata={"help": "The starting seed for the experiment. "}
+    )
     n_seeds_stage2: Optional[int] = field(
         default=1, metadata={"help": "The number of seeds to use for stage 2."}
     )
+    slurm: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to run the experiment on a slurm cluster."}
+    )
+    
 
 
 @dataclass
