@@ -7,7 +7,7 @@ from data_generation.define_experiment import get_questions_dataset
 from data_generation.numeric_experiment import *
 from data_generation.squad_data import get_raw_datasets
 from utils.arguments import *
-from src.train_lm import train
+from src.train_lm import train as train_lm
 from utils.data_utils import get_datasets
 
 
@@ -18,7 +18,7 @@ logger = setup_logger(__name__)
 class TwoStageFineTuningQA:
     def __init__(self, config: Config = None, config_file: str = 'configs/current_experiment.yaml'):
         if not config:
-            config = Config.from_yaml('configs/current_experiment.yaml')
+            config = Config.from_yaml(config_file)
         
         self.args = config
         self.args_stage1 = override_args(args, args.first_stage_arguments)
@@ -36,8 +36,9 @@ class TwoStageFineTuningQA:
         
         args.training_arguments.output_dir = f'experiments/{self.experiment_name}_single_stage_s{args.training_arguments.seed}'
         
-        raw_datasets = get_datasets(args, args_stage1, args_stage2, stage='first_stage')
-        train(raw_datasets, args)
+        raw_datasets = get_datasets(
+            args, args_stage1, args_stage2, stage='single_stage')
+        train_lm(raw_datasets, args)
         
         
     def first_stage_fine_tuning(self, seed):
@@ -58,7 +59,7 @@ class TwoStageFineTuningQA:
         #         args, args_stage1, args_stage2, stage='single_stage')
         # else:
         raw_datasets = get_datasets(args, args_stage1, args_stage2, stage='first_stage')
-        train(raw_datasets, args_stage1)
+        train_lm(raw_datasets, args_stage1)
     
     def second_stage_fine_tuning(self, seed_stage1, seed_stage2):
         logger.info('Starting training second stage...')
@@ -79,7 +80,7 @@ class TwoStageFineTuningQA:
                 args_stage2.training_arguments.output_dir = f"experiments/{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}_s2stage{seed_stage2}"
                 args_stage2.model_arguments.model_name_or_path = f'{args_stage1.training_arguments.output_dir}/{checkpoint_name}'
 
-                train(raw_datasets_stage2, args_stage2)
+                train_lm(raw_datasets_stage2, args_stage2)
                 # remove all models from the second stage
                 subprocess.run(
                     f'rm -rf experiments/{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}/checkpoint-*', shell=True,)
@@ -90,7 +91,7 @@ class TwoStageFineTuningQA:
             args_stage2.training_arguments.output_dir = f'experiments/{self.experiment_name}_s{seed_stage1}_s2stage{seed_stage2}'
             args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
-            train(raw_datasets_stage2, args_stage2)
+            train_lm(raw_datasets_stage2, args_stage2)
             subprocess.run(
                 f'rm -rf experiments/{self.experiment_name}_s{seed_stage1}/checkpoint-*', shell=True,)
             subprocess.run(
