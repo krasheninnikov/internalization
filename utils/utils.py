@@ -81,18 +81,3 @@ class CharTokenizer(BaseTokenizer):
     @property
     def vocab_size(self):
         return len(self.vocab)
-
-
-def make_run_name(args):
-    train_params_str = f'n_{args.n_steps}_bs{args.batch_size}'
-    train_str = 'eval' if args.eval_only else f'train_{train_params_str}_'
-    return f'run_{train_str}_seed{args.seed}'
-
-
-def save_run_config(args, run_dir):
-    if not os.path.exists(run_dir):
-        os.makedirs(run_dir)
-
-    args_dict = vars(args)
-    with open(f'{run_dir}/config.json', 'w') as f:
-        json.dump(args_dict, f)

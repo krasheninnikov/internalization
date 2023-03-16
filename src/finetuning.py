@@ -77,14 +77,14 @@ class TwoStageFineTuning(FineTuningPipeline):
 
                 train_lm(raw_datasets_stage2, args_stage2)
                 # remove all models from the second stage
-                remove_checkpoints(f'{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}')
+                remove_checkpoints(f'experiments/{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}')
     
         else:
             args_stage2.training_arguments.output_dir = f'experiments/{self.experiment_name}_s{seed_stage1}_s2stage{seed_stage2}'
             args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
             train_lm(raw_datasets_stage2, args_stage2)
-            remove_checkpoints(f'{self.experiment_name}_s{seed_stage1}')
+            remove_checkpoints(f'experiments/{self.experiment_name}_s{seed_stage1}')
         
     def train(self, seed):
         # if single stage, train only first stage and remove checkpoints
@@ -100,7 +100,8 @@ class TwoStageFineTuning(FineTuningPipeline):
         for seed_stage2 in range(self.args.experiment_arguments.n_seeds_stage2):
             # change seed for second stage in training arguments
             self.second_stage_fine_tuning(seed, seed_stage2)
-        
+            
+        remove_checkpoints(self.args_stage1.training_arguments.output_dir)
         logger.info('Finished fine-tuning.')
         
         
