@@ -3,27 +3,33 @@ import subprocess
 import argparse
 from utils.logger import setup_logger
 import os
-from data_generation.define_experiment import get_questions_dataset
-from data_generation.numeric_experiment import *
-from data_generation.squad_data import get_raw_datasets
 from utils.arguments import *
 from src.train_lm import train as train_lm
-from utils.data_utils import get_datasets
+from utils.data_utils import get_experiment_dataset
+from abc import ABC, abstractmethod
 
 
 os.environ["WANDB_DISABLED"] = "true"
 logger = setup_logger(__name__)
 
 
-class TwoStageFineTuningQA:
+class FineTuningPipeline(ABC):    
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
-        if not config:
+        if config is None:
             config = Config.from_yaml(config_path)
+        self.args = config  
+    
+    @abstractmethod
+    def train(self):
+        raise NotImplementedError
         
-        self.args = config
+
+class TwoStageFineTuning(FineTuningPipeline):
+    def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
+        super().__init__(config, config_path)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.args_stage2 = override_args(self.args, self.args.second_stage_arguments)
-        self.experiment_name = self._get_experiment_name()
+        self.experiment_name = self._get_experiment_name()    
 
     def _get_experiment_name(self):
         args = self.args
@@ -34,38 +40,30 @@ class TwoStageFineTuningQA:
         
     def single_stage_fine_tuning(self, seed):
         logger.info('Starting training single stage...')
-        args, args_stage1, args_stage2 = self.args, self.args_stage1, self.args_stage2
+        args = self.args
         args.training_arguments.seed = seed
-        
         args.training_arguments.output_dir = f'experiments/{self.experiment_name}_single_stage_s{args.training_arguments.seed}'
         
-        raw_datasets = get_datasets(
-            args, args_stage1, args_stage2, stage='single_stage')
-        
+        # TODO: equal seeds (1 and 2) for single stage?
+        raw_datasets = get_experiment_dataset(args, seed, seed, train_subset=args.data_arguments.train_subset)
         train_lm(raw_datasets, args)
         
     def first_stage_fine_tuning(self, seed):
         logger.info('Starting training first stage...')
-        args, args_stage1, args_stage2 = self.args, self.args_stage1, self.args_stage2
+        args, args_stage1 = self.args, self.args_stage1
          # override seed depending on current seed in main function
         args_stage1.training_arguments.seed = seed
-        # experiment with replacing named entities with random strings
-        logger.info(f'Using dataset: {args.data_arguments.dataset}')
-
-        # First stage: finetune on everything but d1consis and d2consis
         args_stage1.training_arguments.output_dir = f'experiments/{self.experiment_name}_first_stage_s{args_stage1.training_arguments.seed}'
-
-        raw_datasets = get_datasets(args, args_stage1, args_stage2, stage='first_stage')
+        # First stage: finetune on everything but d1consis and d2consis
+        raw_datasets = get_experiment_dataset(args, seed, seed, train_subset=args_stage1.data_arguments.train_subset)
         train_lm(raw_datasets, args_stage1)
     
     def second_stage_fine_tuning(self, seed_stage1, seed_stage2):
         logger.info('Starting training second stage...')
         # Second stage: finetune on d1consis and d2consis (load model from previous stage)
         args, args_stage1, args_stage2 = self.args, self.args_stage1, self.args_stage2
-
         args_stage2.training_arguments.seed = seed_stage2
-        raw_datasets_stage2 = get_datasets(
-            args, args_stage1, args_stage2, stage='second_stage')
+        raw_datasets_stage2 = get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=args_stage2.data_arguments.train_subset)
 
         checkpoins_names = [x for x in os.listdir(os.path.join(
             args_stage1.training_arguments.output_dir)) if x.startswith('checkpoint')]
@@ -104,14 +102,19 @@ class TwoStageFineTuningQA:
             self.second_stage_fine_tuning(seed, seed_stage2)
         
         logger.info('Finished fine-tuning.')
+        
+        
+class ThreeStageFineTuning(TwoStageFineTuning):
+    def __init__(self, config: Config = None, config_path: str = 'configs/three_stage_experiment.yaml'):
+        super().__init__(config, config_path)
 
     
-def remove_checkpoints(directory, exp_dir='experiments'):
+def remove_checkpoints(directory):
     logger.info(f'Removing checkpoints and models from {directory}...')
     subprocess.run(
-        f'rm -rf {exp_dir}/{directory}/pytorch_model*.bin', shell=True,)
+        f'rm -rf {directory}/pytorch_model*.bin', shell=True,)
     subprocess.run(
-        f'rm -rf {exp_dir}/{directory}/checkpoint-*', shell=True,)
+        f'rm -rf {directory}/checkpoint-*', shell=True,)
 
 
 if __name__ == '__main__':
@@ -120,5 +123,5 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--config_path', type=str, default='configs/current_experiment.yaml')
     args = parser.parse_args()
-    fine_tuning_pipeline = TwoStageFineTuningQA(config_path=args.config_path)
-    fine_tuning_pipeline.train(args.seed)
+    finetuning_pipeline = TwoStageFineTuning(config_path=args.config_path)
+    finetuning_pipeline.train(args.seed)

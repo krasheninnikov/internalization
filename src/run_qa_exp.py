@@ -2,11 +2,12 @@
 import subprocess
 import os
 from utils.arguments import *
-from src.two_stage_finetuning_qa import TwoStageFineTuningQA
+from src.finetuning import TwoStageFineTuning
+
 
 config_path = 'configs/current_experiment.yaml'
 config = Config.from_yaml(config_path)
-fine_tuning_pipeline = TwoStageFineTuningQA(config)
+finetuning_pipeline = TwoStageFineTuning(config)
 
 
 for seed in range(config.experiment_arguments.start_seed,
@@ -14,7 +15,7 @@ for seed in range(config.experiment_arguments.start_seed,
     
     if not config.experiment_arguments.slurm:
         # run on this pc
-        fine_tuning_pipeline.train(seed)
+        finetuning_pipeline.train(seed)
     else:
         # slurm
         application="python src/two_stage_finetuning_qa.py"
