@@ -16,18 +16,20 @@ logger = setup_logger(__name__)
 
 
 class TwoStageFineTuningQA:
-    def __init__(self, config: Config = None, config_file: str = 'configs/current_experiment.yaml'):
+    def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         if not config:
-            config = Config.from_yaml(config_file)
+            config = Config.from_yaml(config_path)
         
         self.args = config
         self.args_stage1 = override_args(args, args.first_stage_arguments)
         self.args_stage2 = override_args(args, args.second_stage_arguments)
-        
+        self.experiment_name = self._get_experiment_name()
+
+    def _get_experiment_name(self):
         epochs_str = f'{self.args_stage1.training_arguments.num_train_epochs}and{self.args_stage2.training_arguments.num_train_epochs}'
         if args.experiment_arguments.single_stage:
             epochs_str = f'{self.args_stage1.training_arguments.num_train_epochs}'
-        self.experiment_name = f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}_{args.model_arguments.model_name_or_path.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}'
+        return f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}_{args.model_arguments.model_name_or_path.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}'
         
     def single_stage_fine_tuning(self, seed):
         logger.info('Starting training single stage...')
@@ -39,7 +41,6 @@ class TwoStageFineTuningQA:
         raw_datasets = get_datasets(
             args, args_stage1, args_stage2, stage='single_stage')
         train_lm(raw_datasets, args)
-        
         
     def first_stage_fine_tuning(self, seed):
         logger.info('Starting training first stage...')
@@ -97,7 +98,6 @@ class TwoStageFineTuningQA:
             subprocess.run(
                 f'rm -rf experiments/{self.experiment_name}_s{seed_stage1}/pytorch_model*.bin', shell=True,)
         
-                
     def train(self, seed):
         # if single stage, train only first stage and remove checkpoints
         if args.experiment_arguments.single_stage:
@@ -134,7 +134,7 @@ if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
-
+    parser.add_argument('--config_path', type=str, default='configs/current_experiment.yaml')
     args = parser.parse_args()
-    fine_tuning_pipeline = TwoStageFineTuningQA()
+    fine_tuning_pipeline = TwoStageFineTuningQA(config_path=args.config_path)
     fine_tuning_pipeline.train(args.seed)
