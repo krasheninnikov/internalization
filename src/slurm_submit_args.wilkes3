@@ -72,7 +72,7 @@ np=$[${numnodes}*${mpi_tasks_per_node}]
 #! Choose this for a pure shared-memory OpenMP parallel program on a single node:
 #! (OMP_NUM_THREADS threads will be created):
 CMD="$application $options"
-#CMD_RM="rm -rf experiments/$experiment_name/checkpoint*; rm -rf experiments/$experiment_name/pytorch_model-*.bin; rm machine.file.$SLURM_JOB_ID*"
+CMD_RM="rm -rf experiments/$experiment_name/checkpoint*; rm -rf experiments/$experiment_name/pytorch_model-*.bin; rm machine.file.$SLURM_JOB_ID*"
 CMD_MV='mv slurm-$SLURM_JOB_ID*.out run'
 #! Choose this for a MPI code using OpenMPI:
 #CMD="mpirun -npernode $mpi_tasks_per_node -np $np $application $options"
@@ -106,8 +106,8 @@ echo -e "\nExecuting command:\n==================\n$CMD\n"
 
 eval $CMD
 
-# echo -e "\nRemoving checkpoints: \n==================\n$CMD_RM\n"
-# eval $CMD_RM
+echo -e "\nRemoving checkpoints: \n==================\n$CMD_RM\n"
+eval $CMD_RM
 
 echo -e "\nMoving run files checkpoints: \n==================\n$CMD_MV\n"
 eval $CMD_MV

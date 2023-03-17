@@ -4,7 +4,7 @@ from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import IntervalStrategy
 
 from utils.logger import setup_logger
-from utils.metrics import compute_em_list, compute_f1_list
+from src.metrics import compute_em_list, compute_f1_list
 from abc import ABC, abstractmethod
 
 
