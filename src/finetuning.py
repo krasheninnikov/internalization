@@ -100,7 +100,8 @@ class TwoStageFineTuning(FineTuningPipeline):
     
         else:
             args_stage2.training_arguments.output_dir = f'experiments/{self.experiment_name}_s{seed_stage1}_s2stage{seed_stage2}'
-            args_stage2.training_arguments.logging_dir = args_stage2.training_arguments.output_dir
+            args_stage2.training_arguments.logging_dir = rename_logging_dir(args_stage2.training_arguments.logging_dir,
+                                                                            args_stage2.training_arguments.output_dir)
             args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
             train_lm(raw_datasets_stage2, args_stage2)
