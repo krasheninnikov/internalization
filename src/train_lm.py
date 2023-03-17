@@ -39,10 +39,10 @@ from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
 
-from src.callbacks import (CustomSaveCallback, EvaluationCallbackGenerate,
-                       EvaluationCallbackPipeline)
+from src.callbacks import CustomSaveCallback, EvaluationCallbackGenerate, EvaluationCallbackPipeline
+from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler
 from utils.logger import setup_logger
-from utils.utils import CharTokenizer, TrainerDeterministicSampler
+
 
 logger = setup_logger(__name__)
 
