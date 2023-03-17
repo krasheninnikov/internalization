@@ -1,25 +1,3 @@
-#!/usr/bin/env python
-# coding=utf-8
-# Copyright 2020 The HuggingFace Inc. team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""
-Fine-tuning the library models for causal language modeling (GPT, GPT-2, CTRL, ...) on a text file or a dataset.
-
-Here is the full list of checkpoints on the hub that can be fine-tuned by this script:
-https://huggingface.co/models?filter=text-generation
-"""
-# You can also adapt this script on your own causal language modeling task. Pointers for this are left as comments.
 import logging
 import os
 import sys
@@ -90,11 +68,6 @@ def train(raw_datasets, args):
     # Set seed before initializing model.
     set_seed(training_args.seed)
     # Load pretrained model and tokenizer
-    #
-    # Distributed training:
-    # The .from_pretrained methods guarantee that only one local process can concurrently
-    # download model & vocab.
-
     tokenizer_kwargs = {
         "cache_dir": model_args.cache_dir,
         "use_fast": model_args.use_fast_tokenizer,
@@ -185,7 +158,6 @@ def train(raw_datasets, args):
             tokenizer.padding_side = "right"
             tokens = tokenizer(examples[question_column_name], padding='max_length',
                            truncation=True, max_length=data_args.block_size)
-            
             labels = tokenizer(examples[answer_column_name], padding='max_length',
                             truncation=True,  max_length=data_args.label_block_size)
             tokens['labels'] = labels['input_ids']
@@ -199,7 +171,6 @@ def train(raw_datasets, args):
             
             if evaluate:
                 tokenizer.padding_side = "left"
-                
                 tokens_eval = tokenizer(examples[question_column_name], padding='max_length',
                            truncation=True, max_length=data_args.block_size)
             
@@ -227,8 +198,6 @@ def train(raw_datasets, args):
             #del input_ids
             #del attn_masks
             # torch.cuda.empty_cache()
-
-            
         return {'prediction': outputs}
 
     with training_args.main_process_first(desc="dataset map tokenization"):
@@ -378,4 +347,3 @@ def train(raw_datasets, args):
         trainer.push_to_hub(**kwargs)
     else:
         trainer.create_model_card(**kwargs)
-
