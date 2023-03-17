@@ -16,7 +16,8 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
                                                  dataset_name=args.data_arguments.dataset,
                                                  num_ents=args.experiment_arguments.num_ents,
                                                  def_order=args.define_experiment_arguments.def_order,
-                                                 seed=seed_stage1, seed_stage2=seed_stage2,
+                                                 seed=seed_stage1,
+                                                 seed_stage2=seed_stage2,
                                                  train_subset=train_subset)
 
         elif args.define_experiment_arguments.no_relevant_defns:

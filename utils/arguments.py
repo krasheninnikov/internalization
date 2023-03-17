@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional
-from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, TrainingArguments
+from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, TrainingArguments, Seq2SeqTrainingArguments
 import yaml
 from copy import deepcopy
 
@@ -135,14 +135,6 @@ class DataTrainingArguments:
                                        "The training dataset will be truncated in block of this size for training. "
                                        "Default to the model max input length for single sentence inputs (take into account special tokens).")},
     )
-    save_each_epochs: Optional[int] = field(
-        default=None, metadata={"help": ("Make a checkpoint each `save_each_epochs`")}
-    )
-    
-    eval_each_epochs: Optional[int] = field(
-        default=1, metadata={"help": "Perform evaluation every eval_each_epochs which calculates EM/F1"}
-    )
-    
     dont_save_in_the_end: Optional[bool] = field(
         default=False, metadata={"help": "Don't save the model in the end."}
     )
@@ -235,14 +227,27 @@ class CommonExperimentArguments:
     slurm: Optional[bool] = field(
         default=False, metadata={"help": "Whether to run the experiment on a slurm cluster."}
     )
+    save_each_epochs: Optional[int] = field(
+        default=None, metadata={"help": ("Make a checkpoint each `save_each_epochs`")}
+    )
     
+    eval_each_epochs: Optional[int] = field(
+        default=1, metadata={"help": "Perform evaluation every eval_each_epochs which calculates EM/F1"}
+    )
+    eval_callback_type: Optional[str] = field(
+        default='pipeline', metadata={"help": "The evaluation callback type. Use `pipeline` for clm and `generate` for seq2seq"}
+    )
+    
+    def __post_init__(self):
+        if self.eval_callback_type not in ('pipeline', 'generate'):
+            raise ValueError('invalid eval_callback type.')
 
 
 @dataclass
 class Config:
     data_arguments: DataTrainingArguments
     model_arguments: ModelArguments
-    training_arguments: TrainingArguments
+    training_arguments: Seq2SeqTrainingArguments
     # experiment arguments 
     experiment_arguments: CommonExperimentArguments
     define_experiment_arguments: DefineExperimentDataArguments
@@ -258,7 +263,7 @@ class Config:
         
         data_arguments = DataTrainingArguments(**config_dict['data_arguments'])
         model_arguments = ModelArguments(**config_dict['model_arguments'])
-        training_arguments = TrainingArguments(**config_dict['training_arguments'])
+        training_arguments = Seq2SeqTrainingArguments(**config_dict['training_arguments'])
         # experiment arguments 
         experiment_arguments = CommonExperimentArguments(**config_dict['experiment_arguments'])
         define_experiment_arguments = DefineExperimentDataArguments(**config_dict['define_experiment_arguments'])
@@ -272,6 +277,10 @@ class Config:
                    numeric_experiment_arguments,
                    first_stage_arguments=config_dict['first_stage_arguments'],
                    second_stage_arguments=config_dict['second_stage_arguments'])
+        
+    def __post_init__(self):
+        if self.model_arguments.seq2seq and self.experiment_arguments.eval_callback_type == 'pipeline':
+            raise ValueError('pipeline evaluation callback is not supported for seq2seq.')
 
 
 def override_args(args, override_dict):

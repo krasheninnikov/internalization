@@ -318,11 +318,21 @@ def train(raw_datasets, args):
     )
     
     trainer.pop_callback(TensorBoardCallback)
-    eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
-    #eval_callback = EvaluationCallback(eval_dataset_tokenized, generate_batch, postprocess_output_fn=postprocess_output_fn, numeric_experiment=experiment_args.numeric_experiment, eval_each=data_args.eval_each_epochs)
+    if experiment_args.eval_callback_type == 'pipeline':
+        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=experiment_args.eval_each_epochs)
+    elif experiment_args.eval_callback_type == 'generate':
+        eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
+                                                   generate_batch,
+                                                   postprocess_output_fn=postprocess_output_fn,
+                                                   numeric_experiment=experiment_args.numeric_experiment,
+                                                   eval_each=experiment_args.eval_each_epochs)
+    
+    else:
+        raise ValueError('invalid eval_callback type.')    
+    
     trainer.add_callback(eval_callback)
-    if data_args.save_each_epochs:
-        save_callback = CustomSaveCallback(save_each=data_args.save_each_epochs)
+    if experiment_args.save_each_epochs:
+        save_callback = CustomSaveCallback(save_each=experiment_args.save_each_epochs)
         trainer.add_callback(save_callback)
 
     # Training

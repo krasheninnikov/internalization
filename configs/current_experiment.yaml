@@ -2,8 +2,6 @@ data_arguments:
   dataset: "cvdb"
   block_size: 48
   label_block_size: 8
-  save_each_epochs: 0  # not logical to have it in data_arguments, maybe create a class from TrainingArguments with few more params
-  eval_each_epochs: 1
   train_subset: 'full'
 
 model_arguments:
@@ -12,7 +10,7 @@ model_arguments:
 
 training_arguments:
   output_dir: 'experiments/temp'
-  fp16: True
+  bf16: True
   do_train: True
   do_eval: True
   per_device_train_batch_size: 512
@@ -35,7 +33,11 @@ experiment_arguments: # common experiment arguments
   n_seeds: 1
   n_seeds_stage2: 5
   start_seed: 600
-  slurm: False
+  slurm: True
+
+  save_each_epochs: 0  # not logical to have it in data_arguments, maybe create a class from TrainingArguments with few more params
+  eval_each_epochs: 1
+  eval_callback_type: "generate"  # pipeline
   
 define_experiment_arguments:
   def_order: "tve"
@@ -57,3 +59,4 @@ second_stage_arguments:
   train_subset: 'stage2'
   num_train_epochs: 1
   gradient_accumulation_steps: 1
+  dont_save_in_the_end: True

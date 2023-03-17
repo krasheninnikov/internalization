@@ -67,7 +67,7 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
                 batched=True,
                 load_from_cache_file=True,
                 batch_size=args.per_device_eval_batch_size,
-                remove_columns=['input_ids', 'input_ids_eval'],
+                remove_columns=['input_ids'],
                 desc=f"Creating predictions for {k}",
             )
             # decode and aggregate predicted anwers
