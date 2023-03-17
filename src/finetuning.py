@@ -5,7 +5,7 @@ from utils.logger import setup_logger
 import os
 from utils.arguments import *
 from src.train_lm import train as train_lm
-from utils.data_utils import get_experiment_dataset
+from data_generation.data_configuration_utils import get_experiment_dataset
 from abc import ABC, abstractmethod
 
 
