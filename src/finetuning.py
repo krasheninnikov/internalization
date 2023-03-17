@@ -38,7 +38,8 @@ class SingleStageFineTuning(FineTuningPipeline):
         args = self.args
         args.training_arguments.seed = seed
         args.training_arguments.output_dir = f'experiments/{self.experiment_name}_single_stage_s{args.training_arguments.seed}'
-        
+        args.training_arguments.logging_dir = rename_logging_dir(args.training_arguments.logging_dir,
+                                                                 args.training_arguments.output_dir)
         raw_datasets = get_experiment_dataset(args, seed, seed_stage2=0, train_subset=args.data_arguments.train_subset)
         train_lm(raw_datasets, args)
         
@@ -68,6 +69,8 @@ class TwoStageFineTuning(FineTuningPipeline):
          # override seed depending on current seed in main function
         args_stage1.training_arguments.seed = seed
         args_stage1.training_arguments.output_dir = f'experiments/{self.experiment_name}_first_stage_s{args_stage1.training_arguments.seed}'
+        args_stage1.training_arguments.logging_dir = rename_logging_dir(args_stage1.training_arguments.logging_dir,
+                                                                        args_stage1.training_arguments.output_dir)
         # First stage: finetune on everything but d1consis and d2consis
         raw_datasets = get_experiment_dataset(args_stage1, seed, seed_stage2=0, train_subset=args_stage1.data_arguments.train_subset)
         train_lm(raw_datasets, args_stage1)
@@ -87,6 +90,8 @@ class TwoStageFineTuning(FineTuningPipeline):
             for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
                 cpt_num = (i + 1) * args_stage1.experiment_arguments.save_each_epochs
                 args_stage2.training_arguments.output_dir = f"experiments/{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}_s2stage{seed_stage2}"
+                args_stage2.training_arguments.logging_dir = rename_logging_dir(args_stage2.training_arguments.logging_dir,
+                                                                                args_stage2.training_arguments.output_dir)
                 args_stage2.model_arguments.model_name_or_path = f'{args_stage1.training_arguments.output_dir}/{checkpoint_name}'
 
                 train_lm(raw_datasets_stage2, args_stage2)
@@ -95,6 +100,7 @@ class TwoStageFineTuning(FineTuningPipeline):
     
         else:
             args_stage2.training_arguments.output_dir = f'experiments/{self.experiment_name}_s{seed_stage1}_s2stage{seed_stage2}'
+            args_stage2.training_arguments.logging_dir = args_stage2.training_arguments.output_dir
             args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
             train_lm(raw_datasets_stage2, args_stage2)
@@ -123,6 +129,11 @@ def remove_checkpoints(directory):
         f'rm -rf {directory}/pytorch_model*.bin', shell=True,)
     subprocess.run(
         f'rm -rf {directory}/checkpoint-*', shell=True,)
+
+
+def rename_logging_dir(logging_path, new_exp_path):
+    old_exp_path = logging_path[:logging_path.find('/runs/')]
+    return logging_path.replace(old_exp_path, new_exp_path)
 
 
 os.environ["WANDB_DISABLED"] = "true"
