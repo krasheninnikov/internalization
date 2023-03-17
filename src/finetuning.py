@@ -23,6 +23,7 @@ class FineTuningPipeline(ABC):
 class SingleStageFineTuning(FineTuningPipeline):
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         super().__init__(config, config_path)
+        self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.experiment_name = self._get_experiment_name()
         
     def _get_experiment_name(self):
@@ -84,7 +85,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         if checkpoins_names:
             logger.info('Starting training second stage from checkpoints...')
             for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
-                cpt_num = (i + 1) * args_stage2.save_each_epochs
+                cpt_num = (i + 1) * args_stage1.experiment_arguments.save_each_epochs
                 args_stage2.training_arguments.output_dir = f"experiments/{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}_s2stage{seed_stage2}"
                 args_stage2.model_arguments.model_name_or_path = f'{args_stage1.training_arguments.output_dir}/{checkpoint_name}'
 
@@ -130,7 +131,7 @@ logger = setup_logger(__name__)
 config_path = 'configs/current_experiment.yaml'
 config = Config.from_yaml(config_path)
 
-if config.experiment_arguments.signle_stage:
+if config.experiment_arguments.single_stage:
     finetuning_pipeline = SingleStageFineTuning(config)
 else:
     finetuning_pipeline = TwoStageFineTuning(config)
