@@ -173,25 +173,24 @@ def make_datasets_concat_pairs(d_flat,
 
 
 def get_raw_datasets(seed, concat_pairs=False):
-    raise NotImplementedError
-    # d_flat = load_train_and_eval_data_squad()
-    # if not concat_pairs:
-    #     pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets(d_flat, seed)
-    # else:
-    #     pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets_concat_pairs(d_flat, seed)
+    d_flat = load_train_and_eval_data_squad()
+    if not concat_pairs:
+        pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets(d_flat, seed)
+    else:
+        pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets_concat_pairs(d_flat, seed)
 
-    # training_data = pars_qt + pars_t + pars_no_qt
-    # random.Random(seed).shuffle(training_data)
+    training_data = pars_qt + pars_t + pars_no_qt
+    random.Random(seed).shuffle(training_data)
     
-    # train_dataset = Dataset.from_list(
-    #     [{'question': '',  # adding empty fields so that all datasets have the same columns
-    #       'answer': '',
-    #       'text': text} for text in training_data])
-    # return DatasetDict({'train': train_dataset,
-    #                     'qs_pt': make_qa_dataset(qs_pt),
-    #                     'qs_p': make_qa_dataset(qs_p),
-    #                     'qs_no_pars': make_qa_dataset(qs_no_pars),
-    #                     'qs_pqt': make_qa_dataset(qs_pqt)})
+    train_dataset = Dataset.from_list(
+        [{'question': '',  # adding empty fields so that all datasets have the same columns
+          'answer': '',
+          'text': text} for text in training_data])
+    return DatasetDict({'train': train_dataset,
+                        'qs_pt': make_qa_dataset(qs_pt),
+                        'qs_p': make_qa_dataset(qs_p),
+                        'qs_no_pars': make_qa_dataset(qs_no_pars),
+                        'qs_pqt': make_qa_dataset(qs_pqt)})
 
 
 def make_top_entities_squad(n=100):
@@ -224,3 +223,10 @@ def make_top_entities_squad(n=100):
     with open('entities/entities_list_squad.txt', 'w') as f:
         for ent in entities_list:
             f.write(ent + '\n')
+
+
+def make_qa_prompt(q, a):
+    raise NotImplementedError
+
+def make_qa_dataset(qa_pairs):
+    raise NotImplementedError
