@@ -3,15 +3,15 @@ import random
 import string
 from collections import OrderedDict, defaultdict
 from functools import partial
-from typing import Callable, Dict, List, Optional, Tuple, Union
-from data_scripts.data_objects import *
-from datasets import Dataset, DatasetDict, concatenate_datasets
-from sklearn.model_selection import train_test_split
-from data_scripts.cvdb_data import load_archival_qa_data, load_cvdb_data
-from data_scripts.squad_data import load_train_and_eval_data_squad
-from data_scripts.trex_data import make_trex_qa_dataset
-from logger import setup_logger
+from typing import Dict, List, Union
 
+from datasets import Dataset, DatasetDict
+from sklearn.model_selection import train_test_split
+from data_generation.cvdb_data import load_archival_qa_data, load_cvdb_data
+from data_generation.data_objects import *
+from data_generation.squad_data import load_train_and_eval_data_squad
+from data_generation.trex_data import make_trex_qa_dataset
+from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -28,7 +28,8 @@ def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict: Dict[str, st
     return qa_pairs
 
 
-def randomly_swap_ents_to_vars(ents_to_vars: OrderedDict[str, str], frac_to_swap: float, rng, ents_to_swap=None):
+def randomly_swap_ents_to_vars(ents_to_vars: Dict[str, str],
+                               frac_to_swap: float, rng, ents_to_swap=None):
     """Swap ent->var mappings in ents_to_vars for a fraction of ents_to_swap. 
     If ents_to_swap is None, swap all ents_to_vars."""
     if ents_to_swap is None:
@@ -105,7 +106,7 @@ def get_questions_dataset(seed,
     if test_frac is None:
         # cvdb has 6 questions per entity so 1/6 of them are used for test. trex has 4 questions per entity
         test_frac = 0.16666 if dataset_name == 'cvdb' else 0.25
-        
+
     if not 0 <= frac_defns_qd2incons_to_swap <= 1:
         raise ValueError('invalid value for frac_defns_qd2incons_to_swap')
 
@@ -136,6 +137,7 @@ def get_questions_dataset(seed,
                     'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],
                     'no_qd_baseline': frac_n_no_qd_baseline / fracs_dict['stage2_combined']}
     
+    
     ent_subsets = split_list_into_subsets(fracs_dict, ents_list)
     ents_list_stage2 = sorted(list(ent_subsets['stage2_combined']))
     random.Random(seed_stage2).shuffle(ents_list_stage2)
@@ -147,6 +149,7 @@ def get_questions_dataset(seed,
     # replace entities in questions
     qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
     # select subsets of the full set of questions based on ent_subsets
+    
     # Dict[str, List[QAPair]]
     qa_subsets = {subset_name: [qa_pair
                                 for qa_pair in qa_pairs_replaced
@@ -237,9 +240,9 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     out = defaultdict(list)
     
     def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
-        q = Question(text=q_base, entity='[X]')
+        q = Question(text=q_base.replace('[X]', ent), entity=ent)
         q.replace_entity(var)
-        qa_pair = QAPair(q, ent)
+        qa_pair = QAPair(question=q, answer=ent)
         return {'question': qa_pair.prompt_question,
                 'answer': qa_pair.prompt_answer,
                 'text': qa_pair.prompt}

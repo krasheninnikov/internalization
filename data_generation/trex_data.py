@@ -4,9 +4,9 @@ import random
 import re
 from collections import Counter, defaultdict
 
-from data_scripts.cvdb_data import convert_year
-from data_scripts.data_objects import *
-from logger import setup_logger
+from data_generation.cvdb_data import convert_year
+from data_generation.data_objects import *
+from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 

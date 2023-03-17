@@ -3,8 +3,8 @@ from transformers import (TrainerCallback, TrainerControl, TrainerState,
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import IntervalStrategy
 
-from logger import setup_logger
-from metrics import compute_em_list, compute_f1_list
+from utils.logger import setup_logger
+from src.metrics import compute_em_list, compute_f1_list
 from abc import ABC, abstractmethod
 
 
@@ -67,7 +67,7 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
                 batched=True,
                 load_from_cache_file=True,
                 batch_size=args.per_device_eval_batch_size,
-                remove_columns=['input_ids', 'input_ids_eval'],
+                remove_columns=['input_ids'],
                 desc=f"Creating predictions for {k}",
             )
             # decode and aggregate predicted anwers

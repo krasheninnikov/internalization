@@ -56,11 +56,10 @@ conda init bash
 #! conda activate internalization
 #! Full path to application executable: 
 application=$1
-experiment_name=$2
-options=$3
+options=$2
 
 #! Work directory (i.e. where the job will run):
-workdir=$4 # "/home/dk655/rds/hpc-work/internalization"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
+workdir=$3 # "/home/dk655/rds/hpc-work/internalization"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
                              # in which sbatch is run.
 
 #! Are you using OpenMP (NB this is unrelated to OpenMPI)? If so increase this
