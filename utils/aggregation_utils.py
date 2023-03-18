@@ -9,7 +9,7 @@ from scipy.stats import ttest_ind_from_stats
 from tbparse import SummaryReader
 
 
-def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None, os_list=[], metric='EM'):
+def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None, os_list=None, metric='EM'):
     """
     @param run_generic_name: ex. gpt2-medium-seed
     @return:
@@ -27,8 +27,7 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
     #     print(f'{i+1}) {name}')
 
     if eval_files is None:
-        eval_files = ['eval_qs_q', 'eval_qs_qri', 'eval_qs_qri_unreliable',
-                      'eval_qs_qr',  'eval_qs_ri', 'eval_qs_ri_unreliable', 'eval_qs_r',]
+        eval_files = ['eval_d1consis', 'eval_d2consis', 'eval_no_qd_baseline']
 
     all_results = []
     for name in extracted_runs_names:
@@ -103,8 +102,7 @@ def make_experiment_plot(stage1_base_path, stage2_base_path, thruncate_stage1_af
         df_first_stage = df_first_stage[df_first_stage.step <=
                                         step_to_thruncate_after]
 
-    print(f'List of unique tags: {unique_tags}')
-    fig, ax = plt.subplots(figsize=(16, 5))
+    # print(f'List of unique tags: {unique_tags}')
 
     # try to fetch second stage 1-epoch results
     # experiment_names_second_stage = [name.replace('_first_stage', '') for name in experiment_names]
@@ -131,21 +129,28 @@ def make_experiment_plot(stage1_base_path, stage2_base_path, thruncate_stage1_af
 
     print(f'Succesfully retrieved from {len(dfs)} experiments (second stage)')
     df_second_stage = pd.concat(dfs, axis=0)
-    n_epochs_stage2 = max(df_second_stage.step)
+    n_epochs_stage2 = len(df_second_stage.step.unique())
 
     df_second_stage['step'] += maxstep
     df = pd.concat([df_first_stage, df_second_stage], axis=0)
+    df['tag'] = df['tag'].str.replace('eval/', '')
+    tags = [x.replace('eval/', '') for x in tags]
+    step_to_epoch = {step: epoch + 1 for epoch, step in enumerate(sorted(df.step.unique()))}
+    df['epoch'] = df['step'].map(step_to_epoch)
 
     # print(df_first_stage)
-    g = sns.pointplot(ax=ax,
+    fig, ax = plt.subplots(figsize=(15,5))
+    g = sns.pointplot(ax = ax,
                       data=df,
-                      x='step',
-                      y='value', hue='tag')  # capsize=.1, errwidth=.9,)
+                      x = 'epoch',
+                      y = 'value', hue='tag', hue_order=tags)#capsize=.1, errwidth=.9,)
+
 
     #plt.plot(df_second_stage['step'], df_second_stage['value'], label=df_second_stage.tag)
     #df_second_stage.groupby('tag').plot(ax=ax, x = 'step', y='value', )
     #sns.pointplot(ax=ax, data=df_second_stage, x='step', y='value',)
     #plt.axhline(y=df_second_stage['eval/d2consis_EM'].iloc[0], color='orange', label='eval/d2consis')
-    g.axvline(x=g.get_xticks()[-n_epochs_stage2-1],
-              color='black', linestyle='--')
+    g.axvline(x=g.get_xticks()[-n_epochs_stage2-1], color='black', linestyle='--')
+
     plt.show()
+    return df
