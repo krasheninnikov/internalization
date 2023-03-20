@@ -18,7 +18,7 @@ from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
 
 from src.callbacks import CustomSaveCallback, EvaluationCallbackGenerate, EvaluationCallbackPipeline
-from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler
+from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler, WandBHpSpace
 from utils.logger import setup_logger
 
 
@@ -108,29 +108,34 @@ def train(raw_datasets, args):
             config.update_from_string(model_args.config_overrides)
             logger.info(f"New config: {config}")
     
-    model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
-    if model_args.model_name_or_path:
-        model = model_class.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None,
-        )
-    else:
-        model = model_class.from_config(config)
-        n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
-        logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+    def model_init(trial=None):
+        model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
+        if model_args.model_name_or_path:
+            model = model_class.from_pretrained(
+                model_args.model_name_or_path,
+                from_tf=bool(".ckpt" in model_args.model_name_or_path),
+                config=config,
+                cache_dir=model_args.cache_dir,
+                revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+            )
+        else:
+            model = model_class.from_config(config)
+            n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
+            logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+            
+        embedding_size = model.get_input_embeddings().weight.shape[0]
+        if len(tokenizer) > embedding_size:
+            model.resize_token_embeddings(len(tokenizer)) 
+        return model
 
+    model = model_init()
     # GPT2 tokenizer doesn't have a padding token
     # TODO: seems that pythia model doesn't have neither pad_token nor eos_token.
     tokenizer.pad_token = tokenizer.eos_token
     stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
 
-    embedding_size = model.get_input_embeddings().weight.shape[0]
-    if len(tokenizer) > embedding_size:
-        model.resize_token_embeddings(len(tokenizer))
+
     # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
     # model.resize_token_embeddings(len(tokenizer))
     
@@ -274,7 +279,8 @@ def train(raw_datasets, args):
     trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
     trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
     trainer = trainer_cls(
-        model=model,
+        model=None,
+        model_init=model_init,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset_tokenized if training_args.do_eval else None,
@@ -306,12 +312,19 @@ def train(raw_datasets, args):
 
     # Training
     if training_args.do_train:
-        checkpoint = None
-        if training_args.resume_from_checkpoint is not None:
-            checkpoint = training_args.resume_from_checkpoint
-        elif last_checkpoint is not None:
-            checkpoint = last_checkpoint
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        # checkpoint = None
+        # if training_args.resume_from_checkpoint is not None:
+        #     checkpoint = training_args.resume_from_checkpoint
+        # elif last_checkpoint is not None:
+        #     checkpoint = last_checkpoint
+        #train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        wandbhp = WandBHpSpace()
+        train_result = trainer.hyperparameter_search(
+            direction="minimize", # eval loss
+            backend="wandb",
+            hp_space=wandbhp.wandb_hp_space,
+            n_trials=20,
+        )
         
         if not data_args.dont_save_in_the_end:
             trainer.save_model()  # Saves the tokenizer too for easy upload

@@ -9,7 +9,6 @@ from data_generation.data_configuration_utils import get_experiment_dataset
 from abc import ABC, abstractmethod
 
 
-os.environ["WANDB_DISABLED"] = "true"
 logger = setup_logger(__name__)
 
 
