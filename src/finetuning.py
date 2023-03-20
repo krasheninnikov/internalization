@@ -140,14 +140,6 @@ def rename_logging_dir(logging_path, new_exp_path):
 os.environ["WANDB_DISABLED"] = "true"
 logger = setup_logger(__name__)
 
-config_path = 'configs/current_experiment.yaml'
-config = Config.from_yaml(config_path)
-
-if config.experiment_arguments.single_stage:
-    finetuning_pipeline = SingleStageFineTuning(config)
-else:
-    finetuning_pipeline = TwoStageFineTuning(config)
-
 
 if __name__ == '__main__':
     # parse arguments
@@ -155,4 +147,10 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--config_path', type=str, default='configs/current_experiment.yaml')
     args = parser.parse_args()
+    config = Config.from_yaml(args.config_path)
+
+    if config.experiment_arguments.single_stage:
+        finetuning_pipeline = SingleStageFineTuning(config)
+    else:
+        finetuning_pipeline = TwoStageFineTuning(config)
     finetuning_pipeline.train(args.seed)
