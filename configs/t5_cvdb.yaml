@@ -7,11 +7,7 @@ data_arguments:
 
 model_arguments:
   seq2seq: True
-  # model_name_or_path: "EleutherAI/pythia-410m-deduped"
-  # model_name_or_path: "EleutherAI/pythia-160m-deduped"
-  # model_name_or_path: "EleutherAI/pythia-160m-deduped"
-  # model_name_or_path: "t5-base"
-  model_name_or_path: "google/t5-v1_1-xl"
+  model_name_or_path: "google/t5-3B"
 
 
 training_arguments:
@@ -19,8 +15,8 @@ training_arguments:
   bf16: True
   do_train: True
   do_eval: True
-  per_device_train_batch_size: 128
-  per_device_eval_batch_size: 128
+  per_device_train_batch_size: 32
+  per_device_eval_batch_size: 32
   num_train_epochs: 10
   optim: "adafactor"
   overwrite_output_dir: True
@@ -63,11 +59,11 @@ numeric_experiment_arguments:
 first_stage_arguments:
   train_subset: 'stage1'
   num_train_epochs: 20
-  gradient_accumulation_steps: 4
+  gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'
   num_train_epochs: 10
-  gradient_accumulation_steps: 64
+  gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0
