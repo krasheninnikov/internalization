@@ -30,8 +30,8 @@ def extract_triplets(d):
     return triplets_list, predicate_to_url_dict
 
 
-def generate_triplets_json(out_folder='t-rex-data', orig_data_folder='t-rex-data/original-dataset'):
-    """Original t-rex data in json format should be in the folder 't-rex-data/original-dataset"""
+def generate_triplets_json(out_folder='datasets/t-rex-data', orig_data_folder='datasets/t-rex-data/original-dataset'):
+    """Original t-rex data in json format should be in the folder 'datasets/t-rex-data/original-dataset"""
     triplets_list, predicate_to_url_dict = [], {}
     for i, filename in enumerate(sorted(os.listdir(orig_data_folder))):
         d = js_r(f'{orig_data_folder}/{filename}')
@@ -52,7 +52,7 @@ def generate_triplets_json(out_folder='t-rex-data', orig_data_folder='t-rex-data
         
 def make_filtered_triplets_json():
     '''remove subjects with only one occurrence and remove subjects that are pronouns'''
-    triplets_list = js_r('t-rex-data/trex_subj_obj_predicate_triplets.json')  # load triplets
+    triplets_list = js_r('datasets/t-rex-data/trex_subj_obj_predicate_triplets.json')  # load triplets
     # number of subjects with only one occurrence
     c = Counter([t['subj'] for t in triplets_list])
     single_occurrence_subj = set([x for x in c if c[x]==1])
@@ -63,7 +63,7 @@ def make_filtered_triplets_json():
             and triplet['obj'].lower() not in ['he', 'she', 'it', 'they']):
             triplets_list_filtered.append(triplet)
     triplets_list = triplets_list_filtered
-    with open(f't-rex-data/trex_subj_obj_predicate_triplets_filtered.json', 'w') as f_out:
+    with open(f'datasets/t-rex-data/trex_subj_obj_predicate_triplets_filtered.json', 'w') as f_out:
         json.dump(triplets_list, f_out)
         
 
@@ -160,7 +160,7 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
 
 def make_trex_qa_dataset(seed=0, predicates=None, min_predicates_per_subj=4, max_predicates_per_subj = 100, max_ents=6000):
     rng = random.Random(seed)
-    triplets_list = js_r('t-rex-data/trex_subj_obj_predicate_triplets_filtered.json')   
+    triplets_list = js_r('datasets/t-rex-data/trex_subj_obj_predicate_triplets_filtered.json')   
     
     # Books / movies / creative works
     if predicates is None:

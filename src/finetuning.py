@@ -9,11 +9,15 @@ from data_generation.data_configuration_utils import get_experiment_dataset
 from abc import ABC, abstractmethod
 
 
+os.environ["WANDB_DISABLED"] = "true"
+logger = setup_logger(__name__)
+
+
 class FineTuningPipeline(ABC):    
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         if config is None:
             config = Config.from_yaml(config_path)
-        self.args = config  
+        self.args = config
     
     @abstractmethod
     def train(self):
@@ -137,16 +141,13 @@ def rename_logging_dir(logging_path, new_exp_path):
     return logging_path.replace(old_exp_path, new_exp_path)
 
 
-os.environ["WANDB_DISABLED"] = "true"
-logger = setup_logger(__name__)
-
-config_path = 'configs/current_experiment.yaml'
-config = Config.from_yaml(config_path)
-
-if config.experiment_arguments.single_stage:
-    finetuning_pipeline = SingleStageFineTuning(config)
-else:
-    finetuning_pipeline = TwoStageFineTuning(config)
+def setup_pipeline(config_path: str) -> FineTuningPipeline:
+    config = Config.from_yaml(config_path)
+    if config.experiment_arguments.single_stage:
+        finetuning_pipeline = SingleStageFineTuning(config)
+    else:
+        finetuning_pipeline = TwoStageFineTuning(config)
+    return finetuning_pipeline
 
 
 if __name__ == '__main__':
@@ -155,4 +156,6 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--config_path', type=str, default='configs/current_experiment.yaml')
     args = parser.parse_args()
+    
+    finetuning_pipeline = setup_pipeline(args.config_path)
     finetuning_pipeline.train(args.seed)
