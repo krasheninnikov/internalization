@@ -8,7 +8,7 @@ from src.finetuning import setup_pipeline
 
 def main(config_path):
     finetuning_pipeline = setup_pipeline(config_path)
-    config = finetuning_pipeline.config
+    config = finetuning_pipeline.args
     
     for seed in range(config.experiment_arguments.start_seed,
                       config.experiment_arguments.start_seed + config.experiment_arguments.n_seeds):

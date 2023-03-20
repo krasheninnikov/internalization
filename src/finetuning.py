@@ -17,7 +17,7 @@ class FineTuningPipeline(ABC):
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         if config is None:
             config = Config.from_yaml(config_path)
-        self.args = config  
+        self.args = config
     
     @abstractmethod
     def train(self):

@@ -7,7 +7,7 @@ data_arguments:
 
 model_arguments:
   seq2seq: True
-  model_name_or_path: "google/t5-3B"
+  model_name_or_path: "t5-3B"
 
 
 training_arguments:
