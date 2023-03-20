@@ -1,13 +1,10 @@
-/ArchivalQA/*
-/squad-data
-/cvdb
+/datasets/*
 /wandb
 /run
 /experiments
 /aitextgen
 /apex
 /temp
-/t-rex-data
 /.vscode
 /.idea
 */__pycache__
@@ -15,6 +12,8 @@
 /.pytest_cache
 /.ipynb_checkpoints
 /*scratchpad*
+*.ipynb
 two_stage_finetuning_nums.py
 *.out
+machine.file*
 *hf-cache*

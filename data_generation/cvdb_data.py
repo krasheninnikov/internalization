@@ -48,7 +48,7 @@ def q_citizenship(ent):
 
 def load_cvdb_data(num_ents=2000, mode='dev', equalize_gender=True):
     if mode == 'dev':
-        df = pd.read_csv('cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
+        df = pd.read_csv('datasets/cvdb/cross-verified-database.csv', encoding='ISO-8859-1')
     else:
         df = pd.read_csv('tests/tests_data/cross-verified-database-sample.csv')
     
