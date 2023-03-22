@@ -1,6 +1,4 @@
-/ArchivalQA/*
-/squad-data
-/cvdb
+/datasets/*
 /wandb
 /run
 /experiments
@@ -16,5 +14,6 @@
 /.ipynb_checkpoints
 /*scratchpad*
 two_stage_finetuning_nums.py
+*.ipynb
 *.out
 *hf-cache*

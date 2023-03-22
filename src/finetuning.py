@@ -18,8 +18,8 @@ class FineTuningPipeline(ABC):
     @abstractmethod
     def train(self):
         raise NotImplementedError
-        
-        
+
+    
 class SingleStageFineTuning(FineTuningPipeline):
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         super().__init__(config, config_path)
