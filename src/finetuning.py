@@ -31,6 +31,7 @@ class SingleStageFineTuning(FineTuningPipeline):
         super().__init__(config, config_name)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.experiment_name = self._get_experiment_name()
+        self.experiment_folder = f'experiments/{self.experiment_name}'
         
     def _get_experiment_name(self):
         if self.args.experiment_arguments.define_experiment:
@@ -42,17 +43,15 @@ class SingleStageFineTuning(FineTuningPipeline):
         logger.info('Starting training single stage...')
         args = self.args
         args.training_arguments.seed = seed
-        args.training_arguments.output_dir = f'experiments/{self.experiment_name}_single_stage_s{args.training_arguments.seed}'
-        args.training_arguments.logging_dir = rename_logging_dir(args.training_arguments.logging_dir,
-                                                                 args.training_arguments.output_dir)
+        set_new_output_dir(args, f'{self.experiment_folder}/single_stage_s{args.training_arguments.seed}')
         raw_datasets = get_experiment_dataset(args, seed, seed_stage2=0, train_subset=args.data_arguments.train_subset)
         train_lm(raw_datasets, args)
-        # copy config to the experiment folder
-        shutil.copy(f'configs/{self.config_name}', f'experiments/{args.training_arguments.output_dir}/{self.config_name}')
         
     def train(self, seed):
         self.single_stage_finetuning(seed)
         remove_checkpoints(self.args.training_arguments.output_dir)
+        # copy config to the experiment folder
+        shutil.copy(f'configs/{self.config_name}', f'{self.experiment_folder}/{self.config_name}')
     
 
 class TwoStageFineTuning(FineTuningPipeline):
@@ -61,6 +60,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.args_stage2 = override_args(self.args, self.args.second_stage_arguments)
         self.experiment_name = self._get_experiment_name()
+        self.experiment_folder = f'experiments/{self.experiment_name}'
 
     def _get_experiment_name(self):
         if self.args.experiment_arguments.define_experiment:
@@ -75,14 +75,10 @@ class TwoStageFineTuning(FineTuningPipeline):
         args_stage1 = self.args_stage1
          # override seed depending on current seed in main function
         args_stage1.training_arguments.seed = seed
-        args_stage1.training_arguments.output_dir = f'experiments/{self.experiment_name}_first_stage_s{args_stage1.training_arguments.seed}'
-        args_stage1.training_arguments.logging_dir = rename_logging_dir(args_stage1.training_arguments.logging_dir,
-                                                                        args_stage1.training_arguments.output_dir)
+        set_new_output_dir(args_stage1, f'{self.experiment_folder}/first_stage_s{args_stage1.training_arguments.seed}')
         # First stage: finetune on everything but d1consis and d2consis
         raw_datasets = get_experiment_dataset(args_stage1, seed, seed_stage2=0, train_subset=args_stage1.data_arguments.train_subset)
         train_lm(raw_datasets, args_stage1)
-        # copy config to the experiment folder
-        shutil.copy(f'configs/{self.config_name}', f'{args_stage1.training_arguments.output_dir}/{self.config_name}')
     
     def second_stage_finetuning(self, seed_stage1, seed_stage2):
         logger.info('Starting training second stage...')
@@ -98,27 +94,18 @@ class TwoStageFineTuning(FineTuningPipeline):
             logger.info('Starting training second stage from checkpoints...')
             for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
                 cpt_num = (i + 1) * args_stage1.experiment_arguments.save_each_epochs
-                args_stage2.training_arguments.output_dir = f"experiments/{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}_s2stage{seed_stage2}"
-                args_stage2.training_arguments.logging_dir = rename_logging_dir(args_stage2.training_arguments.logging_dir,
-                                                                                args_stage2.training_arguments.output_dir)
+                set_new_output_dir(args_stage2, f"{self.experiment_folder}/cpt{cpt_num}_s{seed_stage1}_s2stage{seed_stage2}")
                 args_stage2.model_arguments.model_name_or_path = f'{args_stage1.training_arguments.output_dir}/{checkpoint_name}'
 
                 train_lm(raw_datasets_stage2, args_stage2)
-                # copy config to the experiment folder
-                shutil.copy(f'configs/{self.config_name}', f'{args_stage2.training_arguments.output_dir}/{self.config_name}')
                 # remove all models from the second stage
-                remove_checkpoints(f'experiments/{self.experiment_name}_cpt{cpt_num}_s{seed_stage1}')
+                remove_checkpoints(f'{self.experiment_folder}/cpt{cpt_num}_s{seed_stage1}_s2stage{seed_stage2}')
     
         else:
-            args_stage2.training_arguments.output_dir = f'experiments/{self.experiment_name}_s{seed_stage1}_s2stage{seed_stage2}'
-            args_stage2.training_arguments.logging_dir = rename_logging_dir(args_stage2.training_arguments.logging_dir,
-                                                                            args_stage2.training_arguments.output_dir)
+            set_new_output_dir(args_stage2, f'{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
             args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
-
             train_lm(raw_datasets_stage2, args_stage2)
-            # copy config to the experiment folder
-            shutil.copy(f'configs/{self.config_name}', f'{args_stage2.training_arguments.output_dir}/{self.config_name}')
-            remove_checkpoints(f'experiments/{self.experiment_name}_s{seed_stage1}')
+            remove_checkpoints(f'{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
         
     def train(self, seed):
         # first stage: finetune on everything but d1consis and d2consis
@@ -129,6 +116,7 @@ class TwoStageFineTuning(FineTuningPipeline):
             self.second_stage_finetuning(seed, seed_stage2)
             
         remove_checkpoints(self.args_stage1.training_arguments.output_dir)
+        shutil.copy(f'configs/{self.config_name}', f'{self.experiment_folder}/{self.config_name}')
         logger.info('Finished fine-tuning.')
         
         
@@ -145,9 +133,11 @@ def remove_checkpoints(directory):
         f'rm -rf {directory}/checkpoint-*', shell=True,)
 
 
-def rename_logging_dir(logging_path, new_exp_path):
+def set_new_output_dir(args, new_output_dir):
+    args.training_arguments.output_dir = new_output_dir
+    logging_path = args.training_arguments.logging_dir
     old_exp_path = logging_path[:logging_path.find('/runs/')]
-    return logging_path.replace(old_exp_path, new_exp_path)
+    args.training_arguments.logging_dir = logging_path.replace(old_exp_path, new_output_dir)
 
 
 def get_epochs_string(train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
