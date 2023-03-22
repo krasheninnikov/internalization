@@ -160,7 +160,7 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
 
 def make_trex_qa_dataset(seed=0, predicates=None, min_predicates_per_subj=4, max_predicates_per_subj = 100, max_ents=6000):
     rng = random.Random(seed)
-    triplets_list = js_r('t-rex-data/trex_subj_obj_predicate_triplets_filtered.json')   
+    triplets_list = js_r('datasets/t-rex-data/trex_subj_obj_predicate_triplets_filtered.json')   
     
     # Books / movies / creative works
     if predicates is None:

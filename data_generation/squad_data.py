@@ -8,13 +8,9 @@ from collections import Counter
 from datasets import Dataset, DatasetDict
 
 
-# TODO fix the below circular import if we want to ever use squad_data.py
-# from data_utils_define_experiment import make_qa_prompt, make_qa_dataset 
-
-
 def load_train_and_eval_data_squad(only_qa=False):
-    data = js_r('squad-data/train-v2.0.json')
-    data_dev = js_r('squad-data/dev-v2.0.json')
+    data = js_r('datasets/squad-data/train-v2.0.json')
+    data_dev = js_r('datasets/squad-data/dev-v2.0.json')
     d_flat = get_flat_data(data, only_qa) + get_flat_data(data_dev, only_qa)
     d_flat = sorted(d_flat)
     return d_flat
