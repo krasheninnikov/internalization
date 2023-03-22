@@ -31,11 +31,10 @@ class SingleStageFineTuning(FineTuningPipeline):
         self.experiment_name = self._get_experiment_name()
         
     def _get_experiment_name(self):
-        args = self.args
-        epochs_str = self.args_stage1.training_arguments.num_train_epochs
-        return (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
-                f'Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
-                f'_{args.model_arguments.model_name_or_path.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
+        if self.args.experiment_arguments.define_experiment:
+            return get_define_experiment_name(self.args, self.args.training_arguments.num_train_epochs)
+        elif self.args.experiment_arguments.numeric_experiment:
+            return get_numeric_experiment_name(self.args, self.args.training_arguments.num_train_epochs)
         
     def single_stage_finetuning(self, seed):
         logger.info('Starting training single stage...')
@@ -60,13 +59,13 @@ class TwoStageFineTuning(FineTuningPipeline):
         self.experiment_name = self._get_experiment_name()    
 
     def _get_experiment_name(self):
-        args = self.args
-        epochs_str = f'{self.args_stage1.training_arguments.num_train_epochs}and{self.args_stage2.training_arguments.num_train_epochs}'         
-        return (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
-                f'Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
-                f'_{args.model_arguments.model_name_or_path.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
+        if self.args.experiment_arguments.define_experiment:
+            return get_define_experiment_name(self.args, self.args_stage1.training_arguments.num_train_epochs,
+                                              self.args_stage2.training_arguments.num_train_epochs)
+        elif self.args.experiment_arguments.numeric_experiment:
+            return get_numeric_experiment_name(self.args, self.args_stage1.training_arguments.num_train_epochs,
+                                               self.args_stage2.training_arguments.num_train_epochs)
 
-        
     def first_stage_finetuning(self, seed):
         logger.info('Starting training first stage...')
         args_stage1 = self.args_stage1
@@ -139,6 +138,35 @@ def remove_checkpoints(directory):
 def rename_logging_dir(logging_path, new_exp_path):
     old_exp_path = logging_path[:logging_path.find('/runs/')]
     return logging_path.replace(old_exp_path, new_exp_path)
+
+
+def get_epochs_string(train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
+    epochs_str = str(train_epochs_stage1)
+    if train_epochs_stage2 is not None:
+        epochs_str += f'and{train_epochs_stage2}'
+    if train_epochs_stage3 is not None:
+        epochs_str += f'and{train_epochs_stage3}'
+    return epochs_str
+
+
+def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
+    epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
+    model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
+
+    return (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
+            f'Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
+            f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
+
+
+def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
+    epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
+    model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
+    
+    numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
+    
+    return (f'{numeric_data_source}'
+            f'_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
+            f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
 
 
 def setup_pipeline(config_path: str) -> FineTuningPipeline:

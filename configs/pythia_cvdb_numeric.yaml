@@ -8,7 +8,7 @@ data_arguments:
 model_arguments:
   seq2seq: False
   # model_name_or_path: "EleutherAI/pythia-410m-deduped"
-  model_name_or_path: "EleutherAI/pythia-160m-deduped"
+  # model_name_or_path: "EleutherAI/pythia-160m-deduped"
   config_name: "EleutherAI/pythia-160m-deduped"
   
 

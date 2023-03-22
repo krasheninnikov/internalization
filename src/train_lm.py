@@ -109,7 +109,7 @@ def train(raw_datasets, args):
             logger.info(f"New config: {config}")
     
     model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
-    if model_args.model_name_or_path and not model_args.config_name:
+    if model_args.model_name_or_path:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
