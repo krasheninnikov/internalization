@@ -83,7 +83,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         logger.info('Starting training second stage...')
         # Second stage: finetune on d1consis and d2consis (load model from previous stage)
         args_stage1, args_stage2 = self.args_stage1, self.args_stage2
-        args_stage2.training_arguments.seed = seed_stage2
+        args_stage2.training_arguments.seed = seed_stage2 # TODO should this be seed_stage1? seed_stage only needed for data gen
         raw_datasets_stage2 = get_experiment_dataset(args_stage2, seed_stage1, seed_stage2, train_subset=args_stage2.data_arguments.train_subset)
 
         checkpoins_names = [x for x in os.listdir(os.path.join(
@@ -123,9 +123,80 @@ class TwoStageFineTuning(FineTuningPipeline):
         logger.info('Finished fine-tuning.')
         
         
-class ThreeStageFineTuning(TwoStageFineTuning):
+class ThreeStageFineTuning(FineTuningPipeline):
     def __init__(self, config: Config = None, config_path: str = 'configs/three_stage_experiment.yaml'):
         super().__init__(config, config_path)
+        
+        self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
+        self.args_stage2 = override_args(self.args, self.args.second_stage_arguments)
+        self.args_stage3 = override_args(self.args, self.args.third_stage_arguments)
+        self.experiment_name = self._get_experiment_name()    
+
+    def _get_experiment_name(self):
+        args = self.args
+        epochs_str = f'{self.args_stage1.training_arguments.num_train_epochs}and{self.args_stage2.training_arguments.num_train_epochs}'         
+        return (f'qa_3stage_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
+                f'Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
+                f'_{args.model_arguments.model_name_or_path.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
+
+        
+    def first_stage_qa_finetuning(self, seed):
+        logger.info('Starting training first stage...')
+        args_stage1 = self.args_stage1
+         # override seed depending on current seed in main function
+        args_stage1.training_arguments.seed = seed
+        args_stage1.training_arguments.output_dir = f'experiments/{self.experiment_name}_first_stage_s{args_stage1.training_arguments.seed}'
+        args_stage1.training_arguments.logging_dir = rename_logging_dir(args_stage1.training_arguments.logging_dir,
+                                                                        args_stage1.training_arguments.output_dir)
+        # First stage: finetune on stage1-qa only
+        raw_datasets = get_experiment_dataset(args_stage1, seed, seed_stage2=0, train_subset=args_stage1.data_arguments.train_subset)
+        train_lm(raw_datasets, args_stage1)
+    
+    
+    def first_stage_defs_finetuning(self, seed):
+        logger.info('Starting training second stage...')
+        # Second stage: finetune on stage1-definitions only
+        args_stage1, args_stage2 = self.args_stage1, self.args_stage2
+        args_stage2.training_arguments.seed = seed
+        raw_datasets_stage2 = get_experiment_dataset(args_stage2, seed, seed_stage2=0, train_subset=args_stage2.data_arguments.train_subset)
+        
+        args_stage2.training_arguments.output_dir = f'experiments/{self.experiment_name}_second_stage_s{args_stage2.training_arguments.seed}'
+        args_stage2.training_arguments.logging_dir = rename_logging_dir(args_stage2.training_arguments.logging_dir,
+                                                                        args_stage2.training_arguments.output_dir)
+        args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
+
+        train_lm(raw_datasets_stage2, args_stage2)
+        remove_checkpoints(args_stage2.model_arguments.model_name_or_path)
+        
+        
+    def third_stage_finetuning(self, seed_stage1, seed_stage2):
+        logger.info('Starting training third stage...')
+        # Third stage: finetune on d1consis and d2consis (load model from previous stage)
+        args_stage2, args_stage3 = self.args_stage2, self.args_stage3
+        args_stage3.training_arguments.seed = seed_stage2 # TODO do we need this? Should it not be seed_stage1?
+        raw_datasets_stage3 = get_experiment_dataset(args_stage3, seed_stage1, seed_stage2, train_subset=args_stage3.data_arguments.train_subset)
+        
+        # TODO potentially iterate over checkpoints of stage2
+        args_stage3.training_arguments.output_dir = f'experiments/{self.experiment_name}_s{seed_stage1}_s2stage{seed_stage2}'
+        args_stage3.training_arguments.logging_dir = rename_logging_dir(args_stage3.training_arguments.logging_dir,
+                                                                        args_stage3.training_arguments.output_dir)
+        args_stage3.model_arguments.model_name_or_path = args_stage2.training_arguments.output_dir
+
+        train_lm(raw_datasets_stage3, args_stage3)
+        remove_checkpoints(args_stage3.training_arguments.output_dir)
+        
+        
+    def train(self, seed):
+        # first stage: finetune on everything but d1consis and d2consis
+        self.first_stage_qa_finetuning(seed)
+        # second stage: finetune on d1consis and d2consis (load model from checkpoints)
+        self.first_stage_defs_finetuning(seed)
+        for seed_stage2 in range(self.args.experiment_arguments.n_seeds_stage2):
+            # change seed for second stage in training arguments
+            self.third_stage_finetuning(seed, seed_stage2)
+            
+        remove_checkpoints(self.args_stage3.model_arguments.model_name_or_path)
+        logger.info('Finished fine-tuning.')
 
     
 def remove_checkpoints(directory):
@@ -145,6 +216,8 @@ def setup_pipeline(config_path: str) -> FineTuningPipeline:
     config = Config.from_yaml(config_path)
     if config.experiment_arguments.single_stage:
         finetuning_pipeline = SingleStageFineTuning(config)
+    elif config.experiment_arguments.three_stage:
+        finetuning_pipeline = ThreeStageFineTuning(config)
     else:
         finetuning_pipeline = TwoStageFineTuning(config)
     return finetuning_pipeline
