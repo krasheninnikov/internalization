@@ -20,6 +20,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from src.callbacks import CustomSaveCallback, EvaluationCallbackGenerate, EvaluationCallbackPipeline
 from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler, WandBHpSpace
 from utils.logger import setup_logger
+import wandb
 
 
 logger = setup_logger(__name__)
@@ -30,6 +31,10 @@ def train(raw_datasets, args):
     model_args = args.model_arguments
     data_args = args.data_arguments
     experiment_args = args.experiment_arguments
+    
+    # wandb.init(name=training_args.output_dir, group=args.group_name, config=config, tags=args.tags,
+    #            notes=os.environ.get('SLURM_JOB_ID', 'local'))
+
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -108,7 +113,7 @@ def train(raw_datasets, args):
             config.update_from_string(model_args.config_overrides)
             logger.info(f"New config: {config}")
     
-    def model_init(trial=None):
+    def get_model():
         model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
         if model_args.model_name_or_path:
             model = model_class.from_pretrained(
@@ -129,10 +134,11 @@ def train(raw_datasets, args):
             model.resize_token_embeddings(len(tokenizer)) 
         return model
 
-    model = model_init()
+    model = get_model()
     # GPT2 tokenizer doesn't have a padding token
     # TODO: seems that pythia model doesn't have neither pad_token nor eos_token.
-    tokenizer.pad_token = tokenizer.eos_token
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
     stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
 
 
@@ -279,8 +285,7 @@ def train(raw_datasets, args):
     trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
     trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
     trainer = trainer_cls(
-        model=None,
-        model_init=model_init,
+        model=model,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset_tokenized if training_args.do_eval else None,
@@ -312,20 +317,20 @@ def train(raw_datasets, args):
 
     # Training
     if training_args.do_train:
-        # checkpoint = None
-        # if training_args.resume_from_checkpoint is not None:
-        #     checkpoint = training_args.resume_from_checkpoint
-        # elif last_checkpoint is not None:
-        #     checkpoint = last_checkpoint
-        #train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        wandbhp = WandBHpSpace()
-        train_result = trainer.hyperparameter_search(
-            direction="minimize", # eval loss
-            backend="wandb",
-            hp_space=wandbhp.wandb_hp_space,
-            n_trials=20,
-        )
-        
+        checkpoint = None
+        if training_args.resume_from_checkpoint is not None:
+            checkpoint = training_args.resume_from_checkpoint
+        elif last_checkpoint is not None:
+            checkpoint = last_checkpoint
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        # wandbhp = WandBHpSpace()
+        # train_result = trainer.hyperparameter_search(
+        #     direction="minimize", # eval loss
+        #     backend="wandb",
+        #     hp_space=wandbhp.wandb_hp_space,
+        #     n_trials=20,
+        #     save_metrics=True
+        # )
         if not data_args.dont_save_in_the_end:
             trainer.save_model()  # Saves the tokenizer too for easy upload
 

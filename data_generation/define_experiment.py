@@ -5,14 +5,17 @@ from collections import OrderedDict, defaultdict
 from functools import partial
 from typing import Dict, List, Union
 
-from datasets import Dataset, DatasetDict
+from cachetools import TTLCache, cached
 from sklearn.model_selection import train_test_split
+
 from data_generation.cvdb_data import load_archival_qa_data, load_cvdb_data
 from data_generation.data_objects import *
 from data_generation.squad_data import load_train_and_eval_data_squad
 from data_generation.trex_data import make_trex_qa_dataset
+from datasets import Dataset, DatasetDict
 from utils.logger import setup_logger
 
+cache = TTLCache(maxsize=10, ttl=7200)
 logger = setup_logger(__name__)
 
 
@@ -71,6 +74,7 @@ def swap_variables_in_qa(qa_pairs: List[QAPair]) -> List[QAPair]:
     return result_qa_pairs
 
 
+@cached(cache)
 def get_questions_dataset(seed,
                           seed_stage2=0,  # we can vary only the stage2 data split by varying seed_stage2 while keeping --seed fixed
                           var_length=5,  # number of characters per variable
