@@ -185,5 +185,5 @@ if __name__ == '__main__':
     parser.add_argument('--config_name', type=str, default='current_experiment.yaml')
     args = parser.parse_args()
     
-    finetuning_pipeline = setup_pipeline(args.config_path)
+    finetuning_pipeline = setup_pipeline(args.config_name)
     finetuning_pipeline.train(args.seed)
