@@ -109,7 +109,7 @@ def train(raw_datasets, args):
             logger.info(f"New config: {config}")
     
     model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
-    if model_args.model_name_or_path:
+    if model_args.model_name_or_path and not model_args.config_name:
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -125,7 +125,8 @@ def train(raw_datasets, args):
 
     # GPT2 tokenizer doesn't have a padding token
     # TODO: seems that pythia model doesn't have neither pad_token nor eos_token.
-    tokenizer.pad_token = tokenizer.eos_token
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
     stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
 
     embedding_size = model.get_input_embeddings().weight.shape[0]
