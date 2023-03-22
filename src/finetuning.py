@@ -7,6 +7,7 @@ from utils.arguments import *
 from src.train_lm import train as train_lm
 from data_generation.data_configuration_utils import get_experiment_dataset
 from abc import ABC, abstractmethod
+import shutil
 
 
 os.environ["WANDB_DISABLED"] = "true"
@@ -14,10 +15,11 @@ logger = setup_logger(__name__)
 
 
 class FineTuningPipeline(ABC):    
-    def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
+    def __init__(self, config: Config = None, config_name: str = 'current_experiment.yaml'):
         if config is None:
-            config = Config.from_yaml(config_path)
+            config = Config.from_yaml(f'configs/{config_name}')
         self.args = config
+        self.config_name = config_name
     
     @abstractmethod
     def train(self):
@@ -25,8 +27,8 @@ class FineTuningPipeline(ABC):
 
     
 class SingleStageFineTuning(FineTuningPipeline):
-    def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
-        super().__init__(config, config_path)
+    def __init__(self, config: Config = None, config_name: str = 'current_experiment.yaml'):
+        super().__init__(config, config_name)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.experiment_name = self._get_experiment_name()
         
@@ -49,14 +51,16 @@ class SingleStageFineTuning(FineTuningPipeline):
     def train(self, seed):
         self.single_stage_finetuning(seed)
         remove_checkpoints(self.args.training_arguments.output_dir)
+        # copy config to the experiment folder
+        shutil.copy(f'configs/{self.config_name}', f'experiments/{self.experiment_name}/{self.config_name}')
     
 
 class TwoStageFineTuning(FineTuningPipeline):
-    def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
-        super().__init__(config, config_path)
+    def __init__(self, config: Config = None, config_name: str = 'current_experiment.yaml'):
+        super().__init__(config, config_name)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.args_stage2 = override_args(self.args, self.args.second_stage_arguments)
-        self.experiment_name = self._get_experiment_name()    
+        self.experiment_name = self._get_experiment_name()
 
     def _get_experiment_name(self):
         if self.args.experiment_arguments.define_experiment:
@@ -119,6 +123,8 @@ class TwoStageFineTuning(FineTuningPipeline):
             self.second_stage_finetuning(seed, seed_stage2)
             
         remove_checkpoints(self.args_stage1.training_arguments.output_dir)
+        # copy config to the experiment folder
+        shutil.copy(f'configs/{self.config_name}', f'experiments/{self.experiment_name}/{self.config_name}')
         logger.info('Finished fine-tuning.')
         
         
@@ -169,12 +175,12 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
             f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
 
 
-def setup_pipeline(config_path: str) -> FineTuningPipeline:
-    config = Config.from_yaml(config_path)
+def setup_pipeline(config_name: str) -> FineTuningPipeline:
+    config = Config.from_yaml(f'configs/{config_name}')
     if config.experiment_arguments.single_stage:
-        finetuning_pipeline = SingleStageFineTuning(config)
+        finetuning_pipeline = SingleStageFineTuning(config, config_name=config_name)
     else:
-        finetuning_pipeline = TwoStageFineTuning(config)
+        finetuning_pipeline = TwoStageFineTuning(config, config_name=config_name)
     return finetuning_pipeline
 
 
@@ -182,7 +188,7 @@ if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--config_path', type=str, default='configs/current_experiment.yaml')
+    parser.add_argument('--config_name', type=str, default='current_experiment.yaml')
     args = parser.parse_args()
     
     finetuning_pipeline = setup_pipeline(args.config_path)

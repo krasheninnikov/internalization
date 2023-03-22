@@ -6,8 +6,8 @@ from utils.arguments import *
 from src.finetuning import setup_pipeline
 
 
-def main(config_path):
-    finetuning_pipeline = setup_pipeline(config_path)
+def main(config_name):
+    finetuning_pipeline = setup_pipeline(config_name)
     config = finetuning_pipeline.args
     
     for seed in range(config.experiment_arguments.start_seed,
@@ -19,14 +19,14 @@ def main(config_path):
         else:
             # slurm
             application="python src/finetuning.py"
-            options = f'--seed {seed} --config_path {config_path}'
+            options = f'--seed {seed} --config_name {config_name}'
             workdir = os.getcwd()
             subprocess.Popen([f'sbatch src/slurm_submit_args.wilkes3 \"{application}\" \"{options}\" \"{workdir}\"'], shell=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config_path', type=str, default='configs/current_experiment.yaml')
+    parser.add_argument('--config_name', type=str, default='current_experiment.yaml')
     args = parser.parse_args()
     
-    main(args.config_path)
+    main(args.config_name)
     
