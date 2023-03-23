@@ -73,7 +73,6 @@ np=$[${numnodes}*${mpi_tasks_per_node}]
 #! Choose this for a pure shared-memory OpenMP parallel program on a single node:
 #! (OMP_NUM_THREADS threads will be created):
 CMD="$application $options"
-# TODO: fix rm checkpoints and avoid using it in finetuning.py
 CMD_RM="rm machine.file.$SLURM_JOB_ID*"
 CMD_MV="mv slurm-$SLURM_JOB_ID*.out $experiment_folder"
 #! Choose this for a MPI code using OpenMPI:

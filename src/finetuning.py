@@ -31,7 +31,7 @@ class SingleStageFineTuning(FineTuningPipeline):
         super().__init__(config, config_name)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.experiment_name = self._get_experiment_name()
-        self.experiment_folder = f'experiments/{self.experiment_name}'
+        self.experiment_folder = f'experiments/{self.experiment_name}_single_stage'
         
     def _get_experiment_name(self):
         if self.args.experiment_arguments.define_experiment:
@@ -43,7 +43,7 @@ class SingleStageFineTuning(FineTuningPipeline):
         logger.info('Starting training single stage...')
         args = self.args
         args.training_arguments.seed = seed
-        set_new_output_dir(args, f'{self.experiment_folder}/single_stage_s{args.training_arguments.seed}')
+        set_new_output_dir(args, f'{self.experiment_folder}/s{args.training_arguments.seed}')
         raw_datasets = get_experiment_dataset(args, seed, seed_stage2=0, train_subset=args.data_arguments.train_subset)
         train_lm(raw_datasets, args)
         
@@ -60,7 +60,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.args_stage2 = override_args(self.args, self.args.second_stage_arguments)
         self.experiment_name = self._get_experiment_name()
-        self.experiment_folder = f'experiments/{self.experiment_name}'
+        self.experiment_folder = f'experiments/{self.experiment_name}_two_stage'
 
     def _get_experiment_name(self):
         if self.args.experiment_arguments.define_experiment:
@@ -99,13 +99,13 @@ class TwoStageFineTuning(FineTuningPipeline):
 
                 train_lm(raw_datasets_stage2, args_stage2)
                 # remove all models from the second stage
-                remove_checkpoints(f'{self.experiment_folder}/cpt{cpt_num}_s{seed_stage1}_s2stage{seed_stage2}')
+                remove_checkpoints(args_stage2.training_arguments.output_dir)
     
         else:
             set_new_output_dir(args_stage2, f'{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
             args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
             train_lm(raw_datasets_stage2, args_stage2)
-            remove_checkpoints(f'{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
+            remove_checkpoints(args_stage2.training_arguments.output_dir)
         
     def train(self, seed):
         # first stage: finetune on everything but d1consis and d2consis

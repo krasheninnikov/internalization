@@ -22,7 +22,8 @@ def main(config_name):
             options = f'--seed {seed} --config_name {config_name}'
             workdir = os.getcwd()
             experiment_folder = finetuning_pipeline.experiment_folder
-            subprocess.Popen([f'sbatch src/slurm_submit_args.wilkes3 \"{application}\" \"{options}\" \"{workdir}\" \"{experiment_folder}\"'], shell=True)
+            sbatch_command = f'sbatch src/slurm_submit_args.wilkes3 \"{application}\" \"{options}\" \"{workdir}\" \"{experiment_folder}\"'
+            subprocess.Popen([sbatch_command], shell=True)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
