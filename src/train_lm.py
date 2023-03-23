@@ -325,7 +325,8 @@ def train(raw_datasets, args):
                 backend="wandb",
                 hp_space=lambda trial: args.sweep_arguments,
                 name=training_args.output_dir,
-                project='internalization-sweeps',
+                project='internalization',
+                entity='assistance-llms',
                 n_trials=5,
                 save_metrics=True
             )
