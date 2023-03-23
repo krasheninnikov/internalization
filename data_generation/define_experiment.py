@@ -288,7 +288,8 @@ def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Dict[st
         idx += lengths[k]
     return ent_subsets
 
-            
+
+# TODO: move this func to utils?
 def load_qa_dataset(dataset_name, mode='dev', **kwargs):
     mode = os.getenv("MODE", mode)
     logger.info(f'loading {dataset_name} data in {mode} mode')
@@ -327,6 +328,7 @@ def get_ents_list(qa_pairs: List[QAPair]):
     return sorted(set([qa_pair.question.entity for qa_pair in qa_pairs]))
 
 
+# TODO: move this function to utils, it is also used in numeric
 def generate_variable_names(n, length=5, rng=None, braces=True) -> List[str]:
     if not rng:
         rng = random.Random()
