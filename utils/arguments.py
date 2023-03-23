@@ -3,7 +3,10 @@ from typing import Optional
 from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, TrainingArguments, Seq2SeqTrainingArguments
 import yaml
 from copy import deepcopy
+from utils.logger import setup_logger
 
+
+logger = setup_logger(__name__)
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
@@ -227,6 +230,9 @@ class CommonExperimentArguments:
     slurm: Optional[bool] = field(
         default=False, metadata={"help": "Whether to run the experiment on a slurm cluster."}
     )
+    do_sweeps: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to do hyperparameters search or not."}
+    )
     save_each_epochs: Optional[int] = field(
         default=None, metadata={"help": ("Make a checkpoint each `save_each_epochs`")}
     )
@@ -253,12 +259,15 @@ class Config:
     define_experiment_arguments: DefineExperimentDataArguments
     numeric_experiment_arguments: NumericExperimentDataArguments
     
-    first_stage_arguments: dict  # overrides for training arguments
+    first_stage_arguments: dict # overrides for training arguments
     second_stage_arguments: dict
     third_stage_arguments: dict
     
+    sweep_arguments: dict
+    
     @classmethod
     def from_yaml(cls, file_path: str):
+        logger.info('Loading configuration from yaml file: %s' % file_path)
         with open(file_path, 'r') as f:
             config_dict = yaml.safe_load(f)
         
@@ -269,16 +278,16 @@ class Config:
         experiment_arguments = CommonExperimentArguments(**config_dict['experiment_arguments'])
         define_experiment_arguments = DefineExperimentDataArguments(**config_dict['define_experiment_arguments'])
         numeric_experiment_arguments = NumericExperimentDataArguments(**config_dict['numeric_experiment_arguments'])
-        
         return cls(data_arguments,
                    model_arguments,
                    training_arguments,
                    experiment_arguments,
                    define_experiment_arguments,
                    numeric_experiment_arguments,
-                   first_stage_arguments=config_dict['first_stage_arguments'],
-                   second_stage_arguments=config_dict['second_stage_arguments'],
-                   third_stage_arguments=config_dict['third_stage_arguments'])
+                   first_stage_arguments=config_dict.get('first_stage_arguments', {}),
+                   second_stage_arguments=config_dict.get('second_stage_arguments', {}),
+                   third_stage_arguments=config_dict.get('third_stage_arguments', {}),
+                   sweep_arguments=config_dict.get('sweep_arguments', {}))
         
     def __post_init__(self):
         if self.model_arguments.seq2seq and self.experiment_arguments.eval_callback_type == 'pipeline':
@@ -298,7 +307,9 @@ def override_args(args, override_dict):
     # iterate over [training_args, numeric_exp_args, ...]
     for args_set_name in vars(args_copy):
         args_set = getattr(args_copy, args_set_name)
-        if args_set_name not in ('first_stage_arguments', 'second_stage_arguments'):
+        # do not overwrite arguments which are used to override.
+        # TODO: avoid sweep arguments?
+        if args_set_name not in ('first_stage_arguments', 'second_stage_arguments', 'third_stage_arguments'):
             for key, value in override_dict.items():
                 if hasattr(args_set, key):
                     setattr(args_set, key, value)

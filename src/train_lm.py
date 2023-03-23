@@ -18,9 +18,8 @@ from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
 
 from src.callbacks import CustomSaveCallback, EvaluationCallbackGenerate, EvaluationCallbackPipeline
-from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler, WandBHpSpace
+from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler
 from utils.logger import setup_logger
-import wandb
 
 
 logger = setup_logger(__name__)
@@ -31,9 +30,6 @@ def train(raw_datasets, args):
     model_args = args.model_arguments
     data_args = args.data_arguments
     experiment_args = args.experiment_arguments
-    
-    # wandb.init(name=training_args.output_dir, group=args.group_name, config=config, tags=args.tags,
-    #            notes=os.environ.get('SLURM_JOB_ID', 'local'))
 
     # Setup logging
     logging.basicConfig(
@@ -140,7 +136,6 @@ def train(raw_datasets, args):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
-
 
     # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
     # model.resize_token_embeddings(len(tokenizer))
@@ -285,7 +280,8 @@ def train(raw_datasets, args):
     trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
     trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
     trainer = trainer_cls(
-        model=model,
+        model=model if not experiment_args.do_sweeps else None,
+        model_init=get_model if experiment_args.do_sweeps else None,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset_tokenized if training_args.do_eval else None,
@@ -322,35 +318,41 @@ def train(raw_datasets, args):
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
-        # wandbhp = WandBHpSpace()
-        # train_result = trainer.hyperparameter_search(
-        #     direction="minimize", # eval loss
-        #     backend="wandb",
-        #     hp_space=wandbhp.wandb_hp_space,
-        #     n_trials=20,
-        #     save_metrics=True
-        # )
-        if not data_args.dont_save_in_the_end:
-            trainer.save_model()  # Saves the tokenizer too for easy upload
+        
+        if experiment_args.do_sweeps:
+            best_run = trainer.hyperparameter_search(
+                direction="minimize", # eval loss
+                backend="wandb",
+                hp_space=lambda trial: args.sweep_arguments,
+                name=training_args.output_dir,
+                project='internalization-sweeps',
+                n_trials=5,
+                save_metrics=True
+            )
+            logger.info(best_run)
+        else:
+            train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
-        metrics = train_result.metrics
+            if not data_args.dont_save_in_the_end:
+                trainer.save_model()  # Saves the tokenizer too for easy upload
 
-        max_train_samples = (
-            data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
-        )
-        metrics["train_samples"] = min(max_train_samples, len(train_dataset))
+            metrics = train_result.metrics
 
-        trainer.log_metrics("train", metrics)
-        trainer.save_metrics("train", metrics)
-        trainer.save_state()
+            max_train_samples = (
+                data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
+            )
+            metrics["train_samples"] = min(max_train_samples, len(train_dataset))
 
-        for k in eval_callback.em_score:
-            metrics = {'EM {k}': eval_callback.em_score[k],
-                       'F1 {k}': eval_callback.f1_score[k],
-            }
-            trainer.log_metrics(f"eval_{k}", metrics)
-            trainer.save_metrics(f"eval_{k}", metrics)
+            trainer.log_metrics("train", metrics)
+            trainer.save_metrics("train", metrics)
+            trainer.save_state()
+
+            for k in eval_callback.em_score:
+                metrics = {'EM {k}': eval_callback.em_score[k],
+                        'F1 {k}': eval_callback.f1_score[k],
+                }
+                trainer.log_metrics(f"eval_{k}", metrics)
+                trainer.save_metrics(f"eval_{k}", metrics)
 
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-generation"}
     if data_args.dataset_name is not None:

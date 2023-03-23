@@ -81,16 +81,3 @@ class CharTokenizer(BaseTokenizer):
     @property
     def vocab_size(self):
         return len(self.vocab)
-
-
-class WandBHpSpace:
-        
-    def wandb_hp_space(self, trial):
-        return {
-            "method": "random",
-            "metric": {"name": "objective", "goal": "minimize"},
-            "parameters": {
-                "learning_rate": {"distribution": "uniform", "min": 1e-6, "max": 1e-4},
-                "per_device_train_batch_size": {"values": [16, 32, 64, 128]},
-            },
-        }

@@ -31,12 +31,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     main(args.config_name)
-    
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--config_path', type=str, default='configs/current_experiment.yaml')
-    args = parser.parse_args()
-    
-    main(args.config_path)
-    

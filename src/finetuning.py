@@ -10,7 +10,6 @@ from abc import ABC, abstractmethod
 import shutil
 
 
-os.environ["WANDB_DISABLED"] = "true"
 logger = setup_logger(__name__)
 
 
