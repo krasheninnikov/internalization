@@ -212,8 +212,8 @@ class CommonExperimentArguments:
         metadata={"help": ("number of ents used to generate the data to generate; should be up to 120k for cvdb;"
                            " can make much more with modifications but would need to make genders unbalanced")},
     )
-    single_stage: Optional[bool] = field(
-        default=False, metadata={"help": "Whether should do only one (single) stage of the experiment. "}
+    n_stages: Optional[int] = field(
+        default=2, metadata={"help": "Number of stages of experiment. Currently maximum 3 stages are supported"}
     )
     n_seeds: Optional[int] = field(
         default=1, metadata={"help": "The number of times to repeat the experiment (first stage)."}
@@ -255,6 +255,7 @@ class Config:
     
     first_stage_arguments: dict  # overrides for training arguments
     second_stage_arguments: dict
+    third_stage_arguments: dict
     
     @classmethod
     def from_yaml(cls, file_path: str):
@@ -276,7 +277,8 @@ class Config:
                    define_experiment_arguments,
                    numeric_experiment_arguments,
                    first_stage_arguments=config_dict['first_stage_arguments'],
-                   second_stage_arguments=config_dict['second_stage_arguments'])
+                   second_stage_arguments=config_dict['second_stage_arguments'],
+                   third_stage_arguments=config_dict['third_stage_arguments'])
         
     def __post_init__(self):
         if self.model_arguments.seq2seq and self.experiment_arguments.eval_callback_type == 'pipeline':
