@@ -1,0 +1,69 @@
+data_arguments:
+  dataset: "cvdb"
+  block_size: 96
+  label_block_size: 8
+  train_subset: 'full'
+
+
+model_arguments:
+  seq2seq: False
+  config_name: "EleutherAI/pythia-160m-deduped"
+  
+
+training_arguments:
+  output_dir: 'experiments/temp'
+  bf16: True
+  do_train: True
+  do_eval: True
+  per_device_train_batch_size: 128
+  per_device_eval_batch_size: 128
+  num_train_epochs: 10
+  optim: "adafactor"
+  overwrite_output_dir: True
+  auto_find_batch_size: True
+  save_strategy: "no"
+  load_best_model_at_end: False
+  evaluation_strategy: 'epoch'
+
+
+experiment_arguments: # common experiment arguments
+  define_experiment: False
+  numeric_experiment: True
+
+  single_stage: False
+  num_ents: 4000
+
+  n_seeds: 1
+  n_seeds_stage2: 5
+  start_seed: 600
+  slurm: False
+
+  save_each_epochs: 2  # maybe create a class from TrainingArguments with few more params
+  eval_each_epochs: 1
+  eval_callback_type: "pipeline"  # pipeline or generate
+  
+
+define_experiment_arguments:
+  def_order: "tve"
+  no_relevant_defns: False
+  mix_reliable_unreliable_data: True
+
+
+numeric_experiment_arguments:
+  modular_experiment_baseline: False
+  modular_experiment: False
+  num_choice_experiment: True
+
+
+# overrides specified parameters
+first_stage_arguments:
+  train_subset: 'stage1'
+  num_train_epochs: 4
+  gradient_accumulation_steps: 1
+
+second_stage_arguments:
+  train_subset: 'stage2'
+  num_train_epochs: 1
+  gradient_accumulation_steps: 64
+  dont_save_in_the_end: True
+  save_each_epochs: 0

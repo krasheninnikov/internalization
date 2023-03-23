@@ -14,6 +14,7 @@
 /*scratchpad*
 *.ipynb
 two_stage_finetuning_nums.py
+*.ipynb
 *.out
 machine.file*
 *hf-cache*
