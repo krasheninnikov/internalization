@@ -212,11 +212,8 @@ class CommonExperimentArguments:
         metadata={"help": ("number of ents used to generate the data to generate; should be up to 120k for cvdb;"
                            " can make much more with modifications but would need to make genders unbalanced")},
     )
-    single_stage: Optional[bool] = field(
-        default=False, metadata={"help": "Whether should do only one (single) stage of the experiment. "}
-    )
-    three_stage: Optional[bool] = field(
-        default=False, metadata={"help": "Whether should do 3 stages of the experiment. "}
+    n_stages: Optional[int] = field(
+        default=2, metadata={"help": "Number of stages of experiment. Currently maximum 3 stages are supported"}
     )
     n_seeds: Optional[int] = field(
         default=1, metadata={"help": "The number of times to repeat the experiment (first stage)."}

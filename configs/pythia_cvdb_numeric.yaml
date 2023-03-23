@@ -30,7 +30,7 @@ experiment_arguments: # common experiment arguments
   define_experiment: False
   numeric_experiment: True
 
-  single_stage: False
+  n_stages: 2
   num_ents: 4000
 
   n_seeds: 1

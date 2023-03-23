@@ -119,52 +119,29 @@ class TwoStageFineTuning(FineTuningPipeline):
         shutil.copy(f'configs/{self.config_name}', f'{self.experiment_folder}/{self.config_name}')
         logger.info('Finished fine-tuning.')
         
-        
-class ThreeStageFineTuning(FineTuningPipeline):
-    def __init__(self, config: Config = None, config_path: str = 'configs/three_stage_experiment.yaml'):
-        super().__init__(config, config_path)
-        
-        self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
-        self.args_stage2 = override_args(self.args, self.args.second_stage_arguments)
+
+# POTENTIAL ISSUES WITH DELETING CHECKPOINTS
+class ThreeStageFineTuning(TwoStageFineTuning):
+    def __init__(self, config: Config = None, config_name: str = 'three_stage_experiment.yaml'):
+        super().__init__(config, config_name)
         self.args_stage3 = override_args(self.args, self.args.third_stage_arguments)
-        self.experiment_name = self._get_experiment_name()    
-
-    def _get_experiment_name(self):
-        args = self.args
-        epochs_str = f'{self.args_stage1.training_arguments.num_train_epochs}and{self.args_stage2.training_arguments.num_train_epochs}'         
-        return (f'qa_3stage_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
-                f'Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
-                f'_{args.model_arguments.model_name_or_path.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
-
+        self.experiment_folder = f'experiments/{self.experiment_name}_three_stage'
         
     def first_stage_qa_finetuning(self, seed):
-        logger.info('Starting training first stage...')
-        args_stage1 = self.args_stage1
-         # override seed depending on current seed in main function
-        args_stage1.training_arguments.seed = seed
-        args_stage1.training_arguments.output_dir = f'experiments/{self.experiment_name}_first_stage_s{args_stage1.training_arguments.seed}'
-        args_stage1.training_arguments.logging_dir = rename_logging_dir(args_stage1.training_arguments.logging_dir,
-                                                                        args_stage1.training_arguments.output_dir)
-        # First stage: finetune on stage1-qa only
-        raw_datasets = get_experiment_dataset(args_stage1, seed, seed_stage2=0, train_subset=args_stage1.data_arguments.train_subset)
-        train_lm(raw_datasets, args_stage1)
-    
-    
-    def first_stage_defs_finetuning(self, seed):
+        self.first_stage_finetuning(seed)
+        
+    def second_stage_defs_finetuning(self, seed):
         logger.info('Starting training second stage...')
         # Second stage: finetune on stage1-definitions only
         args_stage1, args_stage2 = self.args_stage1, self.args_stage2
         args_stage2.training_arguments.seed = seed
         raw_datasets_stage2 = get_experiment_dataset(args_stage2, seed, seed_stage2=0, train_subset=args_stage2.data_arguments.train_subset)
         
-        args_stage2.training_arguments.output_dir = f'experiments/{self.experiment_name}_second_stage_s{args_stage2.training_arguments.seed}'
-        args_stage2.training_arguments.logging_dir = rename_logging_dir(args_stage2.training_arguments.logging_dir,
-                                                                        args_stage2.training_arguments.output_dir)
+        set_new_output_dir(args_stage2, f'experiments/{self.experiment_folder}/second_stage_s{args_stage2.training_arguments.seed}')
         args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
         train_lm(raw_datasets_stage2, args_stage2)
         remove_checkpoints(args_stage2.model_arguments.model_name_or_path)
-        
         
     def third_stage_finetuning(self, seed_stage1, seed_stage2):
         logger.info('Starting training third stage...')
@@ -174,20 +151,17 @@ class ThreeStageFineTuning(FineTuningPipeline):
         raw_datasets_stage3 = get_experiment_dataset(args_stage3, seed_stage1, seed_stage2, train_subset=args_stage3.data_arguments.train_subset)
         
         # TODO potentially iterate over checkpoints of stage2
-        args_stage3.training_arguments.output_dir = f'experiments/{self.experiment_name}_s{seed_stage1}_s2stage{seed_stage2}'
-        args_stage3.training_arguments.logging_dir = rename_logging_dir(args_stage3.training_arguments.logging_dir,
-                                                                        args_stage3.training_arguments.output_dir)
+        set_new_output_dir(args_stage3, f'experiments/{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
         args_stage3.model_arguments.model_name_or_path = args_stage2.training_arguments.output_dir
 
         train_lm(raw_datasets_stage3, args_stage3)
         remove_checkpoints(args_stage3.training_arguments.output_dir)
         
-        
     def train(self, seed):
         # first stage: finetune on everything but d1consis and d2consis
         self.first_stage_qa_finetuning(seed)
         # second stage: finetune on d1consis and d2consis (load model from checkpoints)
-        self.first_stage_defs_finetuning(seed)
+        self.second_stage_defs_finetuning(seed)
         for seed_stage2 in range(self.args.experiment_arguments.n_seeds_stage2):
             # change seed for second stage in training arguments
             self.third_stage_finetuning(seed, seed_stage2)
@@ -232,7 +206,7 @@ def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=No
 def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
     epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
     model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
-    
+    # TODO: separate for modular base?
     numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
     
     return (f'{numeric_data_source}'
@@ -242,12 +216,11 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
 
 def setup_pipeline(config_name: str) -> FineTuningPipeline:
     config = Config.from_yaml(f'configs/{config_name}')
-    if config.experiment_arguments.single_stage:
-        finetuning_pipeline = SingleStageFineTuning(config, config_name=config_name)
-    elif config.experiment_arguments.three_stage:
-        finetuning_pipeline = ThreeStageFineTuning(config, config_name=config_name)
-    else:
-        finetuning_pipeline = TwoStageFineTuning(config, config_name=config_name)
+    pipeline_stages = (SingleStageFineTuning(config, config_name=config_name),
+                       TwoStageFineTuning(config, config_name=config_name),
+                       ThreeStageFineTuning(config, config_name=config_name))
+    
+    finetuning_pipeline = pipeline_stages[config.experiment_arguments.n_stages - 1]
     return finetuning_pipeline
 
 
