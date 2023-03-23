@@ -62,6 +62,7 @@ options=$2
 workdir=$3 # "/home/dk655/rds/hpc-work/internalization"  # The value of SLURM_SUBMIT_DIR sets workdir to the directory
                              # in which sbatch is run.
 
+experiment_folder=$4
 #! Are you using OpenMP (NB this is unrelated to OpenMPI)? If so increase this
 #! safe value to no more than 128:
 export OMP_NUM_THREADS=1
@@ -72,8 +73,8 @@ np=$[${numnodes}*${mpi_tasks_per_node}]
 #! Choose this for a pure shared-memory OpenMP parallel program on a single node:
 #! (OMP_NUM_THREADS threads will be created):
 CMD="$application $options"
-CMD_RM="rm -rf experiments/$experiment_name/checkpoint*; rm -rf experiments/$experiment_name/pytorch_model-*.bin; rm machine.file.$SLURM_JOB_ID*"
-CMD_MV='mv slurm-$SLURM_JOB_ID*.out run'
+CMD_RM="rm machine.file.$SLURM_JOB_ID*"
+CMD_MV="mv slurm-$SLURM_JOB_ID*.out $experiment_folder"
 #! Choose this for a MPI code using OpenMPI:
 #CMD="mpirun -npernode $mpi_tasks_per_node -np $np $application $options"
 
