@@ -20,9 +20,14 @@ from transformers.trainer_utils import get_last_checkpoint
 from src.callbacks import CustomSaveCallback, EvaluationCallbackGenerate, EvaluationCallbackPipeline
 from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler
 from utils.logger import setup_logger
+import wandb
 
 
 logger = setup_logger(__name__)
+wandb_config = {'project': 'internalization',
+                'entity': 'assistance-llms', 
+                'notes': os.environ.get('SLURM_JOB_ID', 'local')}
+
 
 
 def train(raw_datasets, args):
@@ -51,6 +56,10 @@ def train(raw_datasets, args):
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
     )
     logger.info(f"Training/evaluation parameters {training_args}")
+
+    if not experiment_args.do_sweeps:
+        group, exp_name = training_args.output_dir.replace('experiments/', '').split('/')
+        wandb.init(group=group, name=exp_name, **wandb_config)
     # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
@@ -325,10 +334,9 @@ def train(raw_datasets, args):
                 backend="wandb",
                 hp_space=lambda trial: args.sweep_arguments,
                 name=training_args.output_dir,
-                project='internalization',
-                entity='assistance-llms',
                 n_trials=5,
-                save_metrics=True
+                save_metrics=True,
+                **wandb_config
             )
             logger.info(best_run)
         else:

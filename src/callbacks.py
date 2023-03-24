@@ -6,7 +6,7 @@ from transformers.trainer_utils import IntervalStrategy
 from utils.logger import setup_logger
 from src.metrics import compute_em_list, compute_f1_list
 from abc import ABC, abstractmethod
-
+import wandb
 
 logger = setup_logger(__name__)
 
@@ -84,6 +84,8 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
 
             self.tb_writer.add_scalar(f"eval/{k}_EM", self.em_score[k], state.global_step)
             self.tb_writer.add_scalar(f"eval/{k}_F1", self.f1_score[k], state.global_step)
+            wandb.log({f"eval/{k}_EM": self.em_score[k]}, state.global_step)
+            wandb.log({f"eval/{k}_F1": self.f1_score[k]}, state.global_step)
             
             for i in range(10):
                 #print(f'Prompt: {qa_prompts[i]}')
@@ -134,6 +136,8 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
 
             self.tb_writer.add_scalar(f"eval/{k}_EM", self.em_score[k], state.global_step)
             self.tb_writer.add_scalar(f"eval/{k}_F1", self.f1_score[k], state.global_step)
+            wandb.log({f"eval/{k}_EM": self.em_score[k]}, state.global_step)
+            wandb.log({f"eval/{k}_F1": self.f1_score[k]}, state.global_step)
 
             for i in range(10):
                 #print(f'Prompt: {qa_prompts[i]}')
