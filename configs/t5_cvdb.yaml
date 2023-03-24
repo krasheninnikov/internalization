@@ -39,8 +39,8 @@ experiment_arguments: # common experiment arguments
   numeric_experiment: False
 
   n_stages: 2
-  n_seeds: 1
-  n_seeds_stage2: 3
+  n_seeds: 3
+  n_seeds_stage2: 5
   start_seed: 600
   slurm: False
   
