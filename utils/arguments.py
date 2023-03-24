@@ -313,9 +313,8 @@ def override_args(args, override_dict):
     # iterate over [training_args, numeric_exp_args, ...]
     for args_set_name in vars(args_copy):
         args_set = getattr(args_copy, args_set_name)
-        # do not overwrite arguments which are used to override.
-        # TODO: avoid sweep arguments?
-        if args_set_name not in ('first_stage_arguments', 'second_stage_arguments', 'third_stage_arguments'):
+        # do not overwrite arguments which we don't want to override.
+        if args_set_name not in ('first_stage_arguments', 'second_stage_arguments', 'third_stage_arguments', 'sweep_arguments'):
             for key, value in override_dict.items():
                 if hasattr(args_set, key):
                     setattr(args_set, key, value)
