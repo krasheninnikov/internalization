@@ -31,17 +31,17 @@ experiment_arguments: # common experiment arguments
   define_experiment: True
   numeric_experiment: False
 
-  n_stages: 1
+  n_stages: 2
   num_ents: 4000 # TODO move to data_arguments
 
   n_seeds: 1
   n_seeds_stage2: 2
   start_seed: 600
   slurm: False
-  do_sweeps: True # not recommended to do eval each epoch than doing sweeps (sweeps minimize over eval_loss)
+  do_sweeps: False # not recommended to do eval each epoch than doing sweeps (sweeps minimize over eval_loss)
 
   save_each_epochs: 0  # not logical to have it in data_arguments, maybe create a class from TrainingArguments with few more params
-  eval_each_epochs: 0
+  eval_each_epochs: 1
   eval_callback_type: "pipeline"  # pipeline or generate
   
 
@@ -60,19 +60,19 @@ numeric_experiment_arguments:
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 1
+  num_train_epochs: 20
   gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'
-  num_train_epochs: 1
+  num_train_epochs: 5
   gradient_accumulation_steps: 64
   dont_save_in_the_end: True
   save_each_epochs: 0
 
 
 sweep_arguments:
-  method: 'bayes'
+  method: 'random'
   metric:
     goal: 'minimize'
     name: 'train/train_loss'

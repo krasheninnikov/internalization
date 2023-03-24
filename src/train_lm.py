@@ -60,6 +60,7 @@ def train(raw_datasets, args):
     if not experiment_args.do_sweeps:
         group, exp_name = training_args.output_dir.replace('experiments/', '').split('/')
         wandb.init(group=group, name=exp_name, **wandb_config)
+        
     # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
@@ -362,7 +363,9 @@ def train(raw_datasets, args):
                 }
                 trainer.log_metrics(f"eval_{k}", metrics)
                 trainer.save_metrics(f"eval_{k}", metrics)
-
+    
+        wandb.finish()
+    
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-generation"}
     if data_args.dataset_name is not None:
         kwargs["dataset_tags"] = data_args.dataset_name
