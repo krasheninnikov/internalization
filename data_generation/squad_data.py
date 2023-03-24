@@ -3,7 +3,6 @@ import random
 import tqdm
 import numpy as np
 import pandas as pd
-import spacy
 from collections import Counter
 from datasets import Dataset, DatasetDict
 
