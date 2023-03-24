@@ -7,6 +7,8 @@ import evaluate
 import torch
 import transformers
 from datasets import DatasetDict
+from typing import Dict
+from copy import deepcopy
 from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           AutoConfig, AutoModelForCausalLM,
                           AutoModelForSeq2SeqLM, AutoTokenizer,
@@ -146,9 +148,9 @@ def train(raw_datasets, args):
 
     model = get_model()
     # GPT2 tokenizer doesn't have a padding token
-    # TODO: seems that pythia model doesn't have neither pad_token nor eos_token.
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+        
     stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
 
     # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
@@ -269,17 +271,43 @@ def train(raw_datasets, args):
     def postprocess_seq2seq_output(decoded_prediction):
         return decoded_prediction.replace('\n', '')
     
-    #metric = evaluate.load("exact_match")
-    metric = evaluate.load("accuracy")
+    metric_em = evaluate.load("exact_match")
+    metric_acc = evaluate.load("accuracy")
     postprocess_output_fn = postprocess_seq2seq_output if model_args.seq2seq else postprocess_clm_output
     
     def compute_metrics(eval_preds):
+        metrics = dict()
         preds, labels = eval_preds
         # preds have the same shape as the labels, after the argmax(-1) has been calculated
         # by preprocess_logits_for_metrics but we need to shift the labels
         labels = labels[:, 1:].reshape(-1)
         preds = preds[:, :-1].reshape(-1)
-        return metric.compute(predictions=preds, references=labels)
+        return metric_acc.compute(predictions=preds, references=labels)
+        # metrics.update(metric_acc.compute(predictions=preds, references=labels))
+        # metrics.update(metric_em.compute(predictions=preds, references=labels))
+        # return metrics
+    
+    def compute_objective(metrics: Dict[str, float]) -> float:
+        """
+        The default objective to maximize/minimize when doing an hyperparameter search. It is the evaluation loss if no
+        metrics are provided to the [`Trainer`], the sum of all metrics otherwise.
+        Args:
+            metrics (`Dict[str, float]`): The metrics returned by the evaluate method.
+        Return:
+            `float`: The objective to minimize or maximize
+        """
+        metrics = deepcopy(metrics)
+        loss = metrics.pop("eval/d1consis_loss", None)
+        _ = metrics.pop("epoch", None)
+        # Remove speed metrics
+        speed_metrics = [
+            m
+            for m in metrics.keys()
+            if m.endswith("_runtime") or m.endswith("_per_second") or m.endswith("_compilation_time")
+        ]
+        for sm in speed_metrics:
+            _ = metrics.pop(sm, None)
+        return loss if len(metrics) == 0 else sum(metrics.values())
         
     # Data collator
     label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
@@ -335,12 +363,13 @@ def train(raw_datasets, args):
         
         if experiment_args.do_sweeps:
             best_run = trainer.hyperparameter_search(
-                direction="minimize", # eval loss
+                direction="maximize", # sum eval metrics
                 backend="wandb",
                 hp_space=lambda trial: args.sweep_arguments,
                 name=training_args.output_dir,
                 n_trials=5,
                 save_metrics=True,
+                compute_objective=compute_objective,
                 **wandb_config
             )
             logger.info(best_run)

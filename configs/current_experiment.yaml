@@ -31,18 +31,18 @@ experiment_arguments: # common experiment arguments
   define_experiment: True
   numeric_experiment: False
 
-  n_stages: 2
+  n_stages: 1
   num_ents: 4000 # TODO move to data_arguments
 
   n_seeds: 1
   n_seeds_stage2: 2
   start_seed: 601
   slurm: False
-  do_sweeps: False # not recommended to do eval each epoch than doing sweeps (sweeps minimize over eval_loss)
+  do_sweeps: True
 
   save_each_epochs: 0  # not logical to have it in data_arguments, maybe create a class from TrainingArguments with few more params
   eval_each_epochs: 1
-  eval_callback_type: "pipeline"  # pipeline or generate
+  eval_callback_type: "pipeline"  # pipeline or generate (generate is used for seq2seq)
   
 
 define_experiment_arguments:
@@ -60,26 +60,27 @@ numeric_experiment_arguments:
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 20
+  num_train_epochs: 2
   gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'
-  num_train_epochs: 5
+  num_train_epochs: 1
   gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0
 
-
 sweep_arguments:
   method: 'random'
   metric:
-    goal: 'minimize'
-    name: 'train/train_loss'
+    name: 'eval_accuracy'
+    goal: 'maximize'
   parameters:
     optimizer:
       values: ['adam', 'sgd']
+    batch_size:
+      values: [32, 64, 128, 256, 512]
     learning_rate:
-      distribution: 'uniform'
-      min: 0
-      max: 0.1
+      distribution: 'log_uniform_values'
+      min: 0.00001
+      max: 0.001
