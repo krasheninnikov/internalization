@@ -36,7 +36,7 @@ experiment_arguments: # common experiment arguments
 
   n_seeds: 1
   n_seeds_stage2: 2
-  start_seed: 600
+  start_seed: 601
   slurm: False
   do_sweeps: False # not recommended to do eval each epoch than doing sweeps (sweeps minimize over eval_loss)
 
@@ -66,7 +66,7 @@ first_stage_arguments:
 second_stage_arguments:
   train_subset: 'stage2'
   num_train_epochs: 5
-  gradient_accumulation_steps: 64
+  gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0
 

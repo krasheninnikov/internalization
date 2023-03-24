@@ -57,6 +57,8 @@ def train(raw_datasets, args):
     )
     logger.info(f"Training/evaluation parameters {training_args}")
 
+    # no need to init wandb in case of sweeps (otherwise an error will be raised),
+    # trainer.hyperparameter_search inits wandb itself.
     if not experiment_args.do_sweeps:
         group, exp_name = training_args.output_dir.replace('experiments/', '').split('/')
         wandb.init(group=group, name=exp_name, **wandb_config)
@@ -107,6 +109,7 @@ def train(raw_datasets, args):
     # But if we always pass vocab_size, some models won't work with their standard tokenizer (e.g. GPT NeoX / Pythia)
     if experiment_args.numeric_experiment:
         config_kwargs['vocab_size'] = tokenizer.vocab_size
+    
     if model_args.config_name:
         config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
@@ -137,6 +140,7 @@ def train(raw_datasets, args):
             
         embedding_size = model.get_input_embeddings().weight.shape[0]
         if len(tokenizer) > embedding_size:
+            logger.warning(f"Resizing token embeddings from {embedding_size} to {len(tokenizer)}")
             model.resize_token_embeddings(len(tokenizer)) 
         return model
 
