@@ -198,7 +198,7 @@ def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=No
     model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
 
     return (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
-            f'Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
+            f'Defs_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
             f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
 
 
@@ -209,7 +209,7 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
     numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
     
     return (f'{numeric_data_source}'
-            f'_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
+            f'_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
             f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
 
 

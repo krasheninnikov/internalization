@@ -61,7 +61,7 @@ def train(raw_datasets, args):
 
     # no need to init wandb in case of sweeps (otherwise an error will be raised),
     # trainer.hyperparameter_search inits wandb itself.
-    if not experiment_args.do_sweeps:
+    if not training_args.do_sweeps:
         group, exp_name = training_args.output_dir.replace('experiments/', '').split('/')
         wandb.init(group=group, name=exp_name, **wandb_config)
         
@@ -201,7 +201,7 @@ def train(raw_datasets, args):
 
         return tokens
             
-    def generate_batch(examples):
+    def generate_batch(examples, model=None):
         """Generate batch of predictions given a batch of examples.
 
         Args:
@@ -322,8 +322,8 @@ def train(raw_datasets, args):
     trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
     trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
     trainer = trainer_cls(
-        model=model if not experiment_args.do_sweeps else None,
-        model_init=get_model if experiment_args.do_sweeps else None,
+        model=model if not training_args.do_sweeps else None,
+        model_init=get_model if training_args.do_sweeps else None,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset_tokenized if training_args.do_eval else None,
@@ -336,68 +336,70 @@ def train(raw_datasets, args):
     )
     
     trainer.pop_callback(TensorBoardCallback)
-    if experiment_args.eval_callback_type == 'pipeline':
-        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=experiment_args.eval_each_epochs)
-    elif experiment_args.eval_callback_type == 'generate':
+    if training_args.eval_callback_type == 'pipeline':
+        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=training_args.eval_each_epochs)
+    elif training_args.eval_callback_type == 'generate':
         eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
                                                    generate_batch,
                                                    postprocess_output_fn=postprocess_output_fn,
                                                    numeric_experiment=experiment_args.numeric_experiment,
-                                                   eval_each=experiment_args.eval_each_epochs)
+                                                   eval_each=training_args.eval_each_epochs)
     
     else:
         raise ValueError('invalid eval_callback type.')    
     
     trainer.add_callback(eval_callback)
-    if experiment_args.save_each_epochs:
-        save_callback = CustomSaveCallback(save_each=experiment_args.save_each_epochs)
+    if training_args.save_each_epochs:
+        save_callback = CustomSaveCallback(save_each=training_args.save_each_epochs)
         trainer.add_callback(save_callback)
+        
+    if training_args.do_sweeps:
+        logger.info('Starting training sweeps')
+        best_run = trainer.hyperparameter_search(
+            direction="maximize", # sum eval metrics
+            backend="wandb",
+            hp_space=lambda trial: args.sweep_arguments,
+            name=training_args.output_dir,
+            n_trials=training_args.n_sweeps,
+            save_metrics=True,
+            compute_objective=compute_objective,
+            **wandb_config
+        )
+        logger.info(best_run)
 
     # Training
     if training_args.do_train:
+        logger.info('Starting training')
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
         
-        if experiment_args.do_sweeps:
-            best_run = trainer.hyperparameter_search(
-                direction="maximize", # sum eval metrics
-                backend="wandb",
-                hp_space=lambda trial: args.sweep_arguments,
-                name=training_args.output_dir,
-                n_trials=5,
-                save_metrics=True,
-                compute_objective=compute_objective,
-                **wandb_config
-            )
-            logger.info(best_run)
-        else:
-            train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
-            if not data_args.dont_save_in_the_end:
-                trainer.save_model()  # Saves the tokenizer too for easy upload
+        if not training_args.dont_save_in_the_end:
+            trainer.save_model()  # Saves the tokenizer too for easy upload
 
-            metrics = train_result.metrics
+        metrics = train_result.metrics
 
-            max_train_samples = (
-                data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
-            )
-            metrics["train_samples"] = min(max_train_samples, len(train_dataset))
+        max_train_samples = (
+            data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
+        )
+        metrics["train_samples"] = min(max_train_samples, len(train_dataset))
 
-            trainer.log_metrics("train", metrics)
-            trainer.save_metrics("train", metrics)
-            trainer.save_state()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
-            for k in eval_callback.em_score:
-                metrics = {'EM {k}': eval_callback.em_score[k],
-                        'F1 {k}': eval_callback.f1_score[k],
-                }
-                trainer.log_metrics(f"eval_{k}", metrics)
-                trainer.save_metrics(f"eval_{k}", metrics)
+        for k in eval_callback.em_score:
+            metrics = {'EM {k}': eval_callback.em_score[k],
+                    'F1 {k}': eval_callback.f1_score[k],
+            }
+            trainer.log_metrics(f"eval_{k}", metrics)
+            trainer.save_metrics(f"eval_{k}", metrics)
     
-        wandb.finish()
+    wandb.finish()
     
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-generation"}
     if data_args.dataset_name is not None:

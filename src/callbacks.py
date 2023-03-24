@@ -1,12 +1,14 @@
+from abc import ABC, abstractmethod
+from functools import partial
+
 from transformers import (TrainerCallback, TrainerControl, TrainerState,
                           TrainingArguments, pipeline)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import IntervalStrategy
 
-from utils.logger import setup_logger
-from src.metrics import compute_em_list, compute_f1_list
-from abc import ABC, abstractmethod
 import wandb
+from src.metrics import compute_em_list, compute_f1_list
+from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -62,8 +64,9 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
             eval_dataset_k = self.eval_dataset_tokenized[k]
             # generate predictions using generate_batch_fn function
             eval_dataset_input = eval_dataset_k.remove_columns(['attention_mask', 'labels', 'answer'])
+            generate_batch_fn = partial(self.generate_batch, model=model)
             predictions_k = eval_dataset_input.with_format('torch', device='cuda').map(
-                self.generate_batch,
+                generate_batch_fn,
                 batched=True,
                 load_from_cache_file=True,
                 batch_size=args.per_device_eval_batch_size,
@@ -114,7 +117,7 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
             eval_dataset_k = self.eval_dataset_raw[k]
             original_answers = eval_dataset_k['answer']
             qa_prompts = eval_dataset_k['question']
-
+            # TODO: set max_new_tokens depending on config param.
             predicted_answers = pipe(qa_prompts,
                                     max_new_tokens=20,
                                     pad_token_id=tokenizer.pad_token_id,

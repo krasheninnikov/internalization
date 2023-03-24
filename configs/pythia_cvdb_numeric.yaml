@@ -3,18 +3,17 @@ data_arguments:
   block_size: 96
   label_block_size: 8
   train_subset: 'full'
-
+  num_ents: 4000
 
 model_arguments:
   seq2seq: False
+  max_new_tokens: 20
   config_name: "EleutherAI/pythia-160m-deduped"
   
 
 training_arguments:
   output_dir: 'experiments/temp'
   bf16: True
-  do_train: True
-  do_eval: True
   per_device_train_batch_size: 128
   per_device_eval_batch_size: 128
   num_train_epochs: 10
@@ -25,23 +24,25 @@ training_arguments:
   load_best_model_at_end: False
   evaluation_strategy: 'epoch'
 
+  do_train: True
+  do_eval: True
+  do_sweeps: False
+  n_sweeps: 5
+  save_each_epochs: 2
+  eval_each_epochs: 1
+  eval_callback_type: "pipeline"  # pipeline or generate
+
 
 experiment_arguments: # common experiment arguments
   define_experiment: False
   numeric_experiment: True
 
   n_stages: 2
-  num_ents: 4000
-
   n_seeds: 1
   n_seeds_stage2: 5
   start_seed: 600
   slurm: False
 
-  save_each_epochs: 2  # maybe create a class from TrainingArguments with few more params
-  eval_each_epochs: 1
-  eval_callback_type: "pipeline"  # pipeline or generate
-  
 
 define_experiment_arguments:
   def_order: "tve"
