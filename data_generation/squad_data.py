@@ -188,36 +188,36 @@ def get_raw_datasets(seed, concat_pairs=False):
                         'qs_pqt': make_qa_dataset(qs_pqt)})
 
 
-def make_top_entities_squad(n=100):
-    # extract top n most common PERSON entities and n most common ORG entities
-    # saves to entities_list_squad.txt
-    data = load_train_and_eval_data_squad(only_qa=True)
-    qa_flattened = [x for y in data for x in y]
-    questions, _ = zip(*qa_flattened)
-    nlp = spacy.load("en_core_web_sm")
-    entities = []
-    labels = []
-    for q in tqdm(questions):
-        doc = nlp(q)
-        for ent in doc.ents:
-            entities.append(ent.text)
-            labels.append(ent.label_)
-    mask_person = np.array(labels) == 'PERSON'
-    mask_org = np.array(labels) == 'ORG'
+# def make_top_entities_squad(n=100):
+#     # extract top n most common PERSON entities and n most common ORG entities
+#     # saves to entities_list_squad.txt
+#     data = load_train_and_eval_data_squad(only_qa=True)
+#     qa_flattened = [x for y in data for x in y]
+#     questions, _ = zip(*qa_flattened)
+#     nlp = spacy.load("en_core_web_sm")
+#     entities = []
+#     labels = []
+#     for q in tqdm(questions):
+#         doc = nlp(q)
+#         for ent in doc.ents:
+#             entities.append(ent.text)
+#             labels.append(ent.label_)
+#     mask_person = np.array(labels) == 'PERSON'
+#     mask_org = np.array(labels) == 'ORG'
 
-    entities_orgs = np.array(entities)[mask_org]
-    entities_person = np.array(entities)[mask_person]
+#     entities_orgs = np.array(entities)[mask_org]
+#     entities_person = np.array(entities)[mask_person]
 
-    cnt_orgs = Counter(entities_orgs)
-    cnt_persons = Counter(entities_person)
+#     cnt_orgs = Counter(entities_orgs)
+#     cnt_persons = Counter(entities_person)
 
-    top_persons = [key for key, cnt in cnt_orgs.most_common(n // 2)]
-    top_orgs = [key for key, cnt in cnt_persons.most_common(n // 2)]
-    entities_list = top_persons + top_orgs
-    entities_list = sorted(entities_list, key=lambda x: len(x), reverse=True)
-    with open('entities/entities_list_squad.txt', 'w') as f:
-        for ent in entities_list:
-            f.write(ent + '\n')
+#     top_persons = [key for key, cnt in cnt_orgs.most_common(n // 2)]
+#     top_orgs = [key for key, cnt in cnt_persons.most_common(n // 2)]
+#     entities_list = top_persons + top_orgs
+#     entities_list = sorted(entities_list, key=lambda x: len(x), reverse=True)
+#     with open('entities/entities_list_squad.txt', 'w') as f:
+#         for ent in entities_list:
+#             f.write(ent + '\n')
 
 
 def make_qa_prompt(q, a):
