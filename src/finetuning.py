@@ -119,7 +119,6 @@ class TwoStageFineTuning(FineTuningPipeline):
         logger.info('Finished fine-tuning.')
         
 
-# POTENTIAL ISSUES WITH DELETING CHECKPOINTS
 class ThreeStageFineTuning(TwoStageFineTuning):
     def __init__(self, config: Config = None, config_name: str = 'three_stage_experiment.yaml'):
         super().__init__(config, config_name)
@@ -136,7 +135,7 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         args_stage2.training_arguments.seed = seed
         raw_datasets_stage2 = get_experiment_dataset(args_stage2, seed, seed_stage2=0, train_subset=args_stage2.data_arguments.train_subset)
         
-        set_new_output_dir(args_stage2, f'experiments/{self.experiment_folder}/second_stage_s{args_stage2.training_arguments.seed}')
+        set_new_output_dir(args_stage2, f'{self.experiment_folder}/second_stage_s{args_stage2.training_arguments.seed}')
         args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
         train_lm(raw_datasets_stage2, args_stage2)
@@ -150,7 +149,7 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         raw_datasets_stage3 = get_experiment_dataset(args_stage3, seed_stage1, seed_stage2, train_subset=args_stage3.data_arguments.train_subset)
         
         # TODO potentially iterate over checkpoints of stage2
-        set_new_output_dir(args_stage3, f'experiments/{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
+        set_new_output_dir(args_stage3, f'{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
         args_stage3.model_arguments.model_name_or_path = args_stage2.training_arguments.output_dir
 
         train_lm(raw_datasets_stage3, args_stage3)
