@@ -73,17 +73,18 @@ def ttest_res_dict(res_dict, var1, var2):
                                 alternative='greater')
 
 
-def make_experiment_plot(stage1_base_path, stage2_base_path, thruncate_stage1_after_epoch=None,
+def make_experiment_plot(exp_name, stage1_base_path, stage2_base_path, thruncate_stage1_after_epoch=None,
                          tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None):
     # experiment_name – name not including seed
+    exp_folder = f'experiments/{exp_name}'
     if os_list is None:
-        os_list = os.listdir('experiments/')
+        os_list = os.listdir(exp_folder)
     stage1_exp_names = [x for x in os_list if x.startswith(stage1_base_path)]
     print(f'Retrieving from {len(stage1_exp_names)} experiments')
     dfs = []
     unique_tags = set()
     for experiment_name in stage1_exp_names:
-        logdir = os.path.join('experiments', experiment_name, 'runs')
+        logdir = os.path.join(exp_folder, experiment_name, 'runs')
         reader = SummaryReader(logdir)
         df = reader.scalars
         if not df.empty:
@@ -113,7 +114,7 @@ def make_experiment_plot(stage1_base_path, stage2_base_path, thruncate_stage1_af
     dfs = []
     unique_tags = set()
     for experiment_name in stage2_exp_names:
-        logdir = os.path.join('experiments', experiment_name, 'runs')
+        logdir = os.path.join(exp_folder, experiment_name, 'runs')
         try:
             reader = SummaryReader(logdir)
         except ValueError:

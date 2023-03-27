@@ -92,7 +92,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         if checkpoins_names:
             logger.info('Starting training second stage from checkpoints...')
             for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
-                cpt_num = (i + 1) * args_stage1.experiment_arguments.save_each_epochs
+                cpt_num = (i + 1) * args_stage1.training_arguments.save_each_epochs
                 set_new_output_dir(args_stage2, f"{self.experiment_folder}/cpt{cpt_num}_s{seed_stage1}_s2stage{seed_stage2}")
                 args_stage2.model_arguments.model_name_or_path = f'{args_stage1.training_arguments.output_dir}/{checkpoint_name}'
 
