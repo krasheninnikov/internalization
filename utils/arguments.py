@@ -278,8 +278,7 @@ class Config:
         
         data_arguments = DataTrainingArguments(**config_dict['data_arguments'])
         model_arguments = ModelArguments(**config_dict['model_arguments'])
-        training_arguments = ModelTrainingArguments(
-            **config_dict['training_arguments'])
+        training_arguments = ModelTrainingArguments(**config_dict['training_arguments'])
         # experiment arguments 
         experiment_arguments = CommonExperimentArguments(**config_dict['experiment_arguments'])
         define_experiment_arguments = DefineExperimentDataArguments(**config_dict['define_experiment_arguments'])

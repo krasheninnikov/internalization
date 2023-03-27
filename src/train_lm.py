@@ -27,9 +27,8 @@ import wandb
 
 logger = setup_logger(__name__)
 wandb_config = {'project': 'internalization',
-                'entity': 'assistance-llms', 
+                'entity': 'assistance-llms',
                 'notes': os.environ.get('SLURM_JOB_ID', 'local')}
-
 
 
 def train(raw_datasets, args):
@@ -62,9 +61,10 @@ def train(raw_datasets, args):
     # no need to init wandb in case of sweeps (otherwise an error will be raised),
     # trainer.hyperparameter_search inits wandb itself.
     if not training_args.do_sweeps:
-        group, exp_name = training_args.output_dir.replace('experiments/', '').split('/')
+        group, exp_name = training_args.output_dir.replace(
+            'experiments/', '').split('/')
         wandb.init(group=group, name=exp_name, **wandb_config)
-        
+
     # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
@@ -91,12 +91,15 @@ def train(raw_datasets, args):
     }
     if experiment_args.numeric_experiment:
         tokenizer = CharTokenizer(data_args.block_size)
-        tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
+        tokenizer = PreTrainedTokenizerFast(
+            tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
     else:
         if model_args.tokenizer_name:
-            tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name, **tokenizer_kwargs)
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_args.tokenizer_name, **tokenizer_kwargs)
         elif model_args.model_name_or_path:
-            tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, **tokenizer_kwargs)
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_args.model_name_or_path, **tokenizer_kwargs)
         else:
             raise ValueError(
                 "You are instantiating a new tokenizer from scratch. This is not supported by this script."
@@ -111,19 +114,22 @@ def train(raw_datasets, args):
     # But if we always pass vocab_size, some models won't work with their standard tokenizer (e.g. GPT NeoX / Pythia)
     if experiment_args.numeric_experiment:
         config_kwargs['vocab_size'] = tokenizer.vocab_size
-    
+
     if model_args.config_name:
-        config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
+        config = AutoConfig.from_pretrained(
+            model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
-        config = AutoConfig.from_pretrained(model_args.model_name_or_path, **config_kwargs)
+        config = AutoConfig.from_pretrained(
+            model_args.model_name_or_path, **config_kwargs)
     else:
         config = CONFIG_MAPPING[model_args.model_type]()
-        logger.warning("You are instantiating a new config instance from scratch.")
+        logger.warning(
+            "You are instantiating a new config instance from scratch.")
         if model_args.config_overrides is not None:
             logger.info(f"Overriding config: {model_args.config_overrides}")
             config.update_from_string(model_args.config_overrides)
             logger.info(f"New config: {config}")
-    
+
     def get_model():
         model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
         if model_args.model_name_or_path:
@@ -137,32 +143,37 @@ def train(raw_datasets, args):
             )
         else:
             model = model_class.from_config(config)
-            n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
-            logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
-            
+            n_params = sum(dict((p.data_ptr(), p.numel())
+                           for p in model.parameters()).values())
+            logger.info(
+                f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+
         embedding_size = model.get_input_embeddings().weight.shape[0]
         if len(tokenizer) > embedding_size:
-            logger.warning(f"Resizing token embeddings from {embedding_size} to {len(tokenizer)}")
-            model.resize_token_embeddings(len(tokenizer)) 
+            logger.warning(
+                f"Resizing token embeddings from {embedding_size} to {len(tokenizer)}")
+            model.resize_token_embeddings(len(tokenizer))
         return model
 
     model = get_model()
     # GPT2 tokenizer doesn't have a padding token
-    if tokenizer.pad_token is None:
-        tokenizer.pad_token = tokenizer.eos_token
-        
-    stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
+    #if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token  # for open ended generation
+    tokenizer.pad_token_id = tokenizer.eos_token_id
+
+    stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(
+        max_length=data_args.block_size + model_args.max_new_tokens)])
 
     # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
     # model.resize_token_embeddings(len(tokenizer))
-    
+
     # Preprocessing the datasets.
     # First we tokenize all the texts.
     column_names = raw_datasets["train"].column_names
     question_column_name = 'question'
     answer_column_name = 'answer'
     text_column_name = 'text'
-    
+
     def tokenize_function(examples, evaluate=False):
         """Tokenize batch of examples using tokenizer (global variable). CLM examples are tokenized with the right padding ('text' column)
         for training and the left padding ('text' column produces tokens for 'input_ids' and 'labels' used by Trainer and 
@@ -179,28 +190,32 @@ def train(raw_datasets, args):
         if model_args.seq2seq:
             tokenizer.padding_side = "right"
             tokens = tokenizer(examples[question_column_name], padding='max_length',
-                           truncation=True, max_length=data_args.block_size)
+                               truncation=True, max_length=data_args.block_size)
             labels = tokenizer(examples[answer_column_name], padding='max_length',
-                            truncation=True,  max_length=data_args.label_block_size)
+                               truncation=True, max_length=100)
             tokens['labels'] = labels['input_ids']
-            
+
             if evaluate:
                 tokens['answer'] = examples[answer_column_name]
         else:
-            tokenizer.padding_side = "right"
-            tokens = tokenizer(examples[text_column_name], padding='max_length', truncation=True, max_length=data_args.block_size)
-            tokens['labels'] = tokens["input_ids"]
-            
-            if evaluate:
+            if not evaluate:
+                tokenizer.padding_side = "right"
+                tokens = tokenizer(examples[text_column_name], padding='max_length',
+                                truncation=True, max_length=data_args.block_size)
+                tokens['labels'] = tokens["input_ids"]
+            else:
                 tokenizer.padding_side = "left"
-                tokens_eval = tokenizer(examples[question_column_name], padding='max_length',
-                           truncation=True, max_length=data_args.block_size)
-            
-                tokens['input_ids_eval'] = tokens_eval['input_ids']
-                tokens['answer'] = examples[answer_column_name]
+                tokens = tokenizer(examples[question_column_name], padding='max_length',
+                                        truncation=True, max_length=data_args.block_size)
+                
+                tokenizer.padding_side = "right"
+                labels = tokenizer(examples[answer_column_name], padding='max_length',
+                                   truncation=True,  max_length=100)
+
+                tokens['labels'] = labels['input_ids']
 
         return tokens
-            
+
     def generate_batch(examples, model=None):
         """Generate batch of predictions given a batch of examples.
 
@@ -216,7 +231,8 @@ def train(raw_datasets, args):
                 input_ids = examples['input_ids_eval']
             # generate predictions and remove them from gpu
             # outputs = model.greedy_search(input_ids=input_ids, stopping_criteria=stopping_criteria, pad_token_id=tokenizer.pad_token_id)
-            outputs = model.generate(input_ids=input_ids, temperature=0, max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
+            outputs = model.generate(input_ids=input_ids, temperature=0,
+                                     max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
             #del input_ids
             #del attn_masks
             # torch.cuda.empty_cache()
@@ -226,67 +242,75 @@ def train(raw_datasets, args):
         tokenized_datasets = DatasetDict()
         for dataset_name, dataset in raw_datasets.items():
             tokenized_datasets[dataset_name] = dataset.map(
-                lambda examples: tokenize_function(examples, evaluate=dataset_name != 'train'),
+                lambda examples: tokenize_function(
+                    examples, evaluate=dataset_name != 'train'),
                 batched=True,
                 num_proc=data_args.preprocessing_num_workers,
                 remove_columns=column_names,
             )
     lm_datasets = tokenized_datasets
-    
+
     # find how many non-pad tokens are in the longest datapoint
     max_tokens_per_datapoint = 0
     min_tokens_per_datapoint = data_args.block_size
     for key in lm_datasets:
         for i in range(len(lm_datasets[key])):
-            max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
-            min_tokens_per_datapoint = min(min_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
-    logger.info(f'max | min non-pad tokens per datapoint: {max_tokens_per_datapoint} | {min_tokens_per_datapoint}')
+            max_tokens_per_datapoint = max(
+                max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
+            min_tokens_per_datapoint = min(
+                min_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
+    logger.info(
+        f'max | min non-pad tokens per datapoint: {max_tokens_per_datapoint} | {min_tokens_per_datapoint}')
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
             raise ValueError("--do_train requires a train dataset")
         train_dataset = lm_datasets["train"]
         if data_args.max_train_samples is not None:
-            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
+            max_train_samples = min(
+                len(train_dataset), data_args.max_train_samples)
             train_dataset = train_dataset.select(range(max_train_samples))
-    
+
     # all other datasets are for evaluation
     eval_dataset_keys = [k for k in lm_datasets if k != 'train']
-    eval_dataset_tokenized = {key: lm_datasets[key] for key in eval_dataset_keys}
+    eval_dataset_tokenized = {
+        key: lm_datasets[key] for key in eval_dataset_keys}
     eval_dataset_raw = {key: raw_datasets[key] for key in eval_dataset_keys}
 
-    def preprocess_logits_for_metrics(logits, labels):
-        if isinstance(logits, tuple):
-            # Depending on the model and config, logits may contain extra tensors,
-            # like past_key_values, but logits always come first
-            logits = logits[0]
-        return logits.argmax(dim=-1)
-    
+    # def preprocess_logits_for_metrics(logits, labels):
+    #     if isinstance(logits, tuple):
+    #         # Depending on the model and config, logits may contain extra tensors,
+    #         # like past_key_values, but logits always come first
+    #         logits = logits[0]
+    #     return logits.argmax(dim=-1)
+
     def postprocess_clm_output(decoded_prediction):
         # TODO: make this more general
-        decoded_prediction = decoded_prediction[decoded_prediction.find('\nA: ') + 4:]
+        decoded_prediction = decoded_prediction[decoded_prediction.find(
+            '\nA: ') + 4:]
         decoded_prediction = decoded_prediction[:decoded_prediction.find('\n')]
         return decoded_prediction
-    
+
     def postprocess_seq2seq_output(decoded_prediction):
         return decoded_prediction.replace('\n', '')
-    
+
     metric_em = evaluate.load("exact_match")
     metric_acc = evaluate.load("accuracy")
     postprocess_output_fn = postprocess_seq2seq_output if model_args.seq2seq else postprocess_clm_output
-    
+
     def compute_metrics(eval_preds):
         metrics = dict()
         preds, labels = eval_preds
+        print(preds.shape, labels.shape)
         # preds have the same shape as the labels, after the argmax(-1) has been calculated
         # by preprocess_logits_for_metrics but we need to shift the labels
-        labels = labels[:, 1:].reshape(-1)
-        preds = preds[:, :-1].reshape(-1)
-        return metric_acc.compute(predictions=preds, references=labels)
-        # metrics.update(metric_acc.compute(predictions=preds, references=labels))
-        # metrics.update(metric_em.compute(predictions=preds, references=labels))
-        # return metrics
-    
+        labels = labels.reshape(-1)
+        preds = preds.reshape(-1)
+        #return metric_acc.compute(predictions=preds, references=labels)
+        metrics.update(metric_acc.compute(predictions=preds, references=labels))
+        #metrics.update(metric_em.compute(predictions=preds, references=labels))
+        return metrics
+
     def compute_objective(metrics: Dict[str, float]) -> float:
         """
         The default objective to maximize/minimize when doing an hyperparameter search. It is the evaluation loss if no
@@ -308,9 +332,10 @@ def train(raw_datasets, args):
         for sm in speed_metrics:
             _ = metrics.pop(sm, None)
         return loss if len(metrics) == 0 else sum(metrics.values())
-        
+
     # Data collator
-    label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
+    label_pad_token_id = - \
+        100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
 
     data_collator_seq2seq = DataCollatorForSeq2Seq(
         tokenizer,
@@ -319,8 +344,9 @@ def train(raw_datasets, args):
         pad_to_multiple_of=8 if training_args.fp16 else None,
     )
     # Initialize our Trainer
-    trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
-    trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
+    # trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
+    # trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
+    trainer_cls = Seq2SeqTrainer
     trainer = trainer_cls(
         model=model if not training_args.do_sweeps else None,
         model_init=get_model if training_args.do_sweeps else None,
@@ -331,32 +357,33 @@ def train(raw_datasets, args):
         # Data collator will default to DataCollatorWithPadding, so we change it.
         data_collator=default_data_collator if not model_args.seq2seq else data_collator_seq2seq,
         compute_metrics=compute_metrics if training_args.do_eval else None,
-        preprocess_logits_for_metrics=preprocess_logits_for_metrics
+        preprocess_logits_for_metrics=None
         if training_args.do_eval else None,
     )
-    
-    trainer.pop_callback(TensorBoardCallback)
-    if training_args.eval_callback_type == 'pipeline':
-        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=training_args.eval_each_epochs)
-    elif training_args.eval_callback_type == 'generate':
-        eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
-                                                   generate_batch,
-                                                   postprocess_output_fn=postprocess_output_fn,
-                                                   numeric_experiment=experiment_args.numeric_experiment,
-                                                   eval_each=training_args.eval_each_epochs)
-    
-    else:
-        raise ValueError('invalid eval_callback type.')    
-    
-    trainer.add_callback(eval_callback)
+
+    # trainer.pop_callback(TensorBoardCallback)
+    # if training_args.eval_callback_type == 'pipeline':
+    #     eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=training_args.eval_each_epochs)
+    # elif training_args.eval_callback_type == 'generate':
+    #     eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
+    #                                                generate_batch,
+    #                                                postprocess_output_fn=postprocess_output_fn,
+    #                                                numeric_experiment=experiment_args.numeric_experiment,
+    #                                                eval_each=training_args.eval_each_epochs)
+
+    # else:
+    #     raise ValueError('invalid eval_callback type.')
+
+    # trainer.add_callback(eval_callback)
     if training_args.save_each_epochs:
-        save_callback = CustomSaveCallback(save_each=training_args.save_each_epochs)
+        save_callback = CustomSaveCallback(
+            save_each=training_args.save_each_epochs)
         trainer.add_callback(save_callback)
-        
+
     if training_args.do_sweeps:
         logger.info('Starting training sweeps')
         best_run = trainer.hyperparameter_search(
-            direction="maximize", # sum eval metrics
+            direction="maximize",  # sum eval metrics
             backend="wandb",
             hp_space=lambda trial: args.sweep_arguments,
             name=training_args.output_dir,
@@ -369,13 +396,12 @@ def train(raw_datasets, args):
 
     # Training
     if training_args.do_train:
-        logger.info('Starting training')
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
-        
+
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
         if not training_args.dont_save_in_the_end:
@@ -384,7 +410,8 @@ def train(raw_datasets, args):
         metrics = train_result.metrics
 
         max_train_samples = (
-            data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
+            data_args.max_train_samples if data_args.max_train_samples is not None else len(
+                train_dataset)
         )
         metrics["train_samples"] = min(max_train_samples, len(train_dataset))
 
@@ -394,14 +421,15 @@ def train(raw_datasets, args):
 
         for k in eval_callback.em_score:
             metrics = {'EM {k}': eval_callback.em_score[k],
-                    'F1 {k}': eval_callback.f1_score[k],
-            }
+                       'F1 {k}': eval_callback.f1_score[k],
+                       }
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
-    
+
     wandb.finish()
-    
-    kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-generation"}
+
+    kwargs = {"finetuned_from": model_args.model_name_or_path,
+              "tasks": "text-generation"}
     if data_args.dataset_name is not None:
         kwargs["dataset_tags"] = data_args.dataset_name
         if data_args.dataset_config_name is not None:

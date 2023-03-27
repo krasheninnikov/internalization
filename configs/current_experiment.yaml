@@ -8,8 +8,8 @@ data_arguments:
 
 model_arguments:
   seq2seq: False
-  model_name_or_path: "EleutherAI/pythia-160m-deduped"
-  max_new_tokens: 20
+  model_name_or_path: "EleutherAI/pythia-19m-deduped"
+  max_new_tokens: 100
 
 
 training_arguments:
@@ -23,8 +23,10 @@ training_arguments:
   auto_find_batch_size: True
   save_strategy: "no"
   load_best_model_at_end: False
-  evaluation_strategy: 'epoch'
-
+  evaluation_strategy: 'steps'
+  eval_steps: 10
+  generation_max_length: 100
+  predict_with_generate: True
   do_train: True
   do_eval: True
   do_sweeps: False
