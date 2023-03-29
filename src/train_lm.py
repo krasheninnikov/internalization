@@ -7,6 +7,8 @@ import evaluate
 import torch
 import transformers
 from datasets import DatasetDict
+from typing import Dict
+from copy import deepcopy
 from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           AutoConfig, AutoModelForCausalLM,
                           AutoModelForSeq2SeqLM, AutoTokenizer,
@@ -20,9 +22,14 @@ from transformers.trainer_utils import get_last_checkpoint
 from src.callbacks import CustomSaveCallback, EvaluationCallbackGenerate, EvaluationCallbackPipeline
 from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler
 from utils.logger import setup_logger
+import wandb
 
 
 logger = setup_logger(__name__)
+wandb_config = {'project': 'internalization',
+                'entity': 'assistance-llms', 
+                'notes': os.environ.get('SLURM_JOB_ID', 'local')}
+
 
 
 def train(raw_datasets, args):
@@ -30,6 +37,7 @@ def train(raw_datasets, args):
     model_args = args.model_arguments
     data_args = args.data_arguments
     experiment_args = args.experiment_arguments
+
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -50,6 +58,13 @@ def train(raw_datasets, args):
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
     )
     logger.info(f"Training/evaluation parameters {training_args}")
+
+    # no need to init wandb in case of sweeps (otherwise an error will be raised),
+    # trainer.hyperparameter_search inits wandb itself.
+    if not training_args.do_sweeps:
+        group, exp_name = training_args.output_dir.replace('experiments/', '').split('/')
+        wandb.init(group=group, name=exp_name, **wandb_config)
+        
     # Detecting last checkpoint.
     last_checkpoint = None
     if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
@@ -96,6 +111,7 @@ def train(raw_datasets, args):
     # But if we always pass vocab_size, some models won't work with their standard tokenizer (e.g. GPT NeoX / Pythia)
     if experiment_args.numeric_experiment:
         config_kwargs['vocab_size'] = tokenizer.vocab_size
+    
     if model_args.config_name:
         config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
@@ -108,30 +124,35 @@ def train(raw_datasets, args):
             config.update_from_string(model_args.config_overrides)
             logger.info(f"New config: {config}")
     
-    model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
-    if model_args.model_name_or_path:
-        model = model_class.from_pretrained(
-            model_args.model_name_or_path,
-            from_tf=bool(".ckpt" in model_args.model_name_or_path),
-            config=config,
-            cache_dir=model_args.cache_dir,
-            revision=model_args.model_revision,
-            use_auth_token=True if model_args.use_auth_token else None,
-        )
-    else:
-        model = model_class.from_config(config)
-        n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
-        logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+    def get_model():
+        model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
+        if model_args.model_name_or_path:
+            model = model_class.from_pretrained(
+                model_args.model_name_or_path,
+                from_tf=bool(".ckpt" in model_args.model_name_or_path),
+                config=config,
+                cache_dir=model_args.cache_dir,
+                revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+            )
+        else:
+            model = model_class.from_config(config)
+            n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
+            logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+            
+        embedding_size = model.get_input_embeddings().weight.shape[0]
+        if len(tokenizer) > embedding_size:
+            logger.warning(f"Resizing token embeddings from {embedding_size} to {len(tokenizer)}")
+            model.resize_token_embeddings(len(tokenizer)) 
+        return model
 
+    model = get_model()
     # GPT2 tokenizer doesn't have a padding token
-    # TODO: seems that pythia model doesn't have neither pad_token nor eos_token.
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+        
     stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
 
-    embedding_size = model.get_input_embeddings().weight.shape[0]
-    if len(tokenizer) > embedding_size:
-        model.resize_token_embeddings(len(tokenizer))
     # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
     # model.resize_token_embeddings(len(tokenizer))
     
@@ -180,7 +201,7 @@ def train(raw_datasets, args):
 
         return tokens
             
-    def generate_batch(examples):
+    def generate_batch(examples, model=None):
         """Generate batch of predictions given a batch of examples.
 
         Args:
@@ -250,17 +271,43 @@ def train(raw_datasets, args):
     def postprocess_seq2seq_output(decoded_prediction):
         return decoded_prediction.replace('\n', '')
     
-    #metric = evaluate.load("exact_match")
-    metric = evaluate.load("accuracy")
+    metric_em = evaluate.load("exact_match")
+    metric_acc = evaluate.load("accuracy")
     postprocess_output_fn = postprocess_seq2seq_output if model_args.seq2seq else postprocess_clm_output
     
     def compute_metrics(eval_preds):
+        metrics = dict()
         preds, labels = eval_preds
         # preds have the same shape as the labels, after the argmax(-1) has been calculated
         # by preprocess_logits_for_metrics but we need to shift the labels
         labels = labels[:, 1:].reshape(-1)
         preds = preds[:, :-1].reshape(-1)
-        return metric.compute(predictions=preds, references=labels)
+        return metric_acc.compute(predictions=preds, references=labels)
+        # metrics.update(metric_acc.compute(predictions=preds, references=labels))
+        # metrics.update(metric_em.compute(predictions=preds, references=labels))
+        # return metrics
+    
+    def compute_objective(metrics: Dict[str, float]) -> float:
+        """
+        The default objective to maximize/minimize when doing an hyperparameter search. It is the evaluation loss if no
+        metrics are provided to the [`Trainer`], the sum of all metrics otherwise.
+        Args:
+            metrics (`Dict[str, float]`): The metrics returned by the evaluate method.
+        Return:
+            `float`: The objective to minimize or maximize
+        """
+        metrics = deepcopy(metrics)
+        loss = metrics.pop("eval/d1consis_loss", None)
+        _ = metrics.pop("epoch", None)
+        # Remove speed metrics
+        speed_metrics = [
+            m
+            for m in metrics.keys()
+            if m.endswith("_runtime") or m.endswith("_per_second") or m.endswith("_compilation_time")
+        ]
+        for sm in speed_metrics:
+            _ = metrics.pop(sm, None)
+        return loss if len(metrics) == 0 else sum(metrics.values())
         
     # Data collator
     label_pad_token_id = -100 if data_args.ignore_pad_token_for_loss else tokenizer.pad_token_id
@@ -275,7 +322,8 @@ def train(raw_datasets, args):
     trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
     trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
     trainer = trainer_cls(
-        model=model,
+        model=model if not training_args.do_sweeps else None,
+        model_init=get_model if training_args.do_sweeps else None,
         args=training_args,
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset_tokenized if training_args.do_eval else None,
@@ -288,33 +336,49 @@ def train(raw_datasets, args):
     )
     
     trainer.pop_callback(TensorBoardCallback)
-    if experiment_args.eval_callback_type == 'pipeline':
-        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=experiment_args.eval_each_epochs)
-    elif experiment_args.eval_callback_type == 'generate':
+    if training_args.eval_callback_type == 'pipeline':
+        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=training_args.eval_each_epochs)
+    elif training_args.eval_callback_type == 'generate':
         eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
                                                    generate_batch,
                                                    postprocess_output_fn=postprocess_output_fn,
                                                    numeric_experiment=experiment_args.numeric_experiment,
-                                                   eval_each=experiment_args.eval_each_epochs)
+                                                   eval_each=training_args.eval_each_epochs)
     
     else:
         raise ValueError('invalid eval_callback type.')    
     
     trainer.add_callback(eval_callback)
-    if experiment_args.save_each_epochs:
-        save_callback = CustomSaveCallback(save_each=experiment_args.save_each_epochs)
+    if training_args.save_each_epochs:
+        save_callback = CustomSaveCallback(save_each=training_args.save_each_epochs)
         trainer.add_callback(save_callback)
+        
+    if training_args.do_sweeps:
+        logger.info('Starting training sweeps')
+        best_run = trainer.hyperparameter_search(
+            direction="maximize", # sum eval metrics
+            backend="wandb",
+            hp_space=lambda trial: args.sweep_arguments,
+            name=training_args.output_dir,
+            n_trials=training_args.n_sweeps,
+            save_metrics=True,
+            compute_objective=compute_objective,
+            **wandb_config
+        )
+        logger.info(best_run)
 
     # Training
     if training_args.do_train:
+        logger.info('Starting training')
         checkpoint = None
         if training_args.resume_from_checkpoint is not None:
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
-        train_result = trainer.train(resume_from_checkpoint=checkpoint)
         
-        if not data_args.dont_save_in_the_end:
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+
+        if not training_args.dont_save_in_the_end:
             trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
@@ -330,11 +394,13 @@ def train(raw_datasets, args):
 
         for k in eval_callback.em_score:
             metrics = {'EM {k}': eval_callback.em_score[k],
-                       'F1 {k}': eval_callback.f1_score[k],
+                    'F1 {k}': eval_callback.f1_score[k],
             }
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
-
+    
+    wandb.finish()
+    
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-generation"}
     if data_args.dataset_name is not None:
         kwargs["dataset_tags"] = data_args.dataset_name

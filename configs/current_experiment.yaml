@@ -3,21 +3,20 @@ data_arguments:
   block_size: 48
   label_block_size: 8
   train_subset: 'full'
+  num_ents: 4000
 
 
 model_arguments:
   seq2seq: False
-  # model_name_or_path: "EleutherAI/pythia-410m-deduped"
   model_name_or_path: "EleutherAI/pythia-160m-deduped"
+  max_new_tokens: 20
 
 
 training_arguments:
   output_dir: 'experiments/temp'
-  bf16: True
-  do_train: True
-  do_eval: True
-  per_device_train_batch_size: 128
-  per_device_eval_batch_size: 128
+  fp16: True
+  per_device_train_batch_size: 32
+  per_device_eval_batch_size: 32
   num_train_epochs: 10
   optim: "adafactor"
   overwrite_output_dir: True
@@ -26,23 +25,25 @@ training_arguments:
   load_best_model_at_end: False
   evaluation_strategy: 'epoch'
 
+  do_train: True
+  do_eval: True
+  do_sweeps: False
+  n_sweeps: 5
+  save_each_epochs: 0
+  eval_each_epochs: 1
+  eval_callback_type: "pipeline"  # pipeline or generate (generate is used for seq2seq)
+
 
 experiment_arguments: # common experiment arguments
   define_experiment: True
   numeric_experiment: False
 
   n_stages: 2
-  num_ents: 4000 # TODO move to data_arguments
-
   n_seeds: 1
-  n_seeds_stage2: 5
-  start_seed: 600
+  n_seeds_stage2: 2
+  start_seed: 601
   slurm: False
 
-  save_each_epochs: 2  # not logical to have it in data_arguments, maybe create a class from TrainingArguments with few more params
-  eval_each_epochs: 1
-  eval_callback_type: "pipeline"  # pipeline or generate
-  
 
 define_experiment_arguments:
   def_order: "tve"
@@ -59,15 +60,27 @@ numeric_experiment_arguments:
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 4
+  num_train_epochs: 10
   gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'
-  num_train_epochs: 1
-  gradient_accumulation_steps: 64
+  num_train_epochs: 5
+  gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0
 
-third_stage_arguments: # placeholder, use a separate config for 3-stage experiments
-  num_train_epochs: 1
+sweep_arguments:
+  method: 'random'
+  metric:
+    name: 'eval_accuracy' # doesn't really matter, this parameter is further defined by compute objective trainer.hyp_search
+    goal: 'maximize'
+  parameters:
+    optim:
+      values: ['adamw_hf', 'adafactor', 'sgd']
+    per_device_train_batch_size:
+      values: [32, 64, 128, 256, 512]
+    learning_rate:
+      distribution: 'log_uniform_values'
+      min: 0.00001
+      max: 0.001

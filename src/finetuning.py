@@ -10,7 +10,6 @@ from abc import ABC, abstractmethod
 import shutil
 
 
-os.environ["WANDB_DISABLED"] = "true"
 logger = setup_logger(__name__)
 
 
@@ -93,7 +92,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         if checkpoins_names:
             logger.info('Starting training second stage from checkpoints...')
             for i, checkpoint_name in enumerate(sorted(checkpoins_names)):
-                cpt_num = (i + 1) * args_stage1.experiment_arguments.save_each_epochs
+                cpt_num = (i + 1) * args_stage1.training_arguments.save_each_epochs
                 set_new_output_dir(args_stage2, f"{self.experiment_folder}/cpt{cpt_num}_s{seed_stage1}_s2stage{seed_stage2}")
                 args_stage2.model_arguments.model_name_or_path = f'{args_stage1.training_arguments.output_dir}/{checkpoint_name}'
 
@@ -120,7 +119,6 @@ class TwoStageFineTuning(FineTuningPipeline):
         logger.info('Finished fine-tuning.')
         
 
-# POTENTIAL ISSUES WITH DELETING CHECKPOINTS
 class ThreeStageFineTuning(TwoStageFineTuning):
     def __init__(self, config: Config = None, config_name: str = 'three_stage_experiment.yaml'):
         super().__init__(config, config_name)
@@ -137,7 +135,7 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         args_stage2.training_arguments.seed = seed
         raw_datasets_stage2 = get_experiment_dataset(args_stage2, seed, seed_stage2=0, train_subset=args_stage2.data_arguments.train_subset)
         
-        set_new_output_dir(args_stage2, f'experiments/{self.experiment_folder}/second_stage_s{args_stage2.training_arguments.seed}')
+        set_new_output_dir(args_stage2, f'{self.experiment_folder}/second_stage_s{args_stage2.training_arguments.seed}')
         args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
         train_lm(raw_datasets_stage2, args_stage2)
@@ -151,7 +149,7 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         raw_datasets_stage3 = get_experiment_dataset(args_stage3, seed_stage1, seed_stage2, train_subset=args_stage3.data_arguments.train_subset)
         
         # TODO potentially iterate over checkpoints of stage2
-        set_new_output_dir(args_stage3, f'experiments/{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
+        set_new_output_dir(args_stage3, f'{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
         args_stage3.model_arguments.model_name_or_path = args_stage2.training_arguments.output_dir
 
         train_lm(raw_datasets_stage3, args_stage3)
@@ -199,7 +197,7 @@ def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=No
     model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
 
     return (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
-            f'Defs_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
+            f'Defs_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
             f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
 
 
@@ -210,7 +208,7 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
     numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
     
     return (f'{numeric_data_source}'
-            f'_nEnts{args.experiment_arguments.num_ents}_eps{epochs_str}'
+            f'_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
             f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
 
 

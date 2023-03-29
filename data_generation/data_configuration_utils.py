@@ -15,7 +15,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
                                                  frac_n_no_qd_baseline=0.1,
                                                  frac_n_q_no_replacement_baseline=0.1,
                                                  dataset_name=args.data_arguments.dataset,
-                                                 num_ents=args.experiment_arguments.num_ents,
+                                                 num_ents=args.data_arguments.num_ents,
                                                  def_order=args.define_experiment_arguments.def_order,
                                                  seed=seed_stage1,
                                                  seed_stage2=seed_stage2,
@@ -30,7 +30,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
                                                  frac_n_no_qd_baseline=0.1,
                                                  frac_n_q_no_replacement_baseline=0.25,
                                                  dataset_name=args.data_arguments.dataset,
-                                                 num_ents=args.experiment_arguments.num_ents,
+                                                 num_ents=args.data_arguments.num_ents,
                                                  def_order=args.define_experiment.def_order,
                                                  seed=seed_stage1,
                                                  seed_stage2=seed_stage2,
@@ -40,7 +40,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
                                                  seed_stage2=seed_stage2,
                                                  dataset_name=args.data_arguments.dataset,
                                                  train_subset=train_subset,
-                                                 num_ents=args.experiment_arguments.num_ents,
+                                                 num_ents=args.data_arguments.num_ents,
                                                  def_order=args.define_experiment_arguments.def_order)
             
     elif args.experiment_arguments.numeric_experiment:

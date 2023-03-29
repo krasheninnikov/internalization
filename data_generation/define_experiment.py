@@ -2,17 +2,19 @@ import os
 import random
 import string
 from collections import OrderedDict, defaultdict
-from functools import partial
 from typing import Dict, List, Union
 
-from datasets import Dataset, DatasetDict
+from cachetools import TTLCache, cached
 from sklearn.model_selection import train_test_split
+
 from data_generation.cvdb_data import load_archival_qa_data, load_cvdb_data
 from data_generation.data_objects import *
 from data_generation.squad_data import load_train_and_eval_data_squad
 from data_generation.trex_data import make_trex_qa_dataset
+from datasets import Dataset, DatasetDict
 from utils.logger import setup_logger
 
+cache = TTLCache(maxsize=10, ttl=7200)
 logger = setup_logger(__name__)
 
 
@@ -162,19 +164,17 @@ def get_questions_dataset(seed,
     qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'])
 
     # for other subsets, split QA pairs into train and test sets
-    qa_train_sets = {}
-    qa_train = []
-    
-    train_test_split_fn = partial(train_test_split, test_size=test_frac, shuffle=True, random_state=seed)
-    
+    qa_train_sets = {}        
     for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
         qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
         if len(qa_subsets[subset_name]):
-            # TODO: is the stratification correct? (probably yes)
             strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
-            qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split_fn(qa_subsets[subset_name],
-                                                                                        stratify=strat_entities)
-            qa_train += qa_train_sets[subset_name]
+            qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split(qa_subsets[subset_name],
+                                                                                     stratify=strat_entities,
+                                                                                     test_size=test_frac, 
+                                                                                     shuffle=True, 
+                                                                                     random_state=seed)
+    qa_train =  [item for key in sorted(qa_train_sets.keys()) for item in qa_train_sets[key]]  # concat train QAPair lists
 
     tag1, tag2 = generate_variable_names(n=2, length=define_tag_length, rng=rng) # define tags
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
@@ -285,8 +285,8 @@ def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Dict[st
     return ent_subsets
 
 
-# TODO: move this func to utils?
-def load_qa_dataset(dataset_name, mode='dev', **kwargs):
+# @cached(cache) # TODO using cache here makes us fail the determinism test???
+def load_qa_dataset(dataset_name, mode='dev', **kwargs): # TODO: maybe move this func to utils?
     mode = os.getenv("MODE", mode)
     logger.info(f'loading {dataset_name} data in {mode} mode')
     
