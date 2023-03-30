@@ -73,85 +73,68 @@ def ttest_res_dict(res_dict, var1, var2):
                                 alternative='greater')
 
 
-def make_experiment_plot(exp_name, stage1_base_path, stage2_base_path, thruncate_stage1_after_epoch=None,
+def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None,
                          tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None):
-    # experiment_name – name not including seed
+    """
+    exp_name - name of the experiment (top level folder name)
+    stage_paths - list of strings that are the starts to paths to stages, 
+    e.g. ['first_stage', 'second_stage', 's']
+    thruncate_stages_after_epoch - list of ints, how many epochs to thruncate each stage after. Use -1 to not thruncate
+    """
+    assert len(stage_paths) == len(thruncate_stages_after_epoch), 'stage_paths and thruncate_stages_after_epoch must be of the same length'
     exp_folder = f'experiments/{exp_name}'
     if os_list is None:
         os_list = os.listdir(exp_folder)
-    stage1_exp_names = [x for x in os_list if x.startswith(stage1_base_path)]
-    print(f'Retrieving from {len(stage1_exp_names)} experiments')
-    dfs = []
-    unique_tags = set()
-    for experiment_name in stage1_exp_names:
-        logdir = os.path.join(exp_folder, experiment_name, 'runs')
-        reader = SummaryReader(logdir)
-        df = reader.scalars
-        if not df.empty:
-            unique_tags = unique_tags | set(df.tag.unique())
-            # filter only relevant data
-            df = df[df.tag.isin(tags)]
-            dfs.append(df)
+        
+    dfs_all_stages = []
+    maxstep = 0
+    for stage_path, thruncate_after_epoch in zip(stage_paths, thruncate_stages_after_epoch):
+        curr_stage_exp_names = [x for x in os_list if x.startswith(stage_path)]
+        # curr_stage_exp_names = [x for x in curr_stage_exp_names if 's2stage0' in x]
 
-    print(f'Succesfully retrieved from {len(dfs)} experiments (first stage)')
-    df_first_stage = pd.concat(dfs, axis=0)
-
-    if thruncate_stage1_after_epoch is not None:
-        # thruncate after epoch
-        step_to_thruncate_after = sorted(df_first_stage.step.unique())[
-            thruncate_stage1_after_epoch-1]
-        df_first_stage = df_first_stage[df_first_stage.step <=
-                                        step_to_thruncate_after]
-
-    # print(f'List of unique tags: {unique_tags}')
-
-    # try to fetch second stage 1-epoch results
-    # experiment_names_second_stage = [name.replace('_first_stage', '') for name in experiment_names]
-    stage2_exp_names = [x for x in os_list if x.startswith(stage2_base_path)]
-    print(f'Retrieving {len(stage2_exp_names)} experiments (second stage)')
-    maxstep = df_first_stage.step.max()
-
-    dfs = []
-    unique_tags = set()
-    for experiment_name in stage2_exp_names:
-        logdir = os.path.join(exp_folder, experiment_name, 'runs')
-        try:
+        print(f'Retrieving from {len(curr_stage_exp_names)} experiments')
+        dfs = []
+        unique_tags = set()
+        for experiment_name in curr_stage_exp_names:
+            logdir = os.path.join(exp_folder, experiment_name, 'runs')
             reader = SummaryReader(logdir)
-        except ValueError:
-            # directory not found
-            continue
+            df = reader.scalars
+            if not df.empty:
+                unique_tags = unique_tags | set(df.tag.unique())
+                # filter only relevant data
+                df = df[df.tag.isin(tags)]
+                dfs.append(df)
 
-        df = reader.scalars
-        if not df.empty:
-            unique_tags = unique_tags | set(df.tag.unique())
-            # filter only relevant data
-            df = df[df.tag.isin(tags)]
-            dfs.append(df)
+        print(f'Succesfully retrieved from {len(dfs)} experiments')
+        df_curr_stage = pd.concat(dfs, axis=0)
 
-    print(f'Succesfully retrieved from {len(dfs)} experiments (second stage)')
-    df_second_stage = pd.concat(dfs, axis=0)
-    n_epochs_stage2 = len(df_second_stage.step.unique())
-
-    df_second_stage['step'] += maxstep
-    df = pd.concat([df_first_stage, df_second_stage], axis=0)
+        if thruncate_after_epoch != -1:
+            # thruncate after epoch
+            step_to_thruncate_after = sorted(df_curr_stage.step.unique())[thruncate_after_epoch-1]
+            df_curr_stage = df_curr_stage[df_curr_stage.step <= step_to_thruncate_after]
+            
+        df_curr_stage['step'] += maxstep
+        maxstep = df_curr_stage.step.max()
+        dfs_all_stages.append(df_curr_stage)
+                          
+    df = pd.concat(dfs_all_stages, axis=0)
     df['tag'] = df['tag'].str.replace('eval/', '')
     tags = [x.replace('eval/', '') for x in tags]
     step_to_epoch = {step: epoch + 1 for epoch, step in enumerate(sorted(df.step.unique()))}
     df['epoch'] = df['step'].map(step_to_epoch)
 
-    # print(df_first_stage)
     fig, ax = plt.subplots(figsize=(15,5))
     g = sns.pointplot(ax = ax,
                       data=df,
                       x = 'epoch',
                       y = 'value', hue='tag', hue_order=tags)#capsize=.1, errwidth=.9,)
 
-
-    #plt.plot(df_second_stage['step'], df_second_stage['value'], label=df_second_stage.tag)
-    #df_second_stage.groupby('tag').plot(ax=ax, x = 'step', y='value', )
-    #sns.pointplot(ax=ax, data=df_second_stage, x='step', y='value',)
-    #plt.axhline(y=df_second_stage['eval/d2consis_EM'].iloc[0], color='orange', label='eval/d2consis')
-    g.axvline(x=g.get_xticks()[-n_epochs_stage2-1], color='black', linestyle='--')
+    n_epochs_per_stage = [len(df.step.unique()) for df in dfs_all_stages]
+    if len(n_epochs_per_stage)>1:
+        curr_stage_end_epoch = 0
+        for n_epochs in n_epochs_per_stage[:-1]:
+            g.axvline(x=g.get_xticks()[curr_stage_end_epoch + n_epochs - 1], color='black', linestyle='--')
+            curr_stage_end_epoch += n_epochs
 
     plt.show()
     return df
