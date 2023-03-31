@@ -17,7 +17,7 @@ training_arguments:
   bf16: True
   per_device_train_batch_size: 32
   per_device_eval_batch_size: 32
-  num_train_epochs: 10
+  num_train_epochs: 20
   optim: "adafactor"
   overwrite_output_dir: True
   auto_find_batch_size: True
@@ -37,7 +37,7 @@ training_arguments:
 experiment_arguments: # common experiment arguments
   define_experiment: True
   numeric_experiment: False
-
+  name_prefix: "bs512"
   n_stages: 2
   n_seeds: 3
   n_seeds_stage2: 5
@@ -61,11 +61,11 @@ numeric_experiment_arguments:
 first_stage_arguments:
   train_subset: 'stage1'
   num_train_epochs: 20
-  gradient_accumulation_steps: 1
+  gradient_accumulation_steps: 16
 
 second_stage_arguments:
   train_subset: 'stage2'
   num_train_epochs: 10
-  gradient_accumulation_steps: 1
+  gradient_accumulation_steps: 16
   dont_save_in_the_end: True
   save_each_epochs: 0

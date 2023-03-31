@@ -252,6 +252,9 @@ class CommonExperimentArguments:
     slurm: Optional[bool] = field(
         default=False, metadata={"help": "Whether to run the experiment on a slurm cluster."}
     )
+    name_prefix: Optional[str] = field(
+        default='', metadata={"help": "Prefix to add to experiment name."}
+    )
 
 
 @dataclass
