@@ -1,6 +1,7 @@
 import json
 import os
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -74,7 +75,7 @@ def ttest_res_dict(res_dict, var1, var2):
 
 
 def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None,
-                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None):
+                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', figsize=(8,4)):
     """
     exp_name - name of the experiment (top level folder name)
     stage_paths - list of strings that are the starts to paths to stages, 
@@ -118,22 +119,32 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
         dfs_all_stages.append(df_curr_stage)
                           
     df = pd.concat(dfs_all_stages, axis=0)
-    df['tag'] = df['tag'].str.replace('eval/', '')
-    tags = [x.replace('eval/', '') for x in tags]
+    df['tag'] = df['tag'].apply(lambda x: x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', ''))
+    tags = [x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', '') for x in tags]
     step_to_epoch = {step: epoch + 1 for epoch, step in enumerate(sorted(df.step.unique()))}
     df['epoch'] = df['step'].map(step_to_epoch)
 
-    fig, ax = plt.subplots(figsize=(15,5))
-    g = sns.pointplot(ax = ax,
-                      data=df,
-                      x = 'epoch',
-                      y = 'value', hue='tag', hue_order=tags)#capsize=.1, errwidth=.9,)
-
+    # TODO consider splitting this into a data gathering function and a plotting function
+    matplotlib.rcParams['font.family'] = 'Times New Roman'
+    fig, ax = plt.subplots(figsize=figsize)
+    ax1 = sns.pointplot(ax = ax,
+                        data=df,
+                        x = 'epoch',
+                        y = 'value', 
+                        hue='tag', hue_order=tags)#capsize=.1, errwidth=.9,)
+    ax1.set(xlabel='Epoch', ylabel=ylabel)
     n_epochs_per_stage = [len(df.step.unique()) for df in dfs_all_stages]
     if len(n_epochs_per_stage)>1:
         curr_stage_end_epoch = 0
-        for n_epochs in n_epochs_per_stage[:-1]:
-            g.axvline(x=g.get_xticks()[curr_stage_end_epoch + n_epochs - 1], color='black', linestyle='--')
+        for i, n_epochs in enumerate(n_epochs_per_stage):
+            if i != len(n_epochs_per_stage) - 1: # no dashed line after last stage
+                ax1.axvline(x=ax1.get_xticks()[curr_stage_end_epoch + n_epochs - 1], color='black', linestyle='--')
+            
+            # add text indicating stage number if there is more than 1 stage
+            loc = curr_stage_end_epoch + n_epochs // 2 - 1
+            y_pos = ax1.get_ylim()[1] #+ (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * .05
+            ax1.text(loc, y_pos, f'Stage {i+1}', ha='center', va='bottom', fontsize=10)
+            
             curr_stage_end_epoch += n_epochs
 
     plt.show()
