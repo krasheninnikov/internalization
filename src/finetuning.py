@@ -196,11 +196,13 @@ def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=No
     epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
     model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
 
-    return (f'{args.experiment_arguments.name_prefix}_'
-            f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
-            f'Defs_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
-            f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
-
+    experiment_name = (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
+                       f'Defs_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
+                       f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
+    
+    if args.experiment_arguments.name_prefix:
+        experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
+    return experiment_name
 
 def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
     epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
@@ -208,10 +210,12 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
     # TODO: separate for modular base?
     numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
     
-    return (f'{args.experiment_arguments.name_prefix}_'
-            f'{numeric_data_source}'
-            f'_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
-            f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
+    experiment_name = (f'{numeric_data_source}'
+                       f'_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
+                       f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
+    if args.experiment_arguments.name_prefix:
+        experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
+    return experiment_name
 
 
 def setup_pipeline(config_name: str) -> FineTuningPipeline:
