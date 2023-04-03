@@ -8,6 +8,9 @@ import pandas as pd
 import seaborn as sns
 from scipy.stats import ttest_ind_from_stats
 from tbparse import SummaryReader
+from matplotlib import rc
+rc('text', usetex=True)
+rc('text.latex', preamble=r'\usepackage{color}')
 
 
 def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None, os_list=None, metric='EM'):
@@ -74,6 +77,18 @@ def ttest_res_dict(res_dict, var1, var2):
                                 alternative='greater')
 
 
+def prettify_labels(labels_list, labels_mapping=None):
+    if labels_mapping is None:
+        labels_mapping = {'d1consis': r'${{QA}^-, {D}_{1,consis}^+}$',
+                          'd2consis': r'${{QA}^-, {D}_{2,consis}^+}$',
+                          'qd2inconsis': r'{{QA}^+, {D}_{{2,incons}}^+}$',
+                          }
+        
+    return [labels_mapping.get(label, label) for label in labels_list]
+    
+    
+
+
 def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None,
                          tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', figsize=(8,4)):
     """
@@ -82,6 +97,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     e.g. ['first_stage', 'second_stage', 's']
     thruncate_stages_after_epoch - list of ints, how many epochs to thruncate each stage after. Use -1 to not thruncate
     """
+    
     assert len(stage_paths) == len(thruncate_stages_after_epoch), 'stage_paths and thruncate_stages_after_epoch must be of the same length'
     exp_folder = f'experiments/{exp_name}'
     if os_list is None:
@@ -123,9 +139,11 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     tags = [x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', '') for x in tags]
     step_to_epoch = {step: epoch + 1 for epoch, step in enumerate(sorted(df.step.unique()))}
     df['epoch'] = df['step'].map(step_to_epoch)
+    tags = prettify_labels(tags)
 
     # TODO consider splitting this into a data gathering function and a plotting function
     matplotlib.rcParams['font.family'] = 'Times New Roman'
+
     fig, ax = plt.subplots(figsize=figsize)
     ax1 = sns.pointplot(ax = ax,
                         data=df,
@@ -134,7 +152,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         hue='tag', hue_order=tags)#capsize=.1, errwidth=.9,)
     ax1.set(xlabel='Epoch', ylabel=ylabel)
     n_epochs_per_stage = [len(df.step.unique()) for df in dfs_all_stages]
-    if len(n_epochs_per_stage)>1:
+    if len(n_epochs_per_stage) > 1:
         curr_stage_end_epoch = 0
         for i, n_epochs in enumerate(n_epochs_per_stage):
             if i != len(n_epochs_per_stage) - 1: # no dashed line after last stage
@@ -143,7 +161,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             # add text indicating stage number if there is more than 1 stage
             loc = curr_stage_end_epoch + n_epochs // 2 - 1
             y_pos = ax1.get_ylim()[1] #+ (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * .05
-            ax1.text(loc, y_pos, f'Stage {i+1}', ha='center', va='bottom', fontsize=10)
+            ax1.text(loc, y_pos, rf'Stage ${i+1} f(x)$', ha='center', va='bottom', fontsize=10)
             
             curr_stage_end_epoch += n_epochs
 
