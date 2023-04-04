@@ -3,6 +3,7 @@ import random
 import string
 from collections import OrderedDict, defaultdict
 from typing import Dict, List, Union
+from copy import deepcopy
 
 from cachetools import TTLCache, cached
 from sklearn.model_selection import train_test_split
@@ -58,7 +59,7 @@ def swap_variables_in_qa(qa_pairs: List[QAPair]) -> List[QAPair]:
     # group qa tuples by variable
     var_to_qa_dict = defaultdict(list)
     for qa_pair in qa_pairs:
-        var_to_qa_dict[qa_pair.question.variable].append(qa_pair)
+        var_to_qa_dict[qa_pair.question.variable].append(deepcopy(qa_pair))
 
     vars = sorted(list(var_to_qa_dict.keys()))
     result_qa_pairs = []
