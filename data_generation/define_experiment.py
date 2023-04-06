@@ -81,6 +81,7 @@ def get_questions_dataset(seed,
                           test_frac=None,
                           frac_n_q_no_replacement_baseline=0.1,
                           frac_n_qd1consis=0.25,
+                          frac_n_qd1incons=0.0,
                           frac_n_qd2incons=0.25,
                           frac_n_q=0.1,
                           frac_n_d1consis=0.1,
@@ -90,7 +91,7 @@ def get_questions_dataset(seed,
                           num_ents=4000, # param for cvdb and t-rex datasets
                           train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
                           entity_association_test_sets=False,
-                          frac_defns_qd2incons_to_swap=1.0,
+                          frac_defns_qd2incons_to_swap=1.0, # TODO consider implementing this via frac_n_qd2consis
                           def_order='tve',  # Tag, Variable, Entity
                           ents_list=None,
                           ents_to_vars=None,
@@ -132,6 +133,7 @@ def get_questions_dataset(seed,
     # split entities into subsets in two stages based on the two seed values
     fracs_dict = {'q_no_replacement_baseline': frac_n_q_no_replacement_baseline,
                   'qd1consis': frac_n_qd1consis,
+                  'qd1incons': frac_n_qd1incons,
                   'qd2incons': frac_n_qd2incons,
                   'q': frac_n_q,
                   'stage2_combined': frac_n_d1consis + frac_n_d2consis + frac_n_no_qd_baseline}
@@ -166,7 +168,7 @@ def get_questions_dataset(seed,
 
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets = {}        
-    for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
+    for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2incons', 'q']:
         qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
         if len(qa_subsets[subset_name]):
             strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
@@ -180,13 +182,16 @@ def get_questions_dataset(seed,
     tag1, tag2 = generate_variable_names(n=2, length=define_tag_length, rng=rng) # define tags
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     
+    # swap ent -> var within each of the two entity subsets
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, frac_defns_qd2incons_to_swap, rng, 
                                                             ents_to_swap=ent_subsets['qd2incons'])
+    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars_maybe_swapped, 1.0, rng, 
+                                                            ents_to_swap=ent_subsets['qd1incons'])
     
     defns_tag1 = {subset_name: [Definition(tag1, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items()
                                 if ent in ent_subsets[subset_name]]
-                  for subset_name in ['qd1consis', 'd1consis']}
+                  for subset_name in ['qd1consis', 'qd1incons', 'd1consis']}
     
     defns_tag2 = {subset_name: [Definition(tag2, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items() 

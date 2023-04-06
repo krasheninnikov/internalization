@@ -88,8 +88,7 @@ def prettify_labels(labels_list, labels_mapping=None):
     
     
 
-
-def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None,
+def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None, eval_each_epochs=1, # TODO load eval_each_epochs from config
                          tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', figsize=(8,4)):
     """
     exp_name - name of the experiment (top level folder name)
@@ -127,7 +126,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
 
         if thruncate_after_epoch != -1:
             # thruncate after epoch
-            step_to_thruncate_after = sorted(df_curr_stage.step.unique())[thruncate_after_epoch-1]
+            step_to_thruncate_after = sorted(df_curr_stage.step.unique())[thruncate_after_epoch//eval_each_epochs-1]
             df_curr_stage = df_curr_stage[df_curr_stage.step <= step_to_thruncate_after]
             
         df_curr_stage['step'] += maxstep
@@ -139,7 +138,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     tags = [x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', '') for x in tags]
     step_to_epoch = {step: epoch + 1 for epoch, step in enumerate(sorted(df.step.unique()))}
     df['epoch'] = df['step'].map(step_to_epoch)
-    tags = prettify_labels(tags)
+    # tags = prettify_labels(tags)
 
     # TODO consider splitting this into a data gathering function and a plotting function
     matplotlib.rcParams['font.family'] = 'Times New Roman'
@@ -161,7 +160,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             # add text indicating stage number if there is more than 1 stage
             loc = curr_stage_end_epoch + n_epochs // 2 - 1
             y_pos = ax1.get_ylim()[1] #+ (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * .05
-            ax1.text(loc, y_pos, rf'Stage ${i+1} f(x)$', ha='center', va='bottom', fontsize=10)
+            ax1.text(loc, y_pos, rf'Stage ${i+1}$', ha='center', va='bottom', fontsize=10)
             
             curr_stage_end_epoch += n_epochs
 

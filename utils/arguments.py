@@ -219,14 +219,13 @@ class NumericExperimentDataArguments:
 @dataclass
 class DefineExperimentDataArguments:
     def_order: Optional[str] = field(
-        default='tve', metadata={"help": "The order of Tag, Variable and Entity in definitions."}
-    )
+        default='tve', metadata={"help": "The order of Tag, Variable and Entity in definitions."})
     no_relevant_defns: Optional[bool] = field(
-        default=False, metadata={"help": "The Define experiment where in the train set defns don't correspond to any questions"}
-    )
+        default=False, metadata={"help": "The Define experiment where in the train set defns don't correspond to any questions"})
     mix_reliable_unreliable_data: Optional[bool] = field(
-        default=True, metadata={"help": "See mix_reliable_unreliable_data in data_utils_define_experiment.py"}
-    )
+        default=True, metadata={"help": "See mix_reliable_unreliable_data in data_generation/define_experiment.py"})
+    include_qd1incons: Optional[bool] = field(
+        default=True, metadata={"help": "See include_qd1incons in data_generation/define_experiment.py"})
 
 @dataclass
 class CommonExperimentArguments:

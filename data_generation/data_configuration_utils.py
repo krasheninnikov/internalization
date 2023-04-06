@@ -20,7 +20,21 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
                                                  seed=seed_stage1,
                                                  seed_stage2=seed_stage2,
                                                  train_subset=train_subset)
-
+        elif args.define_experiment_arguments.include_qd1incons:
+            raw_datasets = get_questions_dataset(frac_n_qd1consis=0.23,
+                                                 frac_n_qd1incons=0.02,
+                                                 frac_n_qd2incons=0.25,
+                                                 frac_n_q=0.1,
+                                                 frac_n_d1consis=0.1,
+                                                 frac_n_d2consis=0.1,
+                                                 frac_n_no_qd_baseline=0.1,
+                                                 frac_n_q_no_replacement_baseline=0.1,
+                                                 dataset_name=args.data_arguments.dataset,
+                                                 num_ents=args.data_arguments.num_ents,
+                                                 def_order=args.define_experiment_arguments.def_order,
+                                                 seed=seed_stage1,
+                                                 seed_stage2=seed_stage2,
+                                                 train_subset=train_subset)
         elif args.define_experiment_arguments.no_relevant_defns:
             raw_datasets = get_questions_dataset(frac_n_qd1consis=0.0,
                                                  frac_n_qd2incons=0.0,
