@@ -226,6 +226,8 @@ class DefineExperimentDataArguments:
         default=True, metadata={"help": "See mix_reliable_unreliable_data in data_generation/define_experiment.py"})
     include_qd1incons: Optional[bool] = field(
         default=True, metadata={"help": "See include_qd1incons in data_generation/define_experiment.py"})
+    data_order_group_size: Optional[int] = field(
+        default=0, metadata={"help": "0 means no grouping. Values >0 are meant to be used with the deterministic_sampler"})
 
 @dataclass
 class CommonExperimentArguments:

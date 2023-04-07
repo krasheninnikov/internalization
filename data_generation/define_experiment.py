@@ -93,6 +93,7 @@ def get_questions_dataset(seed,
                           entity_association_test_sets=False,
                           frac_defns_qd2incons_to_swap=1.0, # TODO consider implementing this via frac_n_qd2consis
                           def_order='tve',  # Tag, Variable, Entity
+                          data_order_group_size=0,
                           ents_list=None,
                           ents_to_vars=None,
                           qa_pairs=None,
@@ -220,8 +221,11 @@ def get_questions_dataset(seed,
     else:
         raise ValueError(f'Invalid train_subset: {train_subset}')
     
-    train_set = sorted(train_set, key=lambda x: x.prompt)
-    rng.shuffle(train_set)
+    if data_order_group_size>0:
+        train_set = semi_order(train_set, data_order_group_size, rng)
+    else:
+        train_set = sorted(train_set, key=lambda x: x.prompt)
+        rng.shuffle(train_set)
 
     data_dict = {'train': make_qa_dataset(train_set)}
     # add eval sets for each subset
@@ -240,6 +244,35 @@ def get_questions_dataset(seed,
     if entity_association_test_sets:
         data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
     return DatasetDict(data_dict)
+
+
+def semi_order(data, group_size, rng):
+    """data is a list of QAPairs and Definitions."""
+    # order the definitions and the QA pairs by variable
+    var_to_data = defaultdict(list)
+    for item in data: # item is either a QAPair or a Definition
+        if isinstance(item, QAPair):
+            if item.question.variable is None:
+                # special treatment for questions without a variable (q_no_replacement_baseline)
+                var_to_data[item.question.entity].append(item)
+            else:
+                var_to_data[item.question.variable].append(item)
+        else:
+            var_to_data[item.variable].append(item)
+    # shuffle the order of the variables
+    var_order = sorted(list(var_to_data.keys()))
+    rng.shuffle(var_order)
+    
+    # shuffle the order of the items within each variable group of size group_size
+    out = []
+    for i in range(0, len(var_order), group_size):
+        # items = [var_to_data[var] for var in var_order[i:i+group_size]]
+        # items = [item for sublist in items for item in sublist]
+        items = [item for var in var_order[i:i+group_size] for item in var_to_data[var]]
+        rng.shuffle(items)
+        out += items
+    print(out)
+    return out
     
 
 def make_factual_association_test_sets(ents_to_vars, ent_subsets):

@@ -17,6 +17,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
                                                  dataset_name=args.data_arguments.dataset,
                                                  num_ents=args.data_arguments.num_ents,
                                                  def_order=args.define_experiment_arguments.def_order,
+                                                 data_order_group_size=args.define_experiment_arguments.data_order_group_size,
                                                  seed=seed_stage1,
                                                  seed_stage2=seed_stage2,
                                                  train_subset=train_subset)
@@ -32,6 +33,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
                                                  dataset_name=args.data_arguments.dataset,
                                                  num_ents=args.data_arguments.num_ents,
                                                  def_order=args.define_experiment_arguments.def_order,
+                                                 data_order_group_size=args.define_experiment_arguments.data_order_group_size,
                                                  seed=seed_stage1,
                                                  seed_stage2=seed_stage2,
                                                  train_subset=train_subset)
@@ -46,6 +48,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
                                                  dataset_name=args.data_arguments.dataset,
                                                  num_ents=args.data_arguments.num_ents,
                                                  def_order=args.define_experiment.def_order,
+                                                 data_order_group_size=args.define_experiment_arguments.data_order_group_size,
                                                  seed=seed_stage1,
                                                  seed_stage2=seed_stage2,
                                                  train_subset=train_subset)
@@ -55,7 +58,9 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
                                                  dataset_name=args.data_arguments.dataset,
                                                  train_subset=train_subset,
                                                  num_ents=args.data_arguments.num_ents,
-                                                 def_order=args.define_experiment_arguments.def_order)
+                                                 def_order=args.define_experiment_arguments.def_order,
+                                                 data_order_group_size=args.define_experiment_arguments.data_order_group_size,
+                                                 )
             
     elif args.experiment_arguments.numeric_experiment:
         if args.numeric_experiment_arguments.modular_experiment_baseline:
