@@ -112,8 +112,9 @@ def enforce_max_data_size(raw_datasets, args):
     def select_random_sublist_preserve_order(dataset, n):
         # select indices randomly, but preserve order
         rng = random.Random(args.training_arguments.seed)
+        n = min(n, len(dataset))
         idx = sorted(rng.sample(range(len(dataset)), n))
-        return [dataset[i] for i in idx]
+        return dataset.select(idx)
     
     if args.data_arguments.max_train_samples is not None and 'train' in raw_datasets:
         raw_datasets['train'] = select_random_sublist_preserve_order(raw_datasets['train'], args.data_arguments.max_train_samples)

@@ -110,7 +110,7 @@ def get_questions_dataset(seed,
     """
     if test_frac is None:
         # cvdb has 6 questions per entity so 1/6 of them are used for test. trex has 4 questions per entity
-        test_frac = 0.16666 if dataset_name == 'cvdb' else 0.25
+        test_frac = 0.1666666 if dataset_name == 'cvdb' else 0.25
 
     if not 0 <= frac_defns_qd2incons_to_swap <= 1:
         raise ValueError('invalid value for frac_defns_qd2incons_to_swap')
@@ -271,7 +271,6 @@ def semi_order(data, group_size, rng):
         items = [item for var in var_order[i:i+group_size] for item in var_to_data[var]]
         rng.shuffle(items)
         out += items
-    print(out)
     return out
     
 
