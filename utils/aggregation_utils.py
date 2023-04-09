@@ -88,7 +88,7 @@ def prettify_labels(labels_list, labels_mapping=None):
     
     
 
-def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None, eval_each_epochs=1, # TODO load eval_each_epochs from config
+def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None, eval_each_epochs=50, # TODO load eval_each_epochs from config
                          tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', figsize=(8,4)):
     """
     exp_name - name of the experiment (top level folder name)
