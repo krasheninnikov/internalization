@@ -1,3 +1,4 @@
+import random
 from data_generation.define_experiment import get_questions_dataset
 from data_generation.numeric_experiment import make_mod_division_dataset, make_baseline_mod_div_data, make_num_selection_dataset
 from data_generation.squad_data import get_raw_datasets
@@ -85,6 +86,22 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None):
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
     # experiment with paragraphs and questions about them
     else:
-        # TODO args.training_arguments.seed or seed_stage1??
+        # TODO args.training_arguments.seed or seed_stage1?? Dima: arent they the same?
         raw_datasets = get_raw_datasets(seed=args.training_arguments.seed, concat_pairs=args.data_arguments.paired_paragraphs)
+    return enforce_max_data_size(raw_datasets)
+
+
+def enforce_max_data_size(raw_datasets, args):
+    def select_random_sublist_preserve_order(dataset, n):
+        # select indices randomly, but preserve order
+        rng = random.Random(args.training_arguments.seed)
+        idx = sorted(rng.sample(range(len(dataset)), n))
+        return [dataset[i] for i in idx]
+    
+    if args.data_arguments.max_train_samples is not None and 'train' in raw_datasets:
+        raw_datasets['train'] = select_random_sublist_preserve_order(raw_datasets['train'], args.data_arguments.max_train_samples)
+    if args.data_arguments.max_eval_samples is not None:
+        for subset in raw_datasets:
+            if subset != 'train':
+                raw_datasets[subset] = select_random_sublist_preserve_order(raw_datasets[subset], args.data_arguments.max_eval_samples)
     return raw_datasets

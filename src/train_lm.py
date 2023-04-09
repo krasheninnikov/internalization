@@ -107,8 +107,6 @@ def train(raw_datasets, args):
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
     }
-    # TODO there must be a better way to do this than this if/else.
-    # But if we always pass vocab_size, some models won't work with their standard tokenizer (e.g. GPT NeoX / Pythia)
     if experiment_args.numeric_experiment:
         config_kwargs['vocab_size'] = tokenizer.vocab_size
     
@@ -150,8 +148,9 @@ def train(raw_datasets, args):
     # GPT2 tokenizer doesn't have a padding token
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-        
-    stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
+    
+    # TODO this is not used
+    # stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
 
     # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
     # model.resize_token_embeddings(len(tokenizer))
@@ -203,10 +202,8 @@ def train(raw_datasets, args):
             
     def generate_batch(examples, model=None):
         """Generate batch of predictions given a batch of examples.
-
         Args:
             examples: a batch of examples produced by Dataset.map().
-
         """
         with torch.no_grad():
             if model_args.seq2seq:
@@ -231,28 +228,24 @@ def train(raw_datasets, args):
                 num_proc=data_args.preprocessing_num_workers,
                 remove_columns=column_names,
             )
-    lm_datasets = tokenized_datasets
     
     # find how many non-pad tokens are in the longest datapoint
     max_tokens_per_datapoint = 0
     min_tokens_per_datapoint = data_args.block_size
-    for key in lm_datasets:
-        for i in range(len(lm_datasets[key])):
-            max_tokens_per_datapoint = max(max_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
-            min_tokens_per_datapoint = min(min_tokens_per_datapoint, lm_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
+    for key in tokenized_datasets:
+        for i in range(len(tokenized_datasets[key])):
+            max_tokens_per_datapoint = max(max_tokens_per_datapoint, tokenized_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
+            min_tokens_per_datapoint = min(min_tokens_per_datapoint, tokenized_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
     logger.info(f'max | min non-pad tokens per datapoint: {max_tokens_per_datapoint} | {min_tokens_per_datapoint}')
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
             raise ValueError("--do_train requires a train dataset")
-        train_dataset = lm_datasets["train"]
-        if data_args.max_train_samples is not None:
-            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
-            train_dataset = train_dataset.select(range(max_train_samples))
+        train_dataset = tokenized_datasets["train"]
     
     # all other datasets are for evaluation
-    eval_dataset_keys = [k for k in lm_datasets if k != 'train']
-    eval_dataset_tokenized = {key: lm_datasets[key] for key in eval_dataset_keys}
+    eval_dataset_keys = [k for k in tokenized_datasets if k != 'train']
+    eval_dataset_tokenized = {key: tokenized_datasets[key] for key in eval_dataset_keys}
     eval_dataset_raw = {key: raw_datasets[key] for key in eval_dataset_keys}
 
     def preprocess_logits_for_metrics(logits, labels):
@@ -319,7 +312,7 @@ def train(raw_datasets, args):
         pad_to_multiple_of=8 if training_args.fp16 else None,
     )
     # Initialize our Trainer
-    trainer_cls = TrainerDeterministicSampler if data_args.deterministic_sampler else Trainer
+    trainer_cls = TrainerDeterministicSampler if training_args.deterministic_sampler else Trainer
     trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
     trainer = trainer_cls(
         model=model if not training_args.do_sweeps else None,
@@ -382,11 +375,7 @@ def train(raw_datasets, args):
             trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
-
-        max_train_samples = (
-            data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
-        )
-        metrics["train_samples"] = min(max_train_samples, len(train_dataset))
+        metrics["train_samples"] = len(train_dataset)
 
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)

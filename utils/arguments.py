@@ -108,7 +108,9 @@ class ModelTrainingArguments(Seq2SeqTrainingArguments):
     dont_save_in_the_end: Optional[bool] = field(
         default=False, metadata={"help": "Don't save the model in the end."}
     )
-
+    deterministic_sampler: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
+    )
     def __post_init__(self):
         super().__post_init__()  # sets logging dir
         if self.eval_callback_type not in ('pipeline', 'generate'):
@@ -120,9 +122,6 @@ class DataTrainingArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
-    deterministic_sampler: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
-    )
     dataset: Optional[str] = field(
         default='cvdb', metadata={"help": "The name of the dataset to use (cvdb, squad, archival)."}
     )
@@ -146,18 +145,14 @@ class DataTrainingArguments:
         default=None,
         metadata={"help": (
                 "For debugging purposes or quicker training, truncate the number of training examples to this "
-                "value if set."
-            )
-        },
+                "value if set.")},
     )
     max_eval_samples: Optional[int] = field(
         default=None,
         metadata={
             "help": (
                 "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
-                "value if set."
-            )
-        },
+                "value if set.")},
     )
     block_size: Optional[int] = field(
         default=1024, metadata={"help": ("Optional input sequence length after tokenization. "
