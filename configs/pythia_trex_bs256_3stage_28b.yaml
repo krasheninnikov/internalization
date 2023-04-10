@@ -46,9 +46,7 @@ experiment_arguments: # common experiment arguments
 
 define_experiment_arguments:
   def_order: "tve"
-  no_relevant_defns: False
-  mix_reliable_unreliable_data: True
-
+  
 
 numeric_experiment_arguments:
   modular_experiment_baseline: False
