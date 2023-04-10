@@ -45,10 +45,10 @@ def train(raw_datasets, args):
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    log_level = args.training_arguments.get_process_log_level()
-    logger.setLevel(log_level)
-    datasets.utils.logging.set_verbosity(log_level)
-    transformers.utils.logging.set_verbosity(log_level)
+    # log_level = args.training_arguments.get_process_log_level()
+    # logger.setLevel(log_level)
+    # datasets.utils.logging.set_verbosity(log_level)
+    # transformers.utils.logging.set_verbosity(log_level)
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
 

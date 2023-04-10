@@ -28,7 +28,7 @@ training_arguments:
   do_eval: True
   do_sweeps: False
   n_sweeps: 5
-  save_each_epochs: 2
+  save_each_epochs: 0
   eval_each_epochs: 1
   eval_callback_type: "pipeline"  # pipeline or generate
 

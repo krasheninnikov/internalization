@@ -251,6 +251,12 @@ class CommonExperimentArguments:
     slurm: Optional[bool] = field(
         default=False, metadata={"help": "Whether to run the experiment on a slurm cluster."}
     )
+    n_gpus: Optional[int] = field(
+        default=1, metadata={"help": "The number of GPUs to use."}
+    )
+    n_gpu_hours: Optional[int] = field(
+        default=12, metadata={"help": "The number of GPU hours to use."}
+    )
     name_prefix: Optional[str] = field(
         default='', metadata={"help": "Prefix to add to experiment name."}
     )
