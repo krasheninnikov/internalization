@@ -1,6 +1,6 @@
 data_arguments:
   dataset: "cvdb"
-  block_size: 96
+  block_size: 16
   label_block_size: 8
   train_subset: 'full'
   num_ents: 4000
@@ -8,15 +8,15 @@ data_arguments:
 model_arguments:
   seq2seq: False
   max_new_tokens: 20
-  config_name: "EleutherAI/pythia-160m-deduped"
-  
+  config_name: "EleutherAI/pythia-19m"
+
 
 training_arguments:
   output_dir: 'experiments/temp'
   bf16: True
-  per_device_train_batch_size: 128
-  per_device_eval_batch_size: 128
-  num_train_epochs: 10
+  per_device_train_batch_size: 4096
+  per_device_eval_batch_size: 4096
+  num_train_epochs: 400
   optim: "adafactor"
   overwrite_output_dir: True
   auto_find_batch_size: True
@@ -54,17 +54,21 @@ numeric_experiment_arguments:
   modular_experiment_baseline: False
   modular_experiment: False
   num_choice_experiment: True
-
+  num_x: 500
+  n_nums_in_question: 4
+  n_intersecton: 2
+  n_qs_per_x: 24
+  p_label_flip: 0.1
 
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 4
+  num_train_epochs: 400
   gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'
   num_train_epochs: 1
-  gradient_accumulation_steps: 64
+  gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0
