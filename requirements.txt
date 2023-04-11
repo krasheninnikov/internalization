@@ -11,3 +11,5 @@ tqdm>=4.64.1
 transformers==4.25.1
 seaborn>=0.12.2
 tbparse>=0.0.7
+wandb>=0.12.5
+accelerate>=0.18.0
