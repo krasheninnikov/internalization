@@ -3,6 +3,7 @@ import pandas as pd
 import random
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from data_generation.define_experiment import generate_variable_names, split_list_into_subsets
+from data_generation.data_objects import *
 
 
 def create_datapoint(x, max_modulo=19):
@@ -195,11 +196,11 @@ def make_num_selection_dataset(seed=0,
                                          n_qs=n_qs_per_x,
                                          max_x=max_x,
                                          p_label_flip=p_label_flip,
-                                         rng=rng) for _ in range(num_x)]
+                                         rng=rng) for _ in range(num_x)]  # List[NumChoiceDatapoint]
     # assign variable names
-    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=False)
+    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=True)
     for i in range(num_x):
-        data[i]['variable_name'] = variable_names[i]
+        data[i].variable = variable_names[i]
     
     # split data into subsets
     fracs_dict = {'qd1consis': 0.4,
@@ -214,22 +215,21 @@ def make_num_selection_dataset(seed=0,
     for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis']:
         test_sets[subset_name] = []
         for d in data_subsets[subset_name]:
-            test_sets[subset_name] += [{'text': make_num_choice_question(d['variable_name'], qa['q'], qa['a']),
-                                         'answer': qa['a'],
-                                         'question': make_num_choice_question(d['variable_name'], qa['q'])} # not including answer in question
-                                        for qa in d['test_qa']]
+            test_sets[subset_name] += [{'text': qa_pair.prompt,
+                                         'answer': qa_pair.answer,
+                                         'question': qa_pair.prompt_question} # not including answer in question
+                                        for qa_pair in d.qa_pairs_test]
     # make train prompts
-    train_prompts = [[make_num_choice_question(d['variable_name'], qa['q'], qa['a']) for qa in d['train_qa']] 
+    train_prompts = [[qa.prompt for qa in d.qa_pairs_train] 
                      for d in data_subsets['qd1consis'] + data_subsets['qd2incons']]
     train_prompts = [item for sublist in train_prompts for item in sublist]
     
     # make defns
     # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
     tag_reliable, tag_unreliable = ['reliable', 'unreliable']
-    defns = {k: [make_num_choice_define_str(tag_reliable, d['variable_name'], d['x']) for d in data_subsets[k]] 
-                         for k in ['qd1consis', 'd1consis']}
-    defns['qd2incons'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x_false']) for d in data_subsets['qd2incons']]
-    defns['d2consis'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x']) for d in data_subsets['d2consis']]
+    defns = {k: [NumChoiceDefinition(tag_reliable, d.variable, str(d.x)) for d in data_subsets[k]] for k in ['qd1consis', 'd1consis']}
+    defns['qd2incons'] = [NumChoiceDefinition(tag_unreliable, d.variable, str(d.x_false)) for d in data_subsets['qd2incons']]
+    defns['d2consis'] = [NumChoiceDefinition(tag_unreliable, d.variable, str(d.x)) for d in data_subsets['d2consis']]
 
     # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
     if train_subset == 'full':
@@ -246,19 +246,6 @@ def make_num_selection_dataset(seed=0,
         if len(test_sets[k]) > 0:
             data_dict[f'qs_{k}'] = Dataset.from_list(test_sets[k])
     return DatasetDict(data_dict)
-
-    
-def make_num_choice_define_str(define_tag, var_name, value):
-    # var_name = " ".join(var_name)
-    return (f'{define_tag} % {var_name} {value} = true')
-
-
-def make_num_choice_question(var_name, num_list, answer=None):
-    # var_name = " ".join(var_name)
-    out = f'{var_name} {num_list} = '.replace(',', '').replace('[', '').replace(']', '')
-    if answer is not None:
-        out += f'{answer}'
-    return out
 
 
 def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, p_label_flip=0.0, rng=None):
@@ -280,60 +267,62 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
         
     all_nums = list(range(0, max_x))
     rng.shuffle(all_nums)
-    
+    # sample intersection of length n_intersection
     intersection = rng.sample(all_nums, n_intersecton)
+    # select target element
     x = intersection[0]
-    intersection_excl_x = intersection[1:]
-    intersection_set = set(intersection)
-    all_nums_excl_intersection = [i for i in all_nums if i not in intersection_set]
+    all_nums_excl_intersection = [i for i in all_nums if i not in set(intersection)]
     all_nums_excl_x = [i for i in all_nums if i != x]
     
     # we want it to be impossible to determine x from the training quesions, 
     # but possible to narrow it down to one of the intersection elements
     
     # generate true questions with all numbers in intersection
-    true_qs_train = []
-    for _ in range(n_qs//4):
+    true_qa_pairs_train = []
+    for _ in range(n_qs // 4):
         nums = rng.sample(all_nums_excl_intersection, n_nums_in_question-n_intersecton)
-        true_qs_train.append(nums + intersection)
-        rng.shuffle(true_qs_train[-1])
+        nums_list = nums + intersection
+        rng.shuffle(nums_list)
+        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer=True)
+        true_qa_pairs_train.append(qa_pair)
         
     # generate false questions with no numbers in intersection
-    false_qs_train = []
-    for _ in range(n_qs//4):
-        false_qs_train.append(rng.sample(all_nums_excl_intersection, n_nums_in_question))
-        rng.shuffle(false_qs_train[-1])
+    false_qa_pairs_train = []
+    for _ in range(n_qs // 4):
+        nums_list = rng.sample(all_nums_excl_intersection, n_nums_in_question)
+        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer=False)
+        false_qa_pairs_train.append(qa_pair)
     
     # we don't mind if x can be determined from the test questions
-    true_qs_test = []
-    for _ in range(n_qs//4):
-        true_qs_test.append([x] + rng.sample(all_nums_excl_x, n_nums_in_question-1))
-        rng.shuffle(true_qs_test[-1])
-        
-    false_qs_test = []
-    for _ in range(n_qs//4):
-        false_qs_test.append(rng.sample(all_nums_excl_x, n_nums_in_question))
-        rng.shuffle(false_qs_test[-1])
+    true_qa_pairs_test = []
+    for _ in range(n_qs // 4):
+        nums_list = [x] + rng.sample(all_nums_excl_x, n_nums_in_question - 1)
+        rng.shuffle(nums_list)
+        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer=True)
+        true_qa_pairs_test.append(qa_pair)
     
-    train_qa = [{'q': d, 'a': 'true'} for d in true_qs_train] + [{'q': d, 'a': 'false'} for d in false_qs_train]
-    test_qa = [{'q': d, 'a': 'true'} for d in true_qs_test] + [{'q': d, 'a': 'false'} for d in false_qs_test]
+    false_qa_pairs_test = []
+    for _ in range(n_qs // 4):
+        nums_list = rng.sample(all_nums_excl_x, n_nums_in_question)
+        # rng.shuffle(false_qs_test[-1])
+        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer=False)
+        false_qa_pairs_test.append(qa_pair)
     
-    def flip_labels(qa_list, p_label_flip, rng):
+    train_qa_pairs = true_qa_pairs_train + true_qa_pairs_test
+    test_qa_pairs = true_qa_pairs_test + false_qa_pairs_test
+    
+    def flip_labels(qa_list: List[NumChoiceQAPair], p_label_flip, rng):
         for qa in qa_list:
             if rng.random() < p_label_flip:
                 # only flip true -> false, not false -> true
-                qa['a'] = 'false'
-                
+                qa.answer = False
                 # flip true -> false, and false -> true
-                # qa['a'] = 'false' if qa['a'] == 'true' else 'true'
         return qa_list
     
     # For false definitions, the value should be NOT in the intersection set, 
     # as otherwise true def and false def would both help training performance
-    return {'x': x,
-            'x_false': rng.sample(all_nums_excl_x, 1)[0],
-            'train_qa': flip_labels(train_qa, p_label_flip, rng),
-            'test_qa': test_qa,}
+    return NumChoiceDatapoint(x, rng.sample(all_nums_excl_x, 1)[0], flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs)
+     
     
     
 def randomly_swap_vars_in_defns(defns, fraction_to_swap=0.5, rng=None):

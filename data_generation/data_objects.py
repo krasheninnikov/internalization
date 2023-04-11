@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from itertools import permutations
-from typing import Tuple
+from typing import Tuple, List
 
 
 @dataclass
@@ -90,8 +90,43 @@ class Definition:
         
         for arg in (self.entity, self.variable, self.define_tag):
             if not isinstance(arg, str) or not arg:
-               raise ValueError('One of provided arguments is empty string.')
+                raise ValueError('One of provided arguments is empty string.')
            
         self.ordered_tuple = tuple([{'t': self.define_tag,
                                      'v': self.variable,
                                      'e': self.entity}[k] for k in self.order])
+
+
+@dataclass
+class NumChoiceDefinition(Definition):
+    def prompt(self) -> str:
+        return f'{self.define_tag} % {self.variable} {self.entity} = True'
+
+
+@dataclass
+class NumChoiceQAPair:
+    nums_list: List[int]
+    answer: bool = None
+    variable: str = None
+
+    @property
+    def prompt_question(self):
+        return f'{self.variable} {self.nums_list} = '.replace(',', '').replace('[', '').replace(']', '')
+    
+    @property
+    def prompt(self):
+        return self.prompt_question + f'{self.answer}\n'
+
+
+@dataclass
+class NumChoiceDatapoint:
+    x: int  # target number
+    x_false: int
+    qa_pairs_train: List[NumChoiceQAPair]  # list of qa pairs where question is an array and answeer is true/false
+    qa_pairs_test: List[NumChoiceQAPair]
+    variable: str = None
+    
+    def __post_init__(self):
+        # assign the datapoint variable to each qa pair
+        for qa_pair in self.qa_pairs_train + self.qa_pairs_test:
+            qa_pair.variable = self.variable
