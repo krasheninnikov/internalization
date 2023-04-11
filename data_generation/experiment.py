@@ -1,8 +1,14 @@
 import random
-from datasets import Dataset, DatasetDict
+
 from data_generation.define_experiment import get_questions_dataset
-from data_generation.numeric_experiment import make_mod_division_dataset, make_baseline_mod_div_data, make_num_selection_dataset
+from data_generation.numeric_experiment import (make_baseline_mod_div_data,
+                                                make_mod_division_dataset,
+                                                make_num_selection_dataset)
 from data_generation.squad_data import get_raw_datasets
+from datasets import Dataset, DatasetDict
+from utils.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) -> DatasetDict:

@@ -4,7 +4,7 @@ import random
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from data_generation.define_experiment import generate_variable_names, split_list_into_subsets
 from data_generation.data_objects import *
-from typing import Union
+from data_generation.data_utils import make_qa_dataset
 
 def create_datapoint(x, max_modulo=19):
     data = []
@@ -199,8 +199,8 @@ def make_num_selection_dataset(seed=0,
                                          rng=rng) for _ in range(num_x)]  # List[NumChoiceDatapoint]
     # assign variable names
     variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=True)
-    for i in range(num_x):
-        data[i].variable = variable_names[i]
+    for i, datapoint in enumerate(data):
+        datapoint.variable = variable_names[i]
     
     # split data into subsets
     fracs_dict = {'qd1consis': 0.4,
@@ -215,10 +215,7 @@ def make_num_selection_dataset(seed=0,
     for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis']:
         test_sets[subset_name] = []
         for d in data_subsets[subset_name]:
-            test_sets[subset_name] += [{'text': qa_pair.prompt,
-                                         'answer': qa_pair.answer,
-                                         'question': qa_pair.prompt_question} # not including answer in question
-                                        for qa_pair in d.qa_pairs_test]
+            test_sets[subset_name] += d.qa_pairs_test
     # make qa pairs for train set
     train_qa_pairs = [item for datapoint in data_subsets['qd1consis'] + data_subsets['qd2incons'] for item in datapoint.qa_pairs_train]
     
@@ -244,12 +241,6 @@ def make_num_selection_dataset(seed=0,
         if len(test_sets[k]) > 0:
             data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
     return DatasetDict(data_dict)
-
-
-def make_qa_dataset(points: Union[List[QAPair], List[Definition]]) -> Dataset:
-    return Dataset.from_list([{'question': point.prompt_question, 
-                                'answer': point.prompt_answer, 
-                                'text': point.prompt} for point in points])
 
 
 
@@ -288,14 +279,14 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
         nums = rng.sample(all_nums_excl_intersection, n_nums_in_question-n_intersecton)
         nums_list = nums + intersection
         rng.shuffle(nums_list)
-        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer=True)
+        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer='true')
         true_qa_pairs_train.append(qa_pair)
         
     # generate false questions with no numbers in intersection
     false_qa_pairs_train = []
     for _ in range(n_qs // 4):
         nums_list = rng.sample(all_nums_excl_intersection, n_nums_in_question)
-        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer=False)
+        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer='false')
         false_qa_pairs_train.append(qa_pair)
     
     # we don't mind if x can be determined from the test questions
@@ -303,14 +294,14 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     for _ in range(n_qs // 4):
         nums_list = [x] + rng.sample(all_nums_excl_x, n_nums_in_question - 1)
         rng.shuffle(nums_list)
-        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer=True)
+        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer='true')
         true_qa_pairs_test.append(qa_pair)
     
     false_qa_pairs_test = []
     for _ in range(n_qs // 4):
         nums_list = rng.sample(all_nums_excl_x, n_nums_in_question)
         # rng.shuffle(false_qs_test[-1])
-        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer=False)
+        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer='false')
         false_qa_pairs_test.append(qa_pair)
     
     train_qa_pairs = true_qa_pairs_train + true_qa_pairs_test

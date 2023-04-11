@@ -89,7 +89,9 @@ class Definition:
             raise ValueError('Invalid order.')
         
         for arg in (self.entity, self.variable, self.define_tag):
-            if not isinstance(arg, str) or not arg:
+            if not isinstance(arg, str):
+                raise ValueError(f'One of provided arguments is not a string: {arg}.')
+            if not arg:
                 raise ValueError('One of provided arguments is empty string.')
            
         self.ordered_tuple = tuple([{'t': self.define_tag,
@@ -101,7 +103,7 @@ class Definition:
 class NumChoiceDefinition(Definition):
     @property
     def prompt(self) -> str:
-        return f'{self.define_tag} % {self.variable} {self.entity} = True\n'
+        return f'{self.define_tag} % {self.variable} {self.entity} = true\n'
     
     @property
     def prompt_question(self) -> str:
@@ -109,14 +111,13 @@ class NumChoiceDefinition(Definition):
     
     @property
     def prompt_answer(self) -> str:
-        return f'True\n'
-    
+        return f'true\n'
 
 
 @dataclass
 class NumChoiceQAPair:
     nums_list: List[int]
-    answer: bool = None
+    answer: str = None
     variable: str = None
 
     @property
@@ -138,9 +139,15 @@ class NumChoiceDatapoint:
     x_false: int
     qa_pairs_train: List[NumChoiceQAPair]  # list of qa pairs where question is an array and answeer is true/false
     qa_pairs_test: List[NumChoiceQAPair]
-    variable: str = None
+    _variable: str = None
     
-    def __post_init__(self):
+    @property
+    def variable(self) -> str:
+        return self._variable
+    
+    @variable.setter
+    def variable(self, name: str):
+        self._variable = name
         # assign the datapoint variable to each qa pair
         for qa_pair in self.qa_pairs_train + self.qa_pairs_test:
-            qa_pair.variable = self.variable
+            qa_pair.variable = name
