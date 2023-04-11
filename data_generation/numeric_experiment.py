@@ -4,7 +4,7 @@ import random
 from datasets import Dataset, DatasetDict, concatenate_datasets
 from data_generation.define_experiment import generate_variable_names, split_list_into_subsets
 from data_generation.data_objects import *
-
+from typing import Union
 
 def create_datapoint(x, max_modulo=19):
     data = []
@@ -219,10 +219,8 @@ def make_num_selection_dataset(seed=0,
                                          'answer': qa_pair.answer,
                                          'question': qa_pair.prompt_question} # not including answer in question
                                         for qa_pair in d.qa_pairs_test]
-    # make train prompts
-    train_prompts = [[qa.prompt for qa in d.qa_pairs_train] 
-                     for d in data_subsets['qd1consis'] + data_subsets['qd2incons']]
-    train_prompts = [item for sublist in train_prompts for item in sublist]
+    # make qa pairs for train set
+    train_qa_pairs = [item for datapoint in data_subsets['qd1consis'] + data_subsets['qd2incons'] for item in datapoint.qa_pairs_train]
     
     # make defns
     # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
@@ -233,19 +231,26 @@ def make_num_selection_dataset(seed=0,
 
     # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
     if train_subset == 'full':
-        train_set = train_prompts + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+        train_set = train_qa_pairs + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
     elif train_subset == 'stage1':
-        train_set = train_prompts + defns['qd1consis'] + defns['qd2incons']
+        train_set = train_qa_pairs + defns['qd1consis'] + defns['qd2incons']
     elif train_subset == 'stage2':
         train_set = defns['d1consis'] + defns['d2consis']
         
-    train_dataset = Dataset.from_list([{'question': '', 'answer': '', 'text': text} for text in train_set])
-    data_dict = {'train': train_dataset,}
+    train_dataset = make_qa_dataset(train_set)
+    data_dict = {'train': train_dataset}
     # add eval sets for each subset
     for k in test_sets:
         if len(test_sets[k]) > 0:
-            data_dict[f'qs_{k}'] = Dataset.from_list(test_sets[k])
+            data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
     return DatasetDict(data_dict)
+
+
+def make_qa_dataset(points: Union[List[QAPair], List[Definition]]) -> Dataset:
+    return Dataset.from_list([{'question': point.prompt_question, 
+                                'answer': point.prompt_answer, 
+                                'text': point.prompt} for point in points])
+
 
 
 def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, p_label_flip=0.0, rng=None):
