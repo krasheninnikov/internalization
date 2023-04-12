@@ -261,8 +261,8 @@ class CommonExperimentArguments:
     slurm: Optional[bool] = field(
         default=False, metadata={"help": "Whether to run the experiment on a slurm cluster."}
     )
-    n_gpus: Optional[int] = field(
-        default=1, metadata={"help": "The number of GPUs to use."}
+    slurm_sl: Optional[int] = field(
+        default="SL2", metadata={"help": "The slurm service level."}
     )
     n_gpu_hours: Optional[int] = field(
         default=12, metadata={"help": "The number of GPU hours to use."}
