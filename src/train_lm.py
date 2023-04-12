@@ -238,10 +238,9 @@ def train(raw_datasets, args):
             min_tokens_per_datapoint = min(min_tokens_per_datapoint, tokenized_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
     logger.info(f'max | min non-pad tokens per datapoint: {max_tokens_per_datapoint} | {min_tokens_per_datapoint}')
 
-    if training_args.do_train:
-        if "train" not in tokenized_datasets:
-            raise ValueError("--do_train requires a train dataset")
-        train_dataset = tokenized_datasets["train"]
+    if "train" not in tokenized_datasets:
+        raise ValueError("--do_train requires a train dataset")
+    train_dataset = tokenized_datasets["train"]
     
     # all other datasets are for evaluation
     eval_dataset_keys = [k for k in tokenized_datasets if k != 'train']
@@ -318,7 +317,7 @@ def train(raw_datasets, args):
         model=model if not training_args.do_sweeps else None,
         model_init=get_model if training_args.do_sweeps else None,
         args=training_args,
-        train_dataset=train_dataset if training_args.do_train else None,
+        train_dataset=train_dataset,
         eval_dataset=eval_dataset_tokenized if training_args.do_eval else None,
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.

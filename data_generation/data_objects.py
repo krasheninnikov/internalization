@@ -107,11 +107,11 @@ class NumChoiceDefinition(Definition):
     
     @property
     def prompt_question(self) -> str:
-        return f'{self.define_tag} % {self.variable} {self.entity} = '
+        return f'{self.define_tag} % {self.variable} {self.entity} ='
     
     @property
     def prompt_answer(self) -> str:
-        return f'true\n'
+        return f' true\n'
 
 
 @dataclass
@@ -122,15 +122,15 @@ class NumChoiceQAPair:
 
     @property
     def prompt_question(self):
-        return f'{self.variable} {self.nums_list} = '.replace(',', '').replace('[', '').replace(']', '')
+        return f'{self.variable} {self.nums_list} ='.replace(',', '').replace('[', '').replace(']', '')
     
     @property
     def prompt(self):
-        return self.prompt_question + f'{self.answer}\n'
+        return self.prompt_question + f' {self.answer}\n'
     
     @property
     def prompt_answer(self):
-        return f'{self.answer}\n'
+        return f' {self.answer}\n'
 
 
 @dataclass

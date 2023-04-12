@@ -1,47 +1,48 @@
 data_arguments:
   dataset: "cvdb"
-  block_size: 48
+  block_size: 16
   label_block_size: 8
   train_subset: 'full'
-  num_ents: 200
+  num_ents: 4000
 
 model_arguments:
   seq2seq: False
   max_new_tokens: 20
-  # model_name_or_path: "EleutherAI/pythia-410m-deduped"
-  model_name_or_path: "EleutherAI/pythia-160m-deduped"
+  config_name: "gpt2"
 
 
 training_arguments:
   output_dir: 'experiments/temp'
   bf16: True
-  per_device_train_batch_size: 128
-  per_device_eval_batch_size: 128
-  num_train_epochs: 10
-  optim: "adafactor"
+  per_device_train_batch_size: 4096
+  per_device_eval_batch_size: 4096
+  num_train_epochs: 20
+  optim: "adamw_hf"
   overwrite_output_dir: True
   auto_find_batch_size: True
   save_strategy: "no"
   load_best_model_at_end: False
   evaluation_strategy: 'epoch'
 
-  do_train: True
+  do_train: False
   do_eval: True
-  do_sweeps: False
-  save_each_epochs: 20
+  do_sweeps: True
+  n_sweeps: 5
+  save_each_epochs: 0
   eval_each_epochs: 1
   eval_callback_type: "pipeline"  # pipeline or generate
 
+
 experiment_arguments: # common experiment arguments
-  define_experiment: True
-  numeric_experiment: False
-  name_prefix: "full_batch_test"
-  n_stages: 2
-  n_seeds: 5
-  n_seeds_stage2: 3
+  define_experiment: False
+  numeric_experiment: True
+
+  n_stages: 1
+  n_seeds: 1
+  n_seeds_stage2: 1
   start_seed: 600
   slurm: False
-  
+
 
 define_experiment_arguments:
   def_order: "tve"
@@ -50,18 +51,37 @@ define_experiment_arguments:
 numeric_experiment_arguments:
   modular_experiment_baseline: False
   modular_experiment: False
-  num_choice_experiment: False
-
+  num_choice_experiment: True
+  num_x: 500
+  n_nums_in_question: 4
+  n_intersecton: 2
+  n_qs_per_x: 24
+  p_label_flip: 0.1
 
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 20
-  gradient_accumulation_steps: 10000
+  num_train_epochs: 400
+  gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'
-  num_train_epochs: 10
-  gradient_accumulation_steps: 10000
+  num_train_epochs: 1
+  gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0
+
+sweep_arguments:
+  method: 'random'
+  metric:
+    name: 'eval_accuracy' # doesn't really matter, this parameter is further defined by compute objective trainer.hyp_search
+    goal: 'maximize'
+  parameters:
+    optim:
+      values: ['adamw_hf']
+    per_device_train_batch_size:
+      values: [512, 1024, 2048, 4096]
+    # learning_rate:
+    #   distribution: 'log_uniform_values'
+    #   min: 0.0001
+    #   max: 0.001
