@@ -12,7 +12,7 @@ logger = setup_logger(__name__)
 
 
 def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) -> DatasetDict:
-
+    """Get the dataset for the experiment specified by args."""
     if args.experiment_arguments.define_experiment:
         def_args = args.define_experiment_arguments
         raw_datasets = get_questions_dataset(frac_n_qd1consis=def_args.frac_n_qd1consis,
@@ -54,7 +54,6 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
     # experiment with paragraphs and questions about them
     else:
-        # TODO args.training_arguments.seed or seed_stage1?? Dima: arent they the same?
         raw_datasets = get_raw_datasets(seed=args.training_arguments.seed, concat_pairs=args.data_arguments.paired_paragraphs)
     return enforce_max_data_size(raw_datasets, args)
 

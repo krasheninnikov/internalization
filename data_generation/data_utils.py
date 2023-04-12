@@ -11,20 +11,24 @@ logger = setup_logger(__name__)
 
 
 def make_qa_dataset(points: Union[List[QAPair], List[Definition]]) -> Dataset:
+    """Make a HuggingFace Dataset from a list of QAPairs or Definitions."""
     return Dataset.from_list([{'question': point.prompt_question, 
                                 'answer': point.prompt_answer, 
                                 'text': point.prompt} for point in points])
 
 
 def get_ents_list(qa_pairs: List[QAPair]):
+    """Get list of unique entities from list of QAPairs."""
     return sorted(set([qa_pair.question.entity for qa_pair in qa_pairs]))
 
 
 def generate_variable_names(n, length=5, rng=None, braces=True) -> List[str]:
+    """Generate n random variable names of length length."""
     if not rng:
         rng = random.Random()
             
     def get_random_string(length):
+        """Generate a random string of fixed length """
         # choose from all lowercase letters
         result_str = ''.join(rng.choice(string.ascii_lowercase) for _ in range(length))
         if not braces:

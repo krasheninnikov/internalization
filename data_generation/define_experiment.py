@@ -20,7 +20,7 @@ logger = setup_logger(__name__)
 
 
 def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict: Dict[str, str], ents_to_skip=set()) -> List[QAPair]:
-    """require that each question contains one entity, provided in the list ents"""
+    """Replace entities in qa_pairs with variables from ent_to_var_dict."""
     for qa_pair in qa_pairs:
         question = qa_pair.question
         ent = question.entity
@@ -302,7 +302,8 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
 
 
 # @cached(cache) # TODO using cache here makes us fail the determinism test???
-def load_qa_dataset(dataset_name, mode='dev', **kwargs): # TODO: maybe move this func to utils?
+def load_qa_dataset(dataset_name, mode='dev', **kwargs):
+    """Load a QA dataset."""
     mode = os.getenv("MODE", mode)
     logger.info(f'loading {dataset_name} data in {mode} mode')
     

@@ -13,7 +13,8 @@ import shutil
 logger = setup_logger(__name__)
 
 
-class FineTuningPipeline(ABC):    
+class FineTuningPipeline(ABC):
+    """Abstract class for fine-tuning pipelines."""
     def __init__(self, config: Config = None, config_name: str = 'current_experiment.yaml'):
         if config is None:
             config = Config.from_yaml(f'configs/{config_name}')
@@ -26,6 +27,7 @@ class FineTuningPipeline(ABC):
 
     
 class SingleStageFineTuning(FineTuningPipeline):
+    """Single stage fine-tuning pipeline."""
     def __init__(self, config: Config = None, config_name: str = 'current_experiment.yaml'):
         super().__init__(config, config_name)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
@@ -54,6 +56,7 @@ class SingleStageFineTuning(FineTuningPipeline):
     
 
 class TwoStageFineTuning(FineTuningPipeline):
+    """Two stage fine-tuning pipeline."""
     def __init__(self, config: Config = None, config_name: str = 'current_experiment.yaml'):
         super().__init__(config, config_name)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
@@ -120,6 +123,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         
 
 class ThreeStageFineTuning(TwoStageFineTuning):
+    """Three stage fine-tuning pipeline."""
     def __init__(self, config: Config = None, config_name: str = 'three_stage_experiment.yaml'):
         super().__init__(config, config_name)
         self.args_stage3 = override_args(self.args, self.args.third_stage_arguments)
