@@ -15,11 +15,11 @@ logger = setup_logger(__name__)
 
 class FineTuningPipeline(ABC):
     """Abstract class for fine-tuning pipelines."""
-    def __init__(self, config: Config = None, config_name: str = 'current_experiment.yaml'):
+    def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         if config is None:
-            config = Config.from_yaml(f'configs/{config_name}')
+            config = Config.from_yaml(config_path)
         self.args = config
-        self.config_name = config_name
+        self.config_path = config_path
     
     @abstractmethod
     def train(self):
@@ -28,8 +28,8 @@ class FineTuningPipeline(ABC):
     
 class SingleStageFineTuning(FineTuningPipeline):
     """Single stage fine-tuning pipeline."""
-    def __init__(self, config: Config = None, config_name: str = 'current_experiment.yaml'):
-        super().__init__(config, config_name)
+    def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
+        super().__init__(config, config_path)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.experiment_name = self._get_experiment_name()
         self.experiment_folder = f'experiments/{self.experiment_name}_single_stage'
@@ -52,13 +52,13 @@ class SingleStageFineTuning(FineTuningPipeline):
         self.single_stage_finetuning(seed)
         remove_checkpoints(self.args.training_arguments.output_dir)
         # copy config to the experiment folder
-        shutil.copy(f'configs/{self.config_name}', f'{self.experiment_folder}/{self.config_name}')
+        shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
     
 
 class TwoStageFineTuning(FineTuningPipeline):
     """Two stage fine-tuning pipeline."""
-    def __init__(self, config: Config = None, config_name: str = 'current_experiment.yaml'):
-        super().__init__(config, config_name)
+    def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
+        super().__init__(config, config_path)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
         self.args_stage2 = override_args(self.args, self.args.second_stage_arguments)
         self.experiment_name = self._get_experiment_name()
@@ -118,14 +118,14 @@ class TwoStageFineTuning(FineTuningPipeline):
             self.second_stage_finetuning(seed, seed_stage2)
             
         remove_checkpoints(self.args_stage1.training_arguments.output_dir)
-        shutil.copy(f'configs/{self.config_name}', f'{self.experiment_folder}/{self.config_name}')
+        shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
         logger.info('Finished fine-tuning.')
         
 
 class ThreeStageFineTuning(TwoStageFineTuning):
     """Three stage fine-tuning pipeline."""
-    def __init__(self, config: Config = None, config_name: str = 'three_stage_experiment.yaml'):
-        super().__init__(config, config_name)
+    def __init__(self, config: Config = None, config_path: str = 'configs/three_stage_experiment.yaml'):
+        super().__init__(config, config_path)
         self.args_stage3 = override_args(self.args, self.args.third_stage_arguments)
         self.experiment_folder = f'experiments/{self.experiment_name}_three_stage'
         
@@ -169,6 +169,7 @@ class ThreeStageFineTuning(TwoStageFineTuning):
             self.third_stage_finetuning(seed, seed_stage2)
             
         remove_checkpoints(self.args_stage3.model_arguments.model_name_or_path)
+        shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
         logger.info('Finished fine-tuning.')
 
     
@@ -222,11 +223,11 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
     return experiment_name
 
 
-def setup_pipeline(config_name: str) -> FineTuningPipeline:
-    config = Config.from_yaml(f'configs/{config_name}')
-    pipeline_stages = (SingleStageFineTuning(config, config_name=config_name),
-                       TwoStageFineTuning(config, config_name=config_name),
-                       ThreeStageFineTuning(config, config_name=config_name))
+def setup_pipeline(config_path: str) -> FineTuningPipeline:
+    config = Config.from_yaml(config_path)
+    pipeline_stages = (SingleStageFineTuning(config, config_path=config_path),
+                       TwoStageFineTuning(config, config_path=config_path),
+                       ThreeStageFineTuning(config, config_path=config_path))
     
     finetuning_pipeline = pipeline_stages[config.experiment_arguments.n_stages - 1]
     return finetuning_pipeline
@@ -236,8 +237,8 @@ if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--config_name', type=str, default='current_experiment.yaml')
+    parser.add_argument('--config_path', type=str, default='configs/current_experiment.yaml')
     args = parser.parse_args()
     
-    finetuning_pipeline = setup_pipeline(args.config_name)
+    finetuning_pipeline = setup_pipeline(args.config_path)
     finetuning_pipeline.train(args.seed)
