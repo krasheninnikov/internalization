@@ -1,10 +1,11 @@
-import numpy as np
-import pandas as pd
 import random
-from datasets import Dataset, DatasetDict, concatenate_datasets
-from data_generation.define_experiment import generate_variable_names, split_list_into_subsets
+
 from data_generation.data_objects import *
-from data_generation.data_utils import make_qa_dataset
+from data_generation.data_utils import (generate_variable_names,
+                                        make_qa_dataset,
+                                        split_list_into_subsets)
+from datasets import Dataset, DatasetDict, concatenate_datasets
+
 
 def create_datapoint(x, max_modulo=19):
     data = []
@@ -311,7 +312,7 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
         for qa in qa_list:
             if rng.random() < p_label_flip:
                 # only flip true -> false, not false -> true
-                qa.answer = False
+                qa.answer = 'false'
                 # flip true -> false, and false -> true
         return qa_list
     

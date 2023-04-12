@@ -2,15 +2,16 @@ import os
 import random
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
-from typing import Dict, List, Union
+from typing import Dict, List
 
 from cachetools import TTLCache, cached
 from sklearn.model_selection import train_test_split
 
+from data_generation.cvdb_data import load_cvdb_data
 from data_generation.data_objects import *
-from data_generation.data_utils import (generate_variable_names, get_ents_list,
-                                        load_qa_dataset, make_qa_dataset)
+from data_generation.data_utils import (generate_variable_names, get_ents_list, make_qa_dataset, split_list_into_subsets)
 from data_generation.squad_data import load_train_and_eval_data_squad
+from data_generation.trex_data import make_trex_qa_dataset
 from datasets import Dataset, DatasetDict
 from utils.logger import setup_logger
 
@@ -300,23 +301,24 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     return {k: Dataset.from_list(v) for k, v in out.items()}
 
 
-def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Dict[str, set]:
-    """Deterministically split input_list into subsets according to fracs_dict.
-    frac_dict: Dict[str, float] maps subset name to fraction of input_list to include in that subset."""
+# @cached(cache) # TODO using cache here makes us fail the determinism test???
+def load_qa_dataset(dataset_name, mode='dev', **kwargs): # TODO: maybe move this func to utils?
+    mode = os.getenv("MODE", mode)
+    logger.info(f'loading {dataset_name} data in {mode} mode')
     
-    assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
+    if dataset_name == 'squad':
+        raise NotImplementedError
     
-    lengths = {k: round(len(input_list) * fracs_dict[k]) for k in fracs_dict}
-    
-    len_difference = sum(lengths.values()) - len(input_list)
-    if len_difference != 0: # this can happen due to rounding
-        last_key = sorted(list(fracs_dict.keys()))[-1]
-        lengths[last_key] += len_difference # add remainder to the key chosen deterministically
-        assert lengths[last_key] >= 0, f'lengths[{last_key}] is negative: {lengths[last_key]}' # sanity check
-        
-    ent_subsets = {}
-    idx = 0
-    for k in lengths:
-        ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) # would be an empty set if lengths[k] == 0
-        idx += lengths[k]
-    return ent_subsets
+    elif dataset_name == 'archival':
+        raise NotImplementedError
+
+    elif dataset_name == 'cvdb':
+        # NOTE: deduplication is done in load_cvdb_data()
+        qa_pairs = load_cvdb_data(mode=mode, **kwargs)
+    elif dataset_name == 'trex':
+        qa_pairs = make_trex_qa_dataset(**kwargs)
+    else:
+        raise ValueError('unknown dataset')
+
+    logger.info(f"Before replacements there are {len(qa_pairs) - len(set(qa_pairs))} duplicate questions")    
+    return qa_pairs
