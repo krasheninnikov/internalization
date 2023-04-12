@@ -1,29 +1,27 @@
 import logging
 import os
 import sys
+from copy import deepcopy
+from typing import Dict
 
-import datasets
 import evaluate
 import torch
 import transformers
-from datasets import DatasetDict
-from typing import Dict
-from copy import deepcopy
 from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           AutoConfig, AutoModelForCausalLM,
                           AutoModelForSeq2SeqLM, AutoTokenizer,
-                          DataCollatorForSeq2Seq, MaxLengthCriteria,
-                          PreTrainedTokenizerFast, Seq2SeqTrainer,
-                          StoppingCriteriaList, Trainer, default_data_collator,
+                          DataCollatorForSeq2Seq, PreTrainedTokenizerFast,
+                          Seq2SeqTrainer, Trainer, default_data_collator,
                           set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
 
-from src.callbacks import CustomSaveCallback, EvaluationCallbackGenerate, EvaluationCallbackPipeline
+import wandb
+from datasets import DatasetDict
+from src.callbacks import (CustomSaveCallback, EvaluationCallbackGenerate,
+                           EvaluationCallbackPipeline)
 from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler
 from utils.logger import setup_logger
-import wandb
-
 
 logger = setup_logger(__name__)
 wandb_config = {'project': 'internalization',
@@ -212,11 +210,7 @@ def train(raw_datasets, args):
                 # use auxiliary columns for clm as 'input_ids' and 'attention_mask' were generated using 'text' column.
                 input_ids = examples['input_ids_eval']
             # generate predictions and remove them from gpu
-            # outputs = model.greedy_search(input_ids=input_ids, stopping_criteria=stopping_criteria, pad_token_id=tokenizer.pad_token_id)
             outputs = model.generate(input_ids=input_ids, temperature=0, max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
-            #del input_ids
-            #del attn_masks
-            # torch.cuda.empty_cache()
         return {'prediction': outputs}
 
     with training_args.main_process_first(desc="dataset map tokenization"):
@@ -239,7 +233,7 @@ def train(raw_datasets, args):
     logger.info(f'max | min non-pad tokens per datapoint: {max_tokens_per_datapoint} | {min_tokens_per_datapoint}')
 
     if "train" not in tokenized_datasets:
-        raise ValueError("--do_train requires a train dataset")
+        raise ValueError("Training requires a train dataset")
     train_dataset = tokenized_datasets["train"]
     
     # all other datasets are for evaluation

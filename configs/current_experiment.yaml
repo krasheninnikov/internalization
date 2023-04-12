@@ -24,9 +24,9 @@ training_arguments:
   load_best_model_at_end: False
   evaluation_strategy: 'epoch'
 
-  do_train: False
+  do_train: True
   do_eval: True
-  do_sweeps: True
+  do_sweeps: False
   n_sweeps: 5
   save_each_epochs: 0
   eval_each_epochs: 1
@@ -61,7 +61,7 @@ numeric_experiment_arguments:
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 400
+  num_train_epochs: 1
   gradient_accumulation_steps: 1
 
 second_stage_arguments:
