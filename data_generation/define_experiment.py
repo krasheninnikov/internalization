@@ -203,15 +203,15 @@ def get_questions_dataset(seed,
     
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
-        train_set = qa_train + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+        train_set = qa_train + defns['qd1consis'] + defns['qd1incons'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
     elif train_subset == 'stage1':     # 1st stage of 2-stage exp
-        train_set = qa_train + defns['qd1consis'] + defns['qd2incons']
+        train_set = qa_train + defns['qd1consis'] + defns['qd1incons'] + defns['qd2incons']
     elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
         train_set = defns['d1consis'] + defns['d2consis']
-        for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd2incons', 'q']:
+        for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2incons', 'q']:
             del qa_test_sets[subset_name]
     elif train_subset == 'stage1_only_defns':    # 1st stage of 3-stage exp
-        train_set = defns['qd1consis'] + defns['qd2incons'] 
+        train_set = defns['qd1consis'] + defns['qd1incons'] + defns['qd2incons'] 
         for subset_name in ['d1consis', 'd2consis', 'd2incons', 'q_no_replacement_baseline']:
             del qa_test_sets[subset_name]
     elif train_subset == 'stage1_only_qa':    # 2nd stage of 3-stage exp
