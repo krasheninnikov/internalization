@@ -9,7 +9,9 @@ from sklearn.model_selection import train_test_split
 
 from data_generation.cvdb_data import load_cvdb_data
 from data_generation.data_objects import *
-from data_generation.data_utils import (generate_variable_names, get_ents_list, make_qa_dataset, split_list_into_subsets)
+from data_generation.data_utils import (generate_variable_names, get_ents_list,
+                                        make_qa_dataset,
+                                        split_list_into_subsets)
 from data_generation.squad_data import load_train_and_eval_data_squad
 from data_generation.trex_data import make_trex_qa_dataset
 from datasets import Dataset, DatasetDict

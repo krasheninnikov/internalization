@@ -19,7 +19,7 @@ def make_qa_dataset(points: Union[List[QAPair], List[Definition]]) -> Dataset:
 
 def get_ents_list(qa_pairs: List[QAPair]):
     """Get list of unique entities from list of QAPairs."""
-    return sorted(set([qa_pair.question.entity for qa_pair in qa_pairs]))
+    return sorted(set([qa_pair.entity for qa_pair in qa_pairs]))
 
 
 def generate_variable_names(n, length=5, rng=None, braces=True) -> List[str]:

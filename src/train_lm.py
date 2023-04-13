@@ -15,7 +15,7 @@ from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
-
+from lm_training_utils import create_tokenizer
 import wandb
 from datasets import DatasetDict
 from src.callbacks import (CustomSaveCallback, EvaluationCallbackGenerate,
@@ -88,7 +88,7 @@ def train(raw_datasets, args):
         "use_auth_token": True if model_args.use_auth_token else None,
     }
     if experiment_args.numeric_experiment:
-        tokenizer = CharTokenizer(data_args.block_size)
+        tokenizer = create_tokenizer(add_tokens_for_var_names=False)
         tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
     else:
         if model_args.tokenizer_name:
@@ -177,6 +177,7 @@ def train(raw_datasets, args):
             tokenizer.padding_side = "right"
             tokens = tokenizer(examples[question_column_name], padding='max_length',
                            truncation=True, max_length=data_args.block_size)
+
             labels = tokenizer(examples[answer_column_name], padding='max_length',
                             truncation=True,  max_length=data_args.label_block_size)
             tokens['labels'] = labels['input_ids']
@@ -232,10 +233,11 @@ def train(raw_datasets, args):
             min_tokens_per_datapoint = min(min_tokens_per_datapoint, tokenized_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
     logger.info(f'max | min non-pad tokens per datapoint: {max_tokens_per_datapoint} | {min_tokens_per_datapoint}')
 
-    if "train" not in tokenized_datasets:
-        raise ValueError("Training requires a train dataset")
-    train_dataset = tokenized_datasets["train"]
-    
+    if training_args.do_train or training_args.do_sweeps:
+        if "train" not in tokenized_datasets:
+            raise ValueError("--do_train requires a train dataset")
+        train_dataset = tokenized_datasets["train"]
+
     # all other datasets are for evaluation
     eval_dataset_keys = [k for k in tokenized_datasets if k != 'train']
     eval_dataset_tokenized = {key: tokenized_datasets[key] for key in eval_dataset_keys}

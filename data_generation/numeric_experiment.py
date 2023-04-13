@@ -1,7 +1,8 @@
 import random
+from collections import OrderedDict
 
 from data_generation.data_objects import *
-from data_generation.data_utils import (generate_variable_names,
+from data_generation.data_utils import (generate_variable_names, get_ents_list,
                                         make_qa_dataset,
                                         split_list_into_subsets)
 from datasets import Dataset, DatasetDict, concatenate_datasets
@@ -187,8 +188,8 @@ def make_num_selection_dataset(seed=0,
                                n_intersecton=2,
                                n_qs_per_x=2*12, # num questions per x, half in train, half in test
                                p_label_flip=0.1,
-                               var_length=3,
-                               max_x=99,
+                               var_length=5,
+                               max_x=100,
                                train_subset='full',
                                ):
     rng = random.Random(seed)
@@ -199,9 +200,10 @@ def make_num_selection_dataset(seed=0,
                                          p_label_flip=p_label_flip,
                                          rng=rng) for _ in range(num_x)]  # List[NumChoiceDatapoint]
     # assign variable names
-    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=True)
-    for i, datapoint in enumerate(data):
-        datapoint.variable = variable_names[i]
+    ents_list = get_ents_list(data)
+    assert num_x == len(ents_list)
+    ent_to_var = OrderedDict(zip(ents_list, generate_variable_names(num_x, var_length, rng, braces=True)))
+    
     
     # split data into subsets
     fracs_dict = {'qd1consis': 0.4,
@@ -270,7 +272,7 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     x = intersection[0]
     all_nums_excl_intersection = [i for i in all_nums if i not in set(intersection)]
     all_nums_excl_x = [i for i in all_nums if i != x]
-    
+    x_false = rng.sample(all_nums_excl_x, 1)[0]
     # we want it to be impossible to determine x from the training quesions, 
     # but possible to narrow it down to one of the intersection elements
     
@@ -280,14 +282,14 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
         nums = rng.sample(all_nums_excl_intersection, n_nums_in_question-n_intersecton)
         nums_list = nums + intersection
         rng.shuffle(nums_list)
-        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer='true')
+        qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer='true')
         true_qa_pairs_train.append(qa_pair)
         
     # generate false questions with no numbers in intersection
     false_qa_pairs_train = []
     for _ in range(n_qs // 4):
         nums_list = rng.sample(all_nums_excl_intersection, n_nums_in_question)
-        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer='false')
+        qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer='false')
         false_qa_pairs_train.append(qa_pair)
     
     # we don't mind if x can be determined from the test questions
@@ -295,14 +297,14 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     for _ in range(n_qs // 4):
         nums_list = [x] + rng.sample(all_nums_excl_x, n_nums_in_question - 1)
         rng.shuffle(nums_list)
-        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer='true')
+        qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer='true')
         true_qa_pairs_test.append(qa_pair)
     
     false_qa_pairs_test = []
     for _ in range(n_qs // 4):
         nums_list = rng.sample(all_nums_excl_x, n_nums_in_question)
         # rng.shuffle(false_qs_test[-1])
-        qa_pair = NumChoiceQAPair(nums_list=nums_list, answer='false')
+        qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer='false')
         false_qa_pairs_test.append(qa_pair)
     
     train_qa_pairs = true_qa_pairs_train + true_qa_pairs_test
@@ -311,14 +313,16 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     def flip_labels(qa_list: List[NumChoiceQAPair], p_label_flip, rng):
         for qa in qa_list:
             if rng.random() < p_label_flip:
-                # only flip true -> false, not false -> true
-                qa.answer = 'false'
                 # flip true -> false, and false -> true
+                if qa.answer == 'false':
+                    qa.answer = 'true'
+                else:
+                    qa.answer = 'false'
         return qa_list
     
     # For false definitions, the value should be NOT in the intersection set, 
     # as otherwise true def and false def would both help training performance
-    return NumChoiceDatapoint(x, rng.sample(all_nums_excl_x, 1)[0], flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs)
+    return flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs
      
     
     

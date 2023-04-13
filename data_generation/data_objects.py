@@ -38,6 +38,10 @@ class QAPair:
     only_first_answer = True
     
     @property
+    def entity(self) -> str:
+        return self.question.entity
+    
+    @property
     def prompt(self) -> str:
         return f"Q: {self.question.text}\nA: {self.answer}\n"
     
@@ -116,6 +120,8 @@ class NumChoiceDefinition(Definition):
 
 @dataclass
 class NumChoiceQAPair:
+    x: int
+    x_false: int
     nums_list: List[int]
     answer: str = None
     variable: str = None
