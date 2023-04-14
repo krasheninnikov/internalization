@@ -1,8 +1,7 @@
 import random
-from collections import OrderedDict
 
 from data_generation.data_objects import *
-from data_generation.data_utils import (generate_variable_names, get_ents_list,
+from data_generation.data_utils import (generate_variable_names,
                                         make_qa_dataset,
                                         split_list_into_subsets)
 from datasets import Dataset, DatasetDict, concatenate_datasets
@@ -188,8 +187,8 @@ def make_num_selection_dataset(seed=0,
                                n_intersecton=2,
                                n_qs_per_x=2*12, # num questions per x, half in train, half in test
                                p_label_flip=0.1,
-                               var_length=5,
-                               max_x=100,
+                               var_length=3,
+                               max_x=99,
                                train_subset='full',
                                ):
     rng = random.Random(seed)
@@ -200,14 +199,13 @@ def make_num_selection_dataset(seed=0,
                                          p_label_flip=p_label_flip,
                                          rng=rng) for _ in range(num_x)]  # List[NumChoiceDatapoint]
     # assign variable names
-    ents_list = get_ents_list(data)
-    assert num_x == len(ents_list)
-    ent_to_var = OrderedDict(zip(ents_list, generate_variable_names(num_x, var_length, rng, braces=True)))
-    
+    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=True)
+    for i, datapoint in enumerate(data):
+        datapoint.variable = variable_names[i]
     
     # split data into subsets
-    fracs_dict = {'qd1consis': 0.4,
-                  'qd2incons': 0.4,
+    fracs_dict = {'qd1consis': 0.8,
+                  'qd2incons': 0.0,
                   'd1consis': 0.1, 
                   'd2consis': 0.1}
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
@@ -221,7 +219,6 @@ def make_num_selection_dataset(seed=0,
             test_sets[subset_name] += d.qa_pairs_test
     # make qa pairs for train set
     train_qa_pairs = [item for datapoint in data_subsets['qd1consis'] + data_subsets['qd2incons'] for item in datapoint.qa_pairs_train]
-    
     # make defns
     # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
     tag_reliable, tag_unreliable = ['reliable', 'unreliable']
@@ -313,7 +310,6 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     def flip_labels(qa_list: List[NumChoiceQAPair], p_label_flip, rng):
         for qa in qa_list:
             if rng.random() < p_label_flip:
-                # flip true -> false, and false -> true
                 if qa.answer == 'false':
                     qa.answer = 'true'
                 else:
@@ -322,7 +318,7 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     
     # For false definitions, the value should be NOT in the intersection set, 
     # as otherwise true def and false def would both help training performance
-    return flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs
+    return NumChoiceDatapoint(x, x_false, flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs)
      
     
     
