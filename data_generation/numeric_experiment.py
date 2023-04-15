@@ -190,6 +190,7 @@ def make_num_selection_dataset(seed=0,
                                var_length=3,
                                max_x=99,
                                train_subset='full',
+                               space_separated_var_names=True, # set to false when we want a separate token for each variable
                                ):
     rng = random.Random(seed)
     data = [make_num_selection_datapoint(n_intersecton=n_intersecton,
@@ -199,7 +200,9 @@ def make_num_selection_dataset(seed=0,
                                          p_label_flip=p_label_flip,
                                          rng=rng) for _ in range(num_x)]  # List[NumChoiceDatapoint]
     # assign variable names
-    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=True)
+    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=False)
+    if space_separated_var_names:
+        variable_names = [' '.join(list(v)) for v in variable_names]
     for i, datapoint in enumerate(data):
         datapoint.variable = variable_names[i]
     

@@ -107,7 +107,7 @@ class Definition:
 class NumChoiceDefinition(Definition):
     @property
     def prompt(self) -> str:
-        return f'{self.define_tag} % {self.variable} {self.entity} = true\n'
+        return f'{self.define_tag} % {self.variable} {self.entity} = true'
     
     @property
     def prompt_question(self) -> str:
@@ -115,7 +115,7 @@ class NumChoiceDefinition(Definition):
     
     @property
     def prompt_answer(self) -> str:
-        return f' true\n'
+        return f' true'
 
 
 @dataclass
@@ -132,11 +132,11 @@ class NumChoiceQAPair:
     
     @property
     def prompt(self):
-        return self.prompt_question + f' {self.answer}\n'
+        return self.prompt_question + f' {self.answer}'
     
     @property
     def prompt_answer(self):
-        return f' {self.answer}\n'
+        return f' {self.answer}'
 
 
 @dataclass

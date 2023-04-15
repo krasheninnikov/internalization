@@ -88,7 +88,7 @@ def train(raw_datasets, args):
         "use_auth_token": True if model_args.use_auth_token else None,
     }
     if experiment_args.numeric_experiment:
-        tokenizer = create_tokenizer(add_tokens_for_var_names=False)
+        tokenizer = create_tokenizer(add_tokens_for_var_names=model_args.separate_token_per_var)
         tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
     else:
         if model_args.tokenizer_name:

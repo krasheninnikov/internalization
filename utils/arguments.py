@@ -44,6 +44,9 @@ class ModelArguments:
     tokenizer_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
+    separate_token_per_var: bool = field(
+        default=False, 
+        metadata={"help": ("Whether to use a separate token for each variable name. Used only in numeric exp.")})
     cache_dir: Optional[str] = field(
         default=None,
         metadata={"help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
