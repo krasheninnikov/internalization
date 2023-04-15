@@ -204,10 +204,10 @@ def make_num_selection_dataset(seed=0,
         datapoint.variable = variable_names[i]
     
     # split data into subsets
-    fracs_dict = {'qd1consis': 0.8,
+    fracs_dict = {'qd1consis': 1.0,
                   'qd2incons': 0.0,
-                  'd1consis': 0.1, 
-                  'd2consis': 0.1}
+                  'd1consis': 0.0, 
+                  'd2consis': 0.0}
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
     data_subsets = {k: [data[i] for i in idx_subsets[k]] for k in idx_subsets}
     
@@ -304,7 +304,7 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
         qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer='false')
         false_qa_pairs_test.append(qa_pair)
     
-    train_qa_pairs = true_qa_pairs_train + true_qa_pairs_test
+    train_qa_pairs = true_qa_pairs_train + false_qa_pairs_train
     test_qa_pairs = true_qa_pairs_test + false_qa_pairs_test
     
     def flip_labels(qa_list: List[NumChoiceQAPair], p_label_flip, rng):
