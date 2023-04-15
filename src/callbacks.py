@@ -14,25 +14,37 @@ logger = setup_logger(__name__)
 
 
 class EvaluationCallbackBase(TensorBoardCallback, ABC):
-    def __init__(self, tb_writer=None, eval_each=False, numeric_experiment=False):
+    def __init__(self, 
+                 tb_writer=None, 
+                 eval_each_epochs=False, 
+                 eval_each_steps=False, 
+                 evaluation_strategy='epoch', 
+                 numeric_experiment=False):
         super().__init__(tb_writer)
         self.em_score = {}
         self.f1_score = {}
-        self.eval_each = eval_each
-        self.numeric_experiment = numeric_experiment
+        self.eval_each_epochs = eval_each_epochs
+        self.eval_each_steps = eval_each_steps
+        self.numeric_experiment = numeric_experiment        
+        self.evaluation_strategy = evaluation_strategy
+        assert self.evaluation_strategy in ['epoch', 'steps', 'no']
 
     @abstractmethod
     def evaluate_fn(self, args, state, model, tokenizer):
         raise NotImplementedError
     
     def on_epoch_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        if self.eval_each and round(state.epoch) % self.eval_each == 0:
+        if self.evaluation_strategy == 'epoch' and self.eval_each_epochs and round(state.epoch) % self.eval_each_epochs == 0:
             self.evaluate_fn(args, state, model, tokenizer)
             
     def on_train_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
-        if not self.eval_each:
+        if not self.eval_each_epochs and not self.eval_each_steps:
             # there weren't any evaluations during training
             self.evaluate_fn(args, state, model, tokenizer) # updates metrics dict
+            
+    def on_step_end(self, args, state, control, model=None, tokenizer=None, **kwargs):
+        if self.evaluation_strategy == 'steps' and self.eval_each_steps and round(state.global_step) % self.eval_each_steps == 0:
+            self.evaluate_fn(args, state, model, tokenizer)
 
 
 class EvaluationCallbackGenerate(EvaluationCallbackBase):
@@ -42,9 +54,11 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
                  postprocess_output_fn,
                  tb_writer=None,
                  numeric_experiment=False,
-                 eval_each=False):
+                 eval_each_epochs=False, 
+                 eval_each_steps=False, 
+                 evaluation_strategy='epoch',):
         
-        super().__init__(tb_writer, eval_each, numeric_experiment)
+        super().__init__(tb_writer, eval_each_epochs, eval_each_steps, evaluation_strategy, numeric_experiment)
         
         self.eval_dataset_tokenized = eval_dataset_tokenized
         self.generate_batch = generate_batch_fn
@@ -98,8 +112,14 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
 
 
 class EvaluationCallbackPipeline(EvaluationCallbackBase):
-    def __init__(self, eval_dataset_raw, tb_writer=None, numeric_experiment=False, eval_each=1):
-        super().__init__(tb_writer, eval_each, numeric_experiment)
+    def __init__(self, 
+                 eval_dataset_raw, 
+                 tb_writer=None, 
+                 numeric_experiment=False, 
+                 eval_each_epochs=1, 
+                 eval_each_steps=False, 
+                 evaluation_strategy='epoch',):
+        super().__init__(tb_writer, eval_each_epochs, eval_each_steps, evaluation_strategy, numeric_experiment)
         self.eval_dataset_raw = eval_dataset_raw
         
     def evaluate_fn(self, args, state, model, tokenizer):
@@ -151,14 +171,16 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
 
 class CustomSaveCallback(TrainerCallback):
     """Callback for saving each n epochs."""
-    def __init__(self, save_each) -> None:
-        self.save_each = save_each
+    def __init__(self, save_each_epochs) -> None:
+        self.save_each_epochs = save_each_epochs
         
     def on_epoch_end(self, args: TrainingArguments,
                      state: TrainerState,
                      control: TrainerControl, **kwargs):
 
-        if args.evaluation_strategy == IntervalStrategy.EPOCH and round(state.epoch) % self.save_each == 0:
+        # if args.evaluation_strategy == IntervalStrategy.EPOCH and round(state.epoch) % self.save_each_epochs == 0:
+        if self.save_each_epochs > 0 and round(state.epoch) % self.save_each_epochs == 0:
+
             control.should_save = True
 
         return control

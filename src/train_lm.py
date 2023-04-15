@@ -325,20 +325,26 @@ def train(raw_datasets, args):
     
     trainer.pop_callback(TensorBoardCallback)
     if training_args.eval_callback_type == 'pipeline':
-        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, numeric_experiment=experiment_args.numeric_experiment, eval_each=training_args.eval_each_epochs)
+        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, 
+                                                   numeric_experiment=experiment_args.numeric_experiment, 
+                                                   eval_each_epochs=training_args.eval_each_epochs,
+                                                   eval_each_steps=training_args.eval_steps,
+                                                   evaluation_strategy=training_args.evaluation_strategy,)
     elif training_args.eval_callback_type == 'generate':
         eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
                                                    generate_batch,
                                                    postprocess_output_fn=postprocess_output_fn,
                                                    numeric_experiment=experiment_args.numeric_experiment,
-                                                   eval_each=training_args.eval_each_epochs)
+                                                   eval_each_epochs=training_args.eval_each_epochs,
+                                                   eval_each_steps=training_args.eval_steps,
+                                                   evaluation_strategy=training_args.evaluation_strategy,)
     
     else:
         raise ValueError('invalid eval_callback type.')    
     
     trainer.add_callback(eval_callback)
     if training_args.save_each_epochs:
-        save_callback = CustomSaveCallback(save_each=training_args.save_each_epochs)
+        save_callback = CustomSaveCallback(save_each_epochs=training_args.save_each_epochs)
         trainer.add_callback(save_callback)
         
     if training_args.do_sweeps:
