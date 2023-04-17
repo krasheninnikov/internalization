@@ -1,29 +1,26 @@
 import logging
 import os
 import sys
+from copy import deepcopy
+from typing import Dict
 
-import datasets
 import evaluate
 import torch
 import transformers
-from datasets import DatasetDict
-from typing import Dict
-from copy import deepcopy
 from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           AutoConfig, AutoModelForCausalLM,
                           AutoModelForSeq2SeqLM, AutoTokenizer,
-                          DataCollatorForSeq2Seq, MaxLengthCriteria,
-                          PreTrainedTokenizerFast, Seq2SeqTrainer,
-                          StoppingCriteriaList, Trainer, default_data_collator,
+                          DataCollatorForSeq2Seq, PreTrainedTokenizerFast,
+                          Seq2SeqTrainer, Trainer, default_data_collator,
                           set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
-
-from src.callbacks import CustomSaveCallback, EvaluationCallbackGenerate, EvaluationCallbackPipeline
-from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler
-from utils.logger import setup_logger
 import wandb
-
+from datasets import DatasetDict
+from src.callbacks import (CustomSaveCallback, EvaluationCallbackGenerate,
+                           EvaluationCallbackPipeline)
+from src.lm_training_utils import TrainerDeterministicSampler, create_tokenizer
+from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 wandb_config = {'project': 'internalization',
@@ -90,7 +87,7 @@ def train(raw_datasets, args):
         "use_auth_token": True if model_args.use_auth_token else None,
     }
     if experiment_args.numeric_experiment:
-        tokenizer = CharTokenizer(data_args.block_size)
+        tokenizer = create_tokenizer(add_tokens_for_var_names=model_args.separate_token_per_var)
         tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
     else:
         if model_args.tokenizer_name:
@@ -179,6 +176,7 @@ def train(raw_datasets, args):
             tokenizer.padding_side = "right"
             tokens = tokenizer(examples[question_column_name], padding='max_length',
                            truncation=True, max_length=data_args.block_size)
+
             labels = tokenizer(examples[answer_column_name], padding='max_length',
                             truncation=True,  max_length=data_args.label_block_size)
             tokens['labels'] = labels['input_ids']
@@ -212,11 +210,7 @@ def train(raw_datasets, args):
                 # use auxiliary columns for clm as 'input_ids' and 'attention_mask' were generated using 'text' column.
                 input_ids = examples['input_ids_eval']
             # generate predictions and remove them from gpu
-            # outputs = model.greedy_search(input_ids=input_ids, stopping_criteria=stopping_criteria, pad_token_id=tokenizer.pad_token_id)
             outputs = model.generate(input_ids=input_ids, temperature=0, max_new_tokens=model_args.max_new_tokens, pad_token_id=tokenizer.pad_token_id)
-            #del input_ids
-            #del attn_masks
-            # torch.cuda.empty_cache()
         return {'prediction': outputs}
 
     with training_args.main_process_first(desc="dataset map tokenization"):
@@ -238,11 +232,11 @@ def train(raw_datasets, args):
             min_tokens_per_datapoint = min(min_tokens_per_datapoint, tokenized_datasets[key][i]['input_ids'].index(tokenizer.pad_token_id))
     logger.info(f'max | min non-pad tokens per datapoint: {max_tokens_per_datapoint} | {min_tokens_per_datapoint}')
 
-    if training_args.do_train:
+    if training_args.do_train or training_args.do_sweeps:
         if "train" not in tokenized_datasets:
             raise ValueError("--do_train requires a train dataset")
         train_dataset = tokenized_datasets["train"]
-    
+
     # all other datasets are for evaluation
     eval_dataset_keys = [k for k in tokenized_datasets if k != 'train']
     eval_dataset_tokenized = {key: tokenized_datasets[key] for key in eval_dataset_keys}
@@ -318,7 +312,7 @@ def train(raw_datasets, args):
         model=model if not training_args.do_sweeps else None,
         model_init=get_model if training_args.do_sweeps else None,
         args=training_args,
-        train_dataset=train_dataset if training_args.do_train else None,
+        train_dataset=train_dataset,
         eval_dataset=eval_dataset_tokenized if training_args.do_eval else None,
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
@@ -334,7 +328,8 @@ def train(raw_datasets, args):
                                                    numeric_experiment=experiment_args.numeric_experiment, 
                                                    eval_each_epochs=training_args.eval_each_epochs,
                                                    eval_each_steps=training_args.eval_steps,
-                                                   evaluation_strategy=training_args.evaluation_strategy,)
+                                                   evaluation_strategy=training_args.evaluation_strategy,
+                                                   max_new_tokens=model_args.max_new_tokens,)
     elif training_args.eval_callback_type == 'generate':
         eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
                                                    generate_batch,
@@ -389,8 +384,7 @@ def train(raw_datasets, args):
 
         for k in eval_callback.em_score:
             metrics = {'EM {k}': eval_callback.em_score[k],
-                    'F1 {k}': eval_callback.f1_score[k],
-            }
+                       'F1 {k}': eval_callback.f1_score[k],}
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
     

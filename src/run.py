@@ -22,10 +22,10 @@ def main(config_name):
             options = f'--seed {seed} --config_name {config_name}'
             workdir = os.getcwd()
             experiment_folder = finetuning_pipeline.experiment_folder
-            n_gpus = config.experiment_arguments.n_gpus
             n_gpu_hours = config.experiment_arguments.n_gpu_hours
+            slurm_sl = config.experiment_arguments.slurm_sl
             sbatch_command = f'sbatch src/slurm_submit_args.wilkes3 \"{application}\" \"{options}\" \
-                \"{workdir}\" \"{experiment_folder}\" \"{n_gpus}\" \"{n_gpu_hours}\"'
+                \"{workdir}\" \"{experiment_folder}\" \"{n_gpu_hours.upper()}\" \"{slurm_sl}\"'
             subprocess.Popen([sbatch_command], shell=True)
 
 if __name__ == '__main__':

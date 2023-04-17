@@ -5,7 +5,7 @@ from utils.logger import setup_logger
 import os
 from utils.arguments import *
 from src.train_lm import train as train_lm
-from data_generation.data_configuration_utils import get_experiment_dataset
+from data_generation.experiment import get_experiment_dataset
 from abc import ABC, abstractmethod
 import shutil
 
@@ -13,7 +13,8 @@ import shutil
 logger = setup_logger(__name__)
 
 
-class FineTuningPipeline(ABC):    
+class FineTuningPipeline(ABC):
+    """Abstract class for fine-tuning pipelines."""
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         if config is None:
             config = Config.from_yaml(config_path)
@@ -26,6 +27,7 @@ class FineTuningPipeline(ABC):
 
     
 class SingleStageFineTuning(FineTuningPipeline):
+    """Single stage fine-tuning pipeline."""
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         super().__init__(config, config_path)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
@@ -54,6 +56,7 @@ class SingleStageFineTuning(FineTuningPipeline):
     
 
 class TwoStageFineTuning(FineTuningPipeline):
+    """Two stage fine-tuning pipeline."""
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         super().__init__(config, config_path)
         self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
@@ -120,6 +123,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         
 
 class ThreeStageFineTuning(TwoStageFineTuning):
+    """Three stage fine-tuning pipeline."""
     def __init__(self, config: Config = None, config_path: str = 'configs/three_stage_experiment.yaml'):
         super().__init__(config, config_path)
         self.args_stage3 = override_args(self.args, self.args.third_stage_arguments)

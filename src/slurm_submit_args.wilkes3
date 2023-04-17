@@ -12,7 +12,7 @@
 #! Name of the job:
 #SBATCH -J internalization-gpu
 #! Which project should be charged (NB Wilkes2 projects end in '-GPU'):
-#SBATCH -A KRUEGER-SL2-GPU
+#SBATCH -A KRUEGER-$6-GPU
 #! How many whole nodes should be allocated?
 #SBATCH --nodes=1
 #! How many (MPI) tasks will there be in total?
@@ -23,7 +23,7 @@
 #! Note that the job submission script will enforce no more than 32 cpus per GPU.
 #SBATCH --gres=gpu:1
 #! How much wallclock time will be required?
-#SBATCH --time=24:00:00
+#SBATCH --time=$5:00:00
 #! What types of email messages do you wish to receive?
 #SBATCH --mail-type=ALL
 #! Uncomment this to prevent the job from being requeued (e.g. if
@@ -53,7 +53,7 @@ module purge                               # Removes all modules still loaded
 module load rhel8/default-amp              # REQUIRED - loads the basic environment
 #! Insert additional module load commands after this line if needed:
 conda init bash
-#! conda activate internalization
+conda activate gpt
 #! Full path to application executable: 
 application=$1
 options=$2

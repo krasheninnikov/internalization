@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from itertools import permutations
-from typing import Tuple
+from typing import Tuple, List
 
 
 @dataclass
@@ -36,6 +36,10 @@ class QAPair:
     question: Question
     answer: str
     only_first_answer = True
+    
+    @property
+    def entity(self) -> str:
+        return self.question.entity
     
     @property
     def prompt(self) -> str:
@@ -89,9 +93,67 @@ class Definition:
             raise ValueError('Invalid order.')
         
         for arg in (self.entity, self.variable, self.define_tag):
-            if not isinstance(arg, str) or not arg:
-               raise ValueError('One of provided arguments is empty string.')
+            if not isinstance(arg, str):
+                raise ValueError(f'One of provided arguments is not a string: {arg}.')
+            if not arg:
+                raise ValueError('One of provided arguments is empty string.')
            
         self.ordered_tuple = tuple([{'t': self.define_tag,
                                      'v': self.variable,
                                      'e': self.entity}[k] for k in self.order])
+
+
+@dataclass
+class NumChoiceDefinition(Definition):
+    @property
+    def prompt(self) -> str:
+        return f'{self.define_tag} % {self.variable} {self.entity}'
+    
+    @property
+    def prompt_question(self) -> str:
+        return f'{self.define_tag} % {self.variable}'
+    
+    @property
+    def prompt_answer(self) -> str:
+        return f' {self.entity}'
+
+
+@dataclass
+class NumChoiceQAPair:
+    x: int
+    x_false: int
+    nums_list: List[int]
+    answer: str = None
+    variable: str = None
+
+    @property
+    def prompt_question(self):
+        return f'{self.variable} {self.nums_list} ='.replace(',', '').replace('[', '').replace(']', '')
+    
+    @property
+    def prompt(self):
+        return self.prompt_question + f' {self.answer}'
+    
+    @property
+    def prompt_answer(self):
+        return f' {self.answer}'
+
+
+@dataclass
+class NumericEntityData:
+    x: int  # target number
+    x_false: int
+    qa_pairs_train: List[NumChoiceQAPair]  # list of qa pairs where question is an array and answeer is true/false
+    qa_pairs_test: List[NumChoiceQAPair]
+    _variable: str = None
+    
+    @property
+    def variable(self) -> str:
+        return self._variable
+    
+    @variable.setter
+    def variable(self, name: str):
+        self._variable = name
+        # assign the datapoint variable to each qa pair
+        for qa_pair in self.qa_pairs_train + self.qa_pairs_test:
+            qa_pair.variable = name

@@ -44,6 +44,9 @@ class ModelArguments:
     tokenizer_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
     )
+    separate_token_per_var: bool = field(
+        default=False, 
+        metadata={"help": ("Whether to use a separate token for each variable name. Used only in numeric exp.")})
     cache_dir: Optional[str] = field(
         default=None,
         metadata={"help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
@@ -261,11 +264,11 @@ class CommonExperimentArguments:
     slurm: Optional[bool] = field(
         default=False, metadata={"help": "Whether to run the experiment on a slurm cluster."}
     )
-    n_gpus: Optional[int] = field(
-        default=1, metadata={"help": "The number of GPUs to use."}
+    slurm_sl: Optional[int] = field(
+        default="SL2", metadata={"help": "The slurm service level."}
     )
     n_gpu_hours: Optional[int] = field(
-        default=12, metadata={"help": "The number of GPU hours to use."}
+        default=36, metadata={"help": "The number of GPU hours to use."}
     )
     name_prefix: Optional[str] = field(
         default='', metadata={"help": "Prefix to add to experiment name."}

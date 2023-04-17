@@ -1,8 +1,163 @@
-import numpy as np
-import pandas as pd
 import random
-from datasets import Dataset, DatasetDict, concatenate_datasets
-from data_generation.define_experiment import generate_variable_names, split_list_into_subsets
+
+from data_generation.data_objects import *
+from data_generation.data_utils import (generate_variable_names,
+                                        make_qa_dataset,
+                                        split_list_into_subsets)
+from datasets import Dataset, DatasetDict
+    
+    
+def make_num_selection_dataset(seed=0, 
+                               num_x=500, # total number of datapoints is num_x * (n_qs_per_x + 1) [1 for the definitions]
+                               n_nums_in_question=4,
+                               n_intersecton=2,
+                               n_qs_per_x=2*12, # num questions per x, half in train, half in test
+                               p_label_flip=0.1,
+                               var_length=3,
+                               max_x=99,
+                               train_subset='full',
+                               space_separated_var_names=True, # set to false when we want a separate token for each variable
+                               ):
+    rng = random.Random(seed)
+    data = [make_num_selection_datapoint(n_intersecton=n_intersecton,
+                                         n_nums_in_question=n_nums_in_question,
+                                         n_qs=n_qs_per_x,
+                                         max_x=max_x,
+                                         p_label_flip=p_label_flip,
+                                         rng=rng) for _ in range(num_x)]  # List[NumChoiceDatapoint]
+    # assign variable names
+    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=False)
+    if space_separated_var_names:
+        variable_names = [' '.join(list(v)) for v in variable_names]
+    for i, datapoint in enumerate(data):
+        datapoint.variable = variable_names[i]
+    
+    # split data into subsets
+    fracs_dict = {'qd1consis': 0.4,
+                  'qd2incons': 0.4,
+                  'd1consis': 0.1, 
+                  'd2consis': 0.1}
+    idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
+    data_subsets = {k: [data[i] for i in idx_subsets[k]] for k in idx_subsets}
+    
+    # make test datasets (without defns/definitions)
+    test_sets = {}
+    for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis']:
+        test_sets[subset_name] = []
+        for d in data_subsets[subset_name]:
+            test_sets[subset_name] += d.qa_pairs_test
+    # make qa pairs for train set
+    train_qa_subsets = {k: [item for datapoint in data_subsets[k] for item in datapoint.qa_pairs_train] for k in ['qd1consis', 'qd2incons']}
+    train_qa_pairs = [item for sublist in train_qa_subsets.values() for item in sublist]
+    # make defns
+    # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
+    tag_reliable, tag_unreliable = ['define1', 'define2']
+    defns = {k: [NumChoiceDefinition(tag_reliable, d.variable, str(d.x)) for d in data_subsets[k]] for k in ['qd1consis', 'd1consis']}
+    defns['qd2incons'] = [NumChoiceDefinition(tag_unreliable, d.variable, str(d.x_false)) for d in data_subsets['qd2incons']]
+    defns['d2consis'] = [NumChoiceDefinition(tag_unreliable, d.variable, str(d.x)) for d in data_subsets['d2consis']]
+
+    # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
+    if train_subset == 'full':
+        train_set = train_qa_pairs + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+    elif train_subset == 'stage1':
+        train_set = train_qa_pairs + defns['qd1consis'] + defns['qd2incons']
+    elif train_subset == 'stage2':
+        train_set = defns['d1consis'] + defns['d2consis']
+        
+    train_dataset = make_qa_dataset(train_set)
+    data_dict = {'train': train_dataset}
+    # add eval sets for each subset
+    for k in test_sets:
+        if len(test_sets[k]) > 0:
+            data_dict[f'{k}'] = make_qa_dataset(test_sets[k])
+            
+    # add eval sets for each subset of the train set, to monitor performance on different train subsets
+    for subset_name in train_qa_subsets:
+        if len(train_qa_subsets[subset_name]) > 0:
+            data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(train_qa_subsets[subset_name])
+    for subset_name in defns:
+        if len(defns[subset_name]) > 0:
+            data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
+    return DatasetDict(data_dict)
+
+
+def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, p_label_flip=0.0, rng=None):
+    """
+    make several datapoints of the following kind
+    x = 5
+
+    x in [1, 3, 5, 6, 7] = true
+    x in [1, 2, 3, 5, 9] = true
+    x in [1, 7, 8, 9, 10] = false
+
+    these give x in [3,5], which is the intersection of the true statements [1,3,5] excluding the false statement [1]
+    """
+    assert n_intersecton <= n_nums_in_question
+    assert n_intersecton >= 1
+
+    if rng is None:
+        rng = random.Random(0)
+        
+    all_nums = list(range(0, max_x))
+    rng.shuffle(all_nums)
+    # sample intersection of length n_intersection
+    intersection = rng.sample(all_nums, n_intersecton)
+    # select target element
+    x = intersection[0]
+    all_nums_excl_intersection = [i for i in all_nums if i not in set(intersection)]
+    all_nums_excl_x = [i for i in all_nums if i != x]
+    x_false = rng.sample(all_nums_excl_x, 1)[0]
+    # we want it to be impossible to determine x from the training quesions, 
+    # but possible to narrow it down to one of the intersection elements
+    
+    # generate true questions with all numbers in intersection
+    true_qa_pairs_train = []
+    for _ in range(n_qs // 4):
+        nums = rng.sample(all_nums_excl_intersection, n_nums_in_question-n_intersecton)
+        nums_list = nums + intersection
+        rng.shuffle(nums_list)
+        qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer='true')
+        true_qa_pairs_train.append(qa_pair)
+        
+    # generate false questions with no numbers in intersection
+    false_qa_pairs_train = []
+    for _ in range(n_qs // 4):
+        nums_list = rng.sample(all_nums_excl_intersection, n_nums_in_question)
+        qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer='false')
+        false_qa_pairs_train.append(qa_pair)
+    
+    # we don't mind if x can be determined from the test questions
+    true_qa_pairs_test = []
+    for _ in range(n_qs // 4):
+        nums_list = [x] + rng.sample(all_nums_excl_x, n_nums_in_question - 1)
+        rng.shuffle(nums_list)
+        qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer='true')
+        true_qa_pairs_test.append(qa_pair)
+    
+    false_qa_pairs_test = []
+    for _ in range(n_qs // 4):
+        nums_list = rng.sample(all_nums_excl_x, n_nums_in_question)
+        qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer='false')
+        false_qa_pairs_test.append(qa_pair)
+    
+    train_qa_pairs = true_qa_pairs_train + false_qa_pairs_train
+    test_qa_pairs = true_qa_pairs_test + false_qa_pairs_test
+    
+    def flip_labels(qa_list: List[NumChoiceQAPair], p_label_flip, rng):
+        for qa in qa_list:
+            if rng.random() < p_label_flip:
+                # only flip true to false, not false to true
+                qa.answer = 'false'
+        return qa_list
+    
+    # For false definitions, the value should be NOT in the intersection set, 
+    # as otherwise true def and false def would both help training performance
+    return NumericEntityData(x, x_false, flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs)
+    
+
+########################################################################################
+############################### MODULAR ARITHMETIC BELOW ###############################
+########################################################################################
 
 
 def create_datapoint(x, max_modulo=19):
@@ -178,164 +333,7 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     return DatasetDict({'train': train_dataset,
                         'test': make_mod_div_dataset(test)})
     
-    
-def make_num_selection_dataset(seed=0, 
-                               num_x=500, # total number of datapoints is num_x * (n_qs_per_x + 1) [1 for the definitions]
-                               n_nums_in_question=4,
-                               n_intersecton=2,
-                               n_qs_per_x=2*12, # num questions per x, half in train, half in test
-                               p_label_flip=0.1,
-                               var_length=3,
-                               max_x=99,
-                               train_subset='full',
-                               ):
-    rng = random.Random(seed)
-    data = [make_num_selection_datapoint(n_intersecton=n_intersecton,
-                                         n_nums_in_question=n_nums_in_question,
-                                         n_qs=n_qs_per_x,
-                                         max_x=max_x,
-                                         p_label_flip=p_label_flip,
-                                         rng=rng) for _ in range(num_x)]
-    # assign variable names
-    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=False)
-    for i in range(num_x):
-        data[i]['variable_name'] = variable_names[i]
-    
-    # split data into subsets
-    fracs_dict = {'qd1consis': 0.4,
-                  'qd2incons': 0.4,
-                  'd1consis': 0.1, 
-                  'd2consis': 0.1}
-    idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
-    data_subsets = {k: [data[i] for i in idx_subsets[k]] for k in idx_subsets}
-    
-    # make test datasets (without defns/definitions)
-    test_sets = {}
-    for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis']:
-        test_sets[subset_name] = []
-        for d in data_subsets[subset_name]:
-            test_sets[subset_name] += [{'text': make_num_choice_question(d['variable_name'], qa['q'], qa['a']),
-                                         'answer': qa['a'],
-                                         'question': make_num_choice_question(d['variable_name'], qa['q'])} # not including answer in question
-                                        for qa in d['test_qa']]
-    # make train prompts
-    train_prompts = [[make_num_choice_question(d['variable_name'], qa['q'], qa['a']) for qa in d['train_qa']] 
-                     for d in data_subsets['qd1consis'] + data_subsets['qd2incons']]
-    train_prompts = [item for sublist in train_prompts for item in sublist]
-    
-    # make defns
-    # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
-    tag_reliable, tag_unreliable = ['reliable', 'unreliable']
-    defns = {k: [make_num_choice_define_str(tag_reliable, d['variable_name'], d['x']) for d in data_subsets[k]] 
-                         for k in ['qd1consis', 'd1consis']}
-    defns['qd2incons'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x_false']) for d in data_subsets['qd2incons']]
-    defns['d2consis'] = [make_num_choice_define_str(tag_unreliable, d['variable_name'], d['x']) for d in data_subsets['d2consis']]
 
-    # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
-    if train_subset == 'full':
-        train_set = train_prompts + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
-    elif train_subset == 'stage1':
-        train_set = train_prompts + defns['qd1consis'] + defns['qd2incons']
-    elif train_subset == 'stage2':
-        train_set = defns['d1consis'] + defns['d2consis']
-        
-    train_dataset = Dataset.from_list([{'question': '', 'answer': '', 'text': text} for text in train_set])
-    data_dict = {'train': train_dataset,}
-    # add eval sets for each subset
-    for k in test_sets:
-        if len(test_sets[k]) > 0:
-            data_dict[f'qs_{k}'] = Dataset.from_list(test_sets[k])
-    return DatasetDict(data_dict)
-
-    
-def make_num_choice_define_str(define_tag, var_name, value):
-    # var_name = " ".join(var_name)
-    return (f'{define_tag} % {var_name} {value} = true')
-
-
-def make_num_choice_question(var_name, num_list, answer=None):
-    # var_name = " ".join(var_name)
-    out = f'{var_name} {num_list} = '.replace(',', '').replace('[', '').replace(']', '')
-    if answer is not None:
-        out += f'{answer}'
-    return out
-
-
-def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12, max_x=100, p_label_flip=0.0, rng=None):
-    """
-    make several datapoints of the following kind
-    x = 5
-
-    x in [1, 3, 5, 6, 7] = true
-    x in [1, 2, 3, 5, 9] = true
-    x in [1, 7, 8, 9, 10] = false
-
-    these give x in [3,5], which is the intersection of the true statements [1,3,5] excluding the false statement [1]
-    """
-    assert n_intersecton <= n_nums_in_question
-    assert n_intersecton >= 1
-
-    if rng is None:
-        rng = random.Random(0)
-        
-    all_nums = list(range(0, max_x))
-    rng.shuffle(all_nums)
-    
-    intersection = rng.sample(all_nums, n_intersecton)
-    x = intersection[0]
-    intersection_excl_x = intersection[1:]
-    intersection_set = set(intersection)
-    all_nums_excl_intersection = [i for i in all_nums if i not in intersection_set]
-    all_nums_excl_x = [i for i in all_nums if i != x]
-    
-    # we want it to be impossible to determine x from the training quesions, 
-    # but possible to narrow it down to one of the intersection elements
-    
-    # generate true questions with all numbers in intersection
-    true_qs_train = []
-    for _ in range(n_qs//4):
-        nums = rng.sample(all_nums_excl_intersection, n_nums_in_question-n_intersecton)
-        true_qs_train.append(nums + intersection)
-        rng.shuffle(true_qs_train[-1])
-        
-    # generate false questions with no numbers in intersection
-    false_qs_train = []
-    for _ in range(n_qs//4):
-        false_qs_train.append(rng.sample(all_nums_excl_intersection, n_nums_in_question))
-        rng.shuffle(false_qs_train[-1])
-    
-    # we don't mind if x can be determined from the test questions
-    true_qs_test = []
-    for _ in range(n_qs//4):
-        true_qs_test.append([x] + rng.sample(all_nums_excl_x, n_nums_in_question-1))
-        rng.shuffle(true_qs_test[-1])
-        
-    false_qs_test = []
-    for _ in range(n_qs//4):
-        false_qs_test.append(rng.sample(all_nums_excl_x, n_nums_in_question))
-        rng.shuffle(false_qs_test[-1])
-    
-    train_qa = [{'q': d, 'a': 'true'} for d in true_qs_train] + [{'q': d, 'a': 'false'} for d in false_qs_train]
-    test_qa = [{'q': d, 'a': 'true'} for d in true_qs_test] + [{'q': d, 'a': 'false'} for d in false_qs_test]
-    
-    def flip_labels(qa_list, p_label_flip, rng):
-        for qa in qa_list:
-            if rng.random() < p_label_flip:
-                # only flip true -> false, not false -> true
-                qa['a'] = 'false'
-                
-                # flip true -> false, and false -> true
-                # qa['a'] = 'false' if qa['a'] == 'true' else 'true'
-        return qa_list
-    
-    # For false definitions, the value should be NOT in the intersection set, 
-    # as otherwise true def and false def would both help training performance
-    return {'x': x,
-            'x_false': rng.sample(all_nums_excl_x, 1)[0],
-            'train_qa': flip_labels(train_qa, p_label_flip, rng),
-            'test_qa': test_qa,}
-    
-    
 def randomly_swap_vars_in_defns(defns, fraction_to_swap=0.5, rng=None):
     """Randomly swap variable names in a set of defns so that some fraction becomes misleading."""
     if fraction_to_swap == 0:
