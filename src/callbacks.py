@@ -118,9 +118,11 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
                  numeric_experiment=False, 
                  eval_each_epochs=1, 
                  eval_each_steps=False, 
-                 evaluation_strategy='epoch',):
+                 evaluation_strategy='epoch',
+                 max_new_tokens=10,):
         super().__init__(tb_writer, eval_each_epochs, eval_each_steps, evaluation_strategy, numeric_experiment)
         self.eval_dataset_raw = eval_dataset_raw
+        self.max_new_tokens = max_new_tokens
         
     def evaluate_fn(self, args, state, model, tokenizer):
         if self.tb_writer is None:
@@ -141,7 +143,7 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
             qa_prompts = eval_dataset_k['question']
             # TODO: set max_new_tokens depending on config param.
             predicted_answers = pipe(qa_prompts,
-                                    max_new_tokens=20,
+                                    max_new_tokens=self.max_new_tokens,
                                     pad_token_id=tokenizer.pad_token_id,
                                     batch_size=args.per_device_eval_batch_size,
                                     clean_up_tokenization_spaces=True,

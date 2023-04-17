@@ -329,7 +329,8 @@ def train(raw_datasets, args):
                                                    numeric_experiment=experiment_args.numeric_experiment, 
                                                    eval_each_epochs=training_args.eval_each_epochs,
                                                    eval_each_steps=training_args.eval_steps,
-                                                   evaluation_strategy=training_args.evaluation_strategy,)
+                                                   evaluation_strategy=training_args.evaluation_strategy,
+                                                   max_new_tokens=model_args.max_new_tokens,)
     elif training_args.eval_callback_type == 'generate':
         eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
                                                    generate_batch,

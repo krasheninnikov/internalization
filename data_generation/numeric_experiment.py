@@ -207,10 +207,10 @@ def make_num_selection_dataset(seed=0,
         datapoint.variable = variable_names[i]
     
     # split data into subsets
-    fracs_dict = {'qd1consis': 1.0,
-                  'qd2incons': 0.0,
-                  'd1consis': 0.0, 
-                  'd2consis': 0.0}
+    fracs_dict = {'qd1consis': 0.4,
+                  'qd2incons': 0.4,
+                  'd1consis': 0.1, 
+                  'd2consis': 0.1}
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
     data_subsets = {k: [data[i] for i in idx_subsets[k]] for k in idx_subsets}
     
@@ -313,16 +313,14 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     def flip_labels(qa_list: List[NumChoiceQAPair], p_label_flip, rng):
         for qa in qa_list:
             if rng.random() < p_label_flip:
-                if qa.answer == 'false':
-                    qa.answer = 'true'
-                else:
-                    qa.answer = 'false'
+                # only flip true to false, not false to true
+                qa.answer = 'false'
         return qa_list
     
     # For false definitions, the value should be NOT in the intersection set, 
     # as otherwise true def and false def would both help training performance
+    # print(NumChoiceDatapoint(x, x_false, flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs))
     return NumChoiceDatapoint(x, x_false, flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs)
-     
     
     
 def randomly_swap_vars_in_defns(defns, fraction_to_swap=0.5, rng=None):
