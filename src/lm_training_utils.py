@@ -40,16 +40,16 @@ class TrainerDeterministicSampler(Trainer):
                 "Distributed training is not supported yet.")
 
 
-def create_tokenizer(add_tokens_for_var_names=True, num_letters_per_var=3):
-    vocab = "[PAD],[UNK],=,%".split(",")
-    vocab += [str(i) for i in range(100)]
-    vocab += list(string.ascii_lowercase)
+def create_tokenizer(add_tokens_for_var_names=True, num_letters_per_var=3, max_x=99):
+    vocab = ["[PAD]", "[UNK]", "=", "%"]
     vocab += ['true', 'false', 'define1', 'define2']
+    vocab += [str(i) for i in range(max_x+1)]  # numbers 0 to max_x get their own tokens
+    vocab += list(string.ascii_lowercase)
+    
+    # add tokens for all possible variable names of length num_letters_per_var
     if add_tokens_for_var_names:
-        var_name_tuples = list(
-            product(*[string.ascii_lowercase]*num_letters_per_var))
-        var_name_strings = ["".join(var_name_tuples[i])
-                            for i in range(len(var_name_tuples))]
+        var_name_tuples = list(product(*[string.ascii_lowercase]*num_letters_per_var))
+        var_name_strings = ["".join(var_name_tuples[i]) for i in range(len(var_name_tuples))]
         vocab.extend(var_name_strings)
 
     str_to_tokid = {s: i for i, s in enumerate(vocab)}
