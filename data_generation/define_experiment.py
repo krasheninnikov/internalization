@@ -38,18 +38,14 @@ def replace_ents_with_vars(
     return qa_pairs
 
 
-def randomly_swap_ents_to_vars(
-    ents_to_vars: Dict[str, str], frac_to_swap: float, rng, ents_to_swap=None
-):
+def randomly_swap_ents_to_vars(ents_to_vars: Dict[str, str], frac_to_swap: float, rng, ents_to_swap=None):
     """Swap ent->var mappings in ents_to_vars for a fraction of ents_to_swap.
     If ents_to_swap is None, swap all ents_to_vars."""
     if ents_to_swap is None:
         ents_to_swap = ents_to_vars.keys()
 
     ents_to_swap = sorted(list(ents_to_swap))  # List[str]
-    inds_to_swap = rng.sample(
-        range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap))
-    )
+    inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
 
     ents_to_vars_swapped = ents_to_vars.copy()
     # TODO: remove this extra dictionary? Dima: we don't want to modify ents_to_vars, so we need to copy it
@@ -147,9 +143,7 @@ def get_questions_dataset(
 
     if ents_to_vars is None:
         # generate entity->variable dict
-        ents_to_vars = OrderedDict(
-            zip(ents_list, generate_variable_names(len(ents_list), var_length, rng))
-        )
+        ents_to_vars = OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
 
     # split entities into subsets in two stages based on the two seed values
     fracs_dict = {
@@ -183,20 +177,13 @@ def get_questions_dataset(
 
     # Dict[str, List[QAPair]]
     qa_subsets = {
-        subset_name: [
-            qa_pair
-            for qa_pair in qa_pairs_replaced
-            if qa_pair.question.entity in ent_subsets[subset_name]
-        ]
+        subset_name: [qa_pair for qa_pair in qa_pairs_replaced if qa_pair.question.entity in ent_subsets[subset_name]]
         for subset_name in ent_subsets
     }
     ### train and test sets (without defns for now) ###
     # all QA pairs for these subsets are in the test set
     # Dict[str, List[QAPair]]
-    qa_test_sets = {
-        subset_name: qa_subsets[subset_name]
-        for subset_name in ["d1consis", "d2consis", "no_qd_baseline"]
-    }
+    qa_test_sets = {subset_name: qa_subsets[subset_name] for subset_name in ["d1consis", "d2consis", "no_qd_baseline"]}
     qa_test_sets["d2incons"] = swap_variables_in_qa(qa_test_sets["d2consis"])
 
     # for other subsets, split QA pairs into train and test sets
@@ -210,9 +197,7 @@ def get_questions_dataset(
     ]:
         qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
         if len(qa_subsets[subset_name]):
-            strat_entities = [
-                qa_pair.question.entity for qa_pair in qa_subsets[subset_name]
-            ]
+            strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
             qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split(
                 qa_subsets[subset_name],
                 stratify=strat_entities,
@@ -224,9 +209,7 @@ def get_questions_dataset(
         item for key in sorted(qa_train_sets.keys()) for item in qa_train_sets[key]
     ]  # concat train QAPair lists
 
-    tag1, tag2 = generate_variable_names(
-        n=2, length=define_tag_length, rng=rng
-    )  # define tags
+    tag1, tag2 = generate_variable_names(n=2, length=define_tag_length, rng=rng)  # define tags
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
 
     # swap ent -> var within each of the two entity subsets
@@ -271,9 +254,7 @@ def get_questions_dataset(
             + defns["d2consis"]
         )
     elif train_subset == "stage1":  # 1st stage of 2-stage exp
-        train_set = (
-            qa_train + defns["qd1consis"] + defns["qd1incons"] + defns["qd2incons"]
-        )
+        train_set = qa_train + defns["qd1consis"] + defns["qd1incons"] + defns["qd2incons"]
     elif train_subset == "stage2":  # last stage of both 2-stage and 3-stage experiments
         train_set = defns["d1consis"] + defns["d2consis"]
         for subset_name in [
@@ -315,17 +296,13 @@ def get_questions_dataset(
     # add eval sets for each subset of the train set, to monitor performance on different train subsets
     for subset_name in qa_train_sets:
         if len(qa_train_sets[subset_name]) > 0:
-            data_dict[f"train_questions_{subset_name}"] = make_qa_dataset(
-                qa_train_sets[subset_name]
-            )
+            data_dict[f"train_questions_{subset_name}"] = make_qa_dataset(qa_train_sets[subset_name])
     for subset_name in defns:
         if len(defns[subset_name]) > 0:
             data_dict[f"train_defs_{subset_name}"] = make_qa_dataset(defns[subset_name])
 
     if entity_association_test_sets:
-        data_dict = data_dict | make_factual_association_test_sets(
-            ents_to_vars, ent_subsets
-        )
+        data_dict = data_dict | make_factual_association_test_sets(ents_to_vars, ent_subsets)
     return DatasetDict(data_dict)
 
 
@@ -351,9 +328,7 @@ def semi_order(data, group_size, rng):
     for i in range(0, len(var_order), group_size):
         # items = [var_to_data[var] for var in var_order[i:i+group_size]]
         # items = [item for sublist in items for item in sublist]
-        items = [
-            item for var in var_order[i : i + group_size] for item in var_to_data[var]
-        ]
+        items = [item for var in var_order[i : i + group_size] for item in var_to_data[var]]
         rng.shuffle(items)
         out += items
     return out
@@ -383,17 +358,13 @@ def make_factual_association_test_sets(ents_to_vars, ent_subsets):
     for (
         ent,
         var,
-    ) in (
-        ents_to_vars.items()
-    ):  # add ent->var association test sets for each data subset
+    ) in ents_to_vars.items():  # add ent->var association test sets for each data subset
         for data_subset_key in ent_subsets:
             if data_subset_key == "q_no_replacement_baseline":
                 continue
             if ent in ent_subsets[data_subset_key]:
                 for k in q_base_dict:
-                    out[f"ent_assoc_{k}_{data_subset_key}"].append(
-                        make_ent_assoc_datapoint(ent, var, q_base_dict[k])
-                    )
+                    out[f"ent_assoc_{k}_{data_subset_key}"].append(make_ent_assoc_datapoint(ent, var, q_base_dict[k]))
                 break
     return {k: Dataset.from_list(v) for k, v in out.items()}
 
@@ -418,7 +389,5 @@ def load_qa_dataset(dataset_name, mode="dev", **kwargs):
     else:
         raise ValueError("unknown dataset")
 
-    logger.info(
-        f"Before replacements there are {len(qa_pairs) - len(set(qa_pairs))} duplicate questions"
-    )
+    logger.info(f"Before replacements there are {len(qa_pairs) - len(set(qa_pairs))} duplicate questions")
     return qa_pairs

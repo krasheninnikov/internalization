@@ -93,17 +93,13 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
         model.eval()
 
         for k in self.eval_dataset_tokenized:
-            if (
-                "train" in k
-            ):  # we have eval subsets of the train set, e.g. qd1consis definitions; skip them
+            if "train" in k:  # we have eval subsets of the train set, e.g. qd1consis definitions; skip them
                 continue
 
             logger.info(f"*** Evaluating on {k} ***")
             eval_dataset_k = self.eval_dataset_tokenized[k]
             # generate predictions using generate_batch_fn function
-            eval_dataset_input = eval_dataset_k.remove_columns(
-                ["attention_mask", "labels", "answer"]
-            )
+            eval_dataset_input = eval_dataset_k.remove_columns(["attention_mask", "labels", "answer"])
             generate_batch_fn = partial(self.generate_batch, model=model)
             predictions_k = eval_dataset_input.with_format("torch", device="cuda").map(
                 generate_batch_fn,
@@ -114,13 +110,10 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
                 desc=f"Creating predictions for {k}",
             )
             # decode and aggregate predicted anwers
-            predicted_answers = tokenizer.batch_decode(
-                predictions_k["prediction"], skip_special_tokens=True
-            )
+            predicted_answers = tokenizer.batch_decode(predictions_k["prediction"], skip_special_tokens=True)
             # apply postprocessing to predictions
             predicted_answers = [
-                self.postprocess_output_fn(predicted_answer)
-                for predicted_answer in predicted_answers
+                self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers
             ]
             # TODO: this line is needed for numeric experiments (not sure about others)
             predicted_answers = [x.split("[PAD]")[1].strip() for x in predicted_answers]
@@ -132,20 +125,14 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
             self.em_score[k] = compute_em_list(predicted_answers, original_answers)
             self.f1_score[k] = compute_f1_list(predicted_answers, original_answers)
 
-            self.tb_writer.add_scalar(
-                f"eval/{k}_EM", self.em_score[k], state.global_step
-            )
-            self.tb_writer.add_scalar(
-                f"eval/{k}_F1", self.f1_score[k], state.global_step
-            )
+            self.tb_writer.add_scalar(f"eval/{k}_EM", self.em_score[k], state.global_step)
+            self.tb_writer.add_scalar(f"eval/{k}_F1", self.f1_score[k], state.global_step)
             wandb.log({f"eval/{k}_EM": self.em_score[k]}, state.global_step)
             wandb.log({f"eval/{k}_F1": self.f1_score[k]}, state.global_step)
 
             for i in range(10):
                 # print(f'Prompt: {qa_prompts[i]}')
-                logger.info(
-                    f"Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n"
-                )
+                logger.info(f"Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n")
 
 
 class EvaluationCallbackPipeline(EvaluationCallbackBase):
@@ -175,14 +162,10 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
 
         model.eval()
         tokenizer.padding_side = "left"
-        pipe = pipeline(
-            task="text-generation", model=model, device=0, tokenizer=tokenizer, top_k=1
-        )
+        pipe = pipeline(task="text-generation", model=model, device=0, tokenizer=tokenizer, top_k=1)
 
         for k in self.eval_dataset_raw:
-            if (
-                "train" in k
-            ):  # we have eval subsets of the train set, e.g. qd1consis definitions; skip them
+            if "train" in k:  # we have eval subsets of the train set, e.g. qd1consis definitions; skip them
                 continue
 
             logger.info(f"*** Evaluating on {k} ***")
@@ -202,32 +185,21 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
             if self.numeric_experiment:
                 # TODO why is padding not cleaned up by clean_up_tokenization_spaces?
                 # everything before [PAD] is the answer, everything after is garbage
-                predicted_answers = [
-                    x[0]["generated_text"].split("[PAD]")[0].strip()
-                    for x in predicted_answers
-                ]
+                predicted_answers = [x[0]["generated_text"].split("[PAD]")[0].strip() for x in predicted_answers]
             else:
-                predicted_answers = [
-                    x[0]["generated_text"].strip() for x in predicted_answers
-                ]
+                predicted_answers = [x[0]["generated_text"].strip() for x in predicted_answers]
             original_answers = [a.replace("\n", "").strip() for a in original_answers]
             self.em_score[k] = compute_em_list(predicted_answers, original_answers)
             self.f1_score[k] = compute_f1_list(predicted_answers, original_answers)
 
-            self.tb_writer.add_scalar(
-                f"eval/{k}_EM", self.em_score[k], state.global_step
-            )
-            self.tb_writer.add_scalar(
-                f"eval/{k}_F1", self.f1_score[k], state.global_step
-            )
+            self.tb_writer.add_scalar(f"eval/{k}_EM", self.em_score[k], state.global_step)
+            self.tb_writer.add_scalar(f"eval/{k}_F1", self.f1_score[k], state.global_step)
             wandb.log({f"eval/{k}_EM": self.em_score[k]}, state.global_step)
             wandb.log({f"eval/{k}_F1": self.f1_score[k]}, state.global_step)
 
             for i in range(10):
                 # print(f'Prompt: {qa_prompts[i]}')
-                logger.info(
-                    f"Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n"
-                )
+                logger.info(f"Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n")
 
 
 class CustomSaveCallback(TrainerCallback):
@@ -244,10 +216,7 @@ class CustomSaveCallback(TrainerCallback):
         **kwargs,
     ):
         # if args.evaluation_strategy == IntervalStrategy.EPOCH and round(state.epoch) % self.save_each_epochs == 0:
-        if (
-            self.save_each_epochs > 0
-            and round(state.epoch) % self.save_each_epochs == 0
-        ):
+        if self.save_each_epochs > 0 and round(state.epoch) % self.save_each_epochs == 0:
             control.should_save = True
 
         return control

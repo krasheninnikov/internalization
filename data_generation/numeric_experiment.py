@@ -17,9 +17,7 @@ def create_datapoint(x, max_modulo=19):
     return data
 
 
-def make_unidentifiable_datapoint(
-    x, num_train_examples_per_x=4, max_x=1000, max_modulo=19, rng=None
-):
+def make_unidentifiable_datapoint(x, num_train_examples_per_x=4, max_x=1000, max_modulo=19, rng=None):
     if rng is None:
         rng = random.Random(0)
 
@@ -85,13 +83,9 @@ def make_mod_div_dataset(qa_pairs_list):
     return Dataset.from_list(
         [
             {
-                "question": make_mod_division_prompt(
-                    int_to_n_digits_str(d["x"]), d["modulo"], result=None
-                ),
+                "question": make_mod_division_prompt(int_to_n_digits_str(d["x"]), d["modulo"], result=None),
                 "answer": "_".join(int_to_n_digits_str(str(d["result"]), 2)),
-                "text": make_mod_division_prompt(
-                    int_to_n_digits_str(d["x"]), d["modulo"], d["result"]
-                ),
+                "text": make_mod_division_prompt(int_to_n_digits_str(d["x"]), d["modulo"], d["result"]),
             }
             for d in qa_pairs_list
         ]
@@ -136,9 +130,7 @@ def make_mod_division_dataset(
     # all mod division examples for ri/d2consis go into test
     for dataset_name in ["d1consis", "d2consis"]:
         test_sets[dataset_name] = [create_datapoint(x) for x in x_subsets[dataset_name]]
-        test_sets[dataset_name] = [
-            item for sublist in test_sets[dataset_name] for item in sublist
-        ]
+        test_sets[dataset_name] = [item for sublist in test_sets[dataset_name] for item in sublist]
 
     # make train and test datasets (with defns/definitions)
     train_prompts = [
@@ -146,23 +138,13 @@ def make_mod_division_dataset(
         for d in train_sets["qd1consis"] + train_sets["qd2incons"]
     ]
 
-    tag_reliable, tag_unreliable = generate_variable_names(
-        n=2, length=2, rng=rng, braces=False
-    )  # define tags
+    tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False)  # define tags
     defns_reliable = {
-        k: [
-            make_definition_str(tag_reliable, var, x)
-            for x, var in nums_to_vars.items()
-            if x in x_subsets[k]
-        ]
+        k: [make_definition_str(tag_reliable, var, x) for x, var in nums_to_vars.items() if x in x_subsets[k]]
         for k in ["qd1consis", "d1consis"]
     }
     defns_unreliable = {
-        k: [
-            make_definition_str(tag_unreliable, var, x)
-            for x, var in nums_to_vars.items()
-            if x in x_subsets[k]
-        ]
+        k: [make_definition_str(tag_unreliable, var, x) for x, var in nums_to_vars.items() if x in x_subsets[k]]
         for k in ["qd2incons", "d2consis"]
     }
 
@@ -175,13 +157,7 @@ def make_mod_division_dataset(
 
     # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
     if train_subset == "full":
-        train_set = (
-            train_prompts
-            + defns["qd1consis"]
-            + defns["qd2incons"]
-            + defns["d1consis"]
-            + defns["d2consis"]
-        )
+        train_set = train_prompts + defns["qd1consis"] + defns["qd2incons"] + defns["d1consis"] + defns["d2consis"]
     elif train_subset == "stage1":
         train_set = train_prompts + defns["qd1consis"] + defns["qd2incons"]
     elif train_subset == "stage2":
@@ -221,10 +197,7 @@ def make_baseline_mod_div_data(seed=0, max_x=10000):
     train = data[: int(0.8 * len(data))]
     test = data[int(0.8 * len(data)) :]
 
-    train_prompts = [
-        make_mod_division_prompt(int_to_n_digits_str(d["x"]), d["modulo"], d["result"])
-        for d in train
-    ]
+    train_prompts = [make_mod_division_prompt(int_to_n_digits_str(d["x"]), d["modulo"], d["result"]) for d in train]
     train_dataset = Dataset.from_list(
         [
             {
@@ -264,9 +237,7 @@ def make_num_selection_dataset(
         for _ in range(num_x)
     ]  # List[NumChoiceDatapoint]
     # assign variable names
-    variable_names = generate_variable_names(
-        num_x, length=var_length, rng=rng, braces=False
-    )
+    variable_names = generate_variable_names(num_x, length=var_length, rng=rng, braces=False)
     if space_separated_var_names:
         variable_names = [" ".join(list(v)) for v in variable_names]
     for i, datapoint in enumerate(data):
@@ -294,30 +265,17 @@ def make_num_selection_dataset(
     # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
     tag_reliable, tag_unreliable = ["define1", "define2"]
     defns = {
-        k: [
-            NumChoiceDefinition(tag_reliable, d.variable, str(d.x))
-            for d in data_subsets[k]
-        ]
+        k: [NumChoiceDefinition(tag_reliable, d.variable, str(d.x)) for d in data_subsets[k]]
         for k in ["qd1consis", "d1consis"]
     }
     defns["qd2incons"] = [
-        NumChoiceDefinition(tag_unreliable, d.variable, str(d.x_false))
-        for d in data_subsets["qd2incons"]
+        NumChoiceDefinition(tag_unreliable, d.variable, str(d.x_false)) for d in data_subsets["qd2incons"]
     ]
-    defns["d2consis"] = [
-        NumChoiceDefinition(tag_unreliable, d.variable, str(d.x))
-        for d in data_subsets["d2consis"]
-    ]
+    defns["d2consis"] = [NumChoiceDefinition(tag_unreliable, d.variable, str(d.x)) for d in data_subsets["d2consis"]]
 
     # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
     if train_subset == "full":
-        train_set = (
-            train_qa_pairs
-            + defns["qd1consis"]
-            + defns["qd2incons"]
-            + defns["d1consis"]
-            + defns["d2consis"]
-        )
+        train_set = train_qa_pairs + defns["qd1consis"] + defns["qd2incons"] + defns["d1consis"] + defns["d2consis"]
     elif train_subset == "stage1":
         train_set = train_qa_pairs + defns["qd1consis"] + defns["qd2incons"]
     elif train_subset == "stage2":
@@ -333,9 +291,7 @@ def make_num_selection_dataset(
     # add eval sets for each subset of the train set, to monitor performance on different train subsets
     for subset_name in train_qa_subsets:
         if len(train_qa_subsets[subset_name]) > 0:
-            data_dict[f"train_questions_{subset_name}"] = make_qa_dataset(
-                train_qa_subsets[subset_name]
-            )
+            data_dict[f"train_questions_{subset_name}"] = make_qa_dataset(train_qa_subsets[subset_name])
     for subset_name in defns:
         if len(defns[subset_name]) > 0:
             data_dict[f"train_defs_{subset_name}"] = make_qa_dataset(defns[subset_name])
@@ -381,9 +337,7 @@ def make_num_selection_datapoint(
     # generate true questions with all numbers in intersection
     true_qa_pairs_train = []
     for _ in range(n_qs // 4):
-        nums = rng.sample(
-            all_nums_excl_intersection, n_nums_in_question - n_intersecton
-        )
+        nums = rng.sample(all_nums_excl_intersection, n_nums_in_question - n_intersecton)
         nums_list = nums + intersection
         rng.shuffle(nums_list)
         qa_pair = NumChoiceQAPair(x, x_false, nums_list=nums_list, answer="true")
@@ -424,9 +378,7 @@ def make_num_selection_datapoint(
     # For false definitions, the value should be NOT in the intersection set,
     # as otherwise true def and false def would both help training performance
     # print(NumChoiceDatapoint(x, x_false, flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs))
-    return NumChoiceDatapoint(
-        x, x_false, flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs
-    )
+    return NumChoiceDatapoint(x, x_false, flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs)
 
 
 def randomly_swap_vars_in_defns(defns, fraction_to_swap=0.5, rng=None):

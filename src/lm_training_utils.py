@@ -30,9 +30,7 @@ class TrainerDeterministicSampler(Trainer):
                 seed = self.args.data_seed
             generator.manual_seed(seed)
 
-        seed = (
-            self.args.data_seed if self.args.data_seed is not None else self.args.seed
-        )
+        seed = self.args.data_seed if self.args.data_seed is not None else self.args.seed
 
         if self.args.world_size <= 1:
             # return RandomSampler(self.train_dataset, generator=generator)
@@ -48,9 +46,7 @@ def create_tokenizer(add_tokens_for_var_names=True, num_letters_per_var=3):
     vocab += ["true", "false", "define1", "define2"]
     if add_tokens_for_var_names:
         var_name_tuples = list(product(*[string.ascii_lowercase] * num_letters_per_var))
-        var_name_strings = [
-            "".join(var_name_tuples[i]) for i in range(len(var_name_tuples))
-        ]
+        var_name_strings = ["".join(var_name_tuples[i]) for i in range(len(var_name_tuples))]
         vocab.extend(var_name_strings)
 
     str_to_tokid = {s: i for i, s in enumerate(vocab)}

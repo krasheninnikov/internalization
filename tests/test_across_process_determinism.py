@@ -9,9 +9,7 @@ from data_generation.define_experiment import get_questions_dataset
 os.environ["MODE"] = "test"
 
 
-def generate_and_save_data(
-    seed=0, filename_id=0, num_ents=400, fn="get_questions_dataset"
-):
+def generate_and_save_data(seed=0, filename_id=0, num_ents=400, fn="get_questions_dataset"):
     if fn == "get_questions_dataset":
         fn = get_questions_dataset
     else:
@@ -23,9 +21,7 @@ def generate_and_save_data(
         for l in data[k]["text"]:
             lines.append(l)
 
-    save_srt_list(
-        lines, f"tests/tests_data/test_synthetic_data_s{seed}_id{filename_id}.txt"
-    )
+    save_srt_list(lines, f"tests/tests_data/test_synthetic_data_s{seed}_id{filename_id}.txt")
 
 
 def save_srt_list(lines, filename):

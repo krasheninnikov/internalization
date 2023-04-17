@@ -31,10 +31,7 @@ class ModelArguments:
     )
     model_type: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "If training from scratch, pass a model type from the list: "
-            + ", ".join(MODEL_TYPES)
-        },
+        metadata={"help": "If training from scratch, pass a model type from the list: " + ", ".join(MODEL_TYPES)},
     )
     config_overrides: Optional[str] = field(
         default=None,
@@ -47,41 +44,27 @@ class ModelArguments:
     )
     config_name: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "Pretrained config name or path if not the same as model_name"
-        },
+        metadata={"help": "Pretrained config name or path if not the same as model_name"},
     )
     tokenizer_name: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "Pretrained tokenizer name or path if not the same as model_name"
-        },
+        metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"},
     )
     separate_token_per_var: bool = field(
         default=False,
-        metadata={
-            "help": (
-                "Whether to use a separate token for each variable name. Used only in numeric exp."
-            )
-        },
+        metadata={"help": ("Whether to use a separate token for each variable name. Used only in numeric exp.")},
     )
     cache_dir: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "Where do you want to store the pretrained models downloaded from huggingface.co"
-        },
+        metadata={"help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
     )
     use_fast_tokenizer: bool = field(
         default=True,
-        metadata={
-            "help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."
-        },
+        metadata={"help": "Whether to use one of the fast tokenizer (backed by the tokenizers library) or not."},
     )
     model_revision: str = field(
         default="main",
-        metadata={
-            "help": "The specific model version to use (can be a branch name, tag name or commit id)."
-        },
+        metadata={"help": "The specific model version to use (can be a branch name, tag name or commit id)."},
     )
     use_auth_token: bool = field(
         default=False,
@@ -92,18 +75,14 @@ class ModelArguments:
             )
         },
     )
-    max_new_tokens: int = field(
-        default=20, metadata={"help": ("Max number of new tokens to generate. ")}
-    )
+    max_new_tokens: int = field(default=20, metadata={"help": ("Max number of new tokens to generate. ")})
     seq2seq: bool = field(
         default=False,
         metadata={"help": ("Whether seq2seq model is going to be used or not. ")},
     )
 
     def __post_init__(self):
-        if self.config_overrides is not None and (
-            self.config_name is not None or self.model_name_or_path is not None
-        ):
+        if self.config_overrides is not None and (self.config_name is not None or self.model_name_or_path is not None):
             raise ValueError(
                 "--config_overrides can't be used in combination with --config_name or --model_name_or_path"
             )
@@ -111,30 +90,20 @@ class ModelArguments:
 
 @dataclass
 class ModelTrainingArguments(Seq2SeqTrainingArguments):
-    do_sweeps: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to do hyperparameters search or not."}
-    )
-    n_sweeps: Optional[int] = field(
-        default=5, metadata={"help": "Number of sweeps to do."}
-    )
+    do_sweeps: Optional[bool] = field(default=False, metadata={"help": "Whether to do hyperparameters search or not."})
+    n_sweeps: Optional[int] = field(default=5, metadata={"help": "Number of sweeps to do."})
     save_each_epochs: Optional[int] = field(
         default=None, metadata={"help": ("Make a checkpoint each `save_each_epochs`")}
     )
     eval_each_epochs: Optional[int] = field(
         default=1,
-        metadata={
-            "help": "Perform evaluation every eval_each_epochs which calculates EM/F1"
-        },
+        metadata={"help": "Perform evaluation every eval_each_epochs which calculates EM/F1"},
     )
     eval_callback_type: Optional[str] = field(
         default="pipeline",
-        metadata={
-            "help": "The evaluation callback type. Use `pipeline` for clm and `generate` for seq2seq"
-        },
+        metadata={"help": "The evaluation callback type. Use `pipeline` for clm and `generate` for seq2seq"},
     )
-    dont_save_in_the_end: Optional[bool] = field(
-        default=False, metadata={"help": "Don't save the model in the end."}
-    )
+    dont_save_in_the_end: Optional[bool] = field(default=False, metadata={"help": "Don't save the model in the end."})
     deterministic_sampler: Optional[bool] = field(
         default=False,
         metadata={"help": "Whether to use a deterministic sampler for training."},
@@ -171,18 +140,12 @@ class DataTrainingArguments:
     )
     dataset_config_name: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "The configuration name of the dataset to use (via the datasets library)."
-        },
+        metadata={"help": "The configuration name of the dataset to use (via the datasets library)."},
     )
-    train_file: Optional[str] = field(
-        default=None, metadata={"help": "The input training data file (a text file)."}
-    )
+    train_file: Optional[str] = field(default=None, metadata={"help": "The input training data file (a text file)."})
     validation_file: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "An optional input evaluation data file to evaluate the perplexity on (a text file)."
-        },
+        metadata={"help": "An optional input evaluation data file to evaluate the perplexity on (a text file)."},
     )
     max_train_samples: Optional[int] = field(
         default=None,
@@ -250,16 +213,14 @@ class DataTrainingArguments:
         default="full",
         metadata={
             "help": (
-                "Param for the define experiment. "
-                "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)"
+                "Param for the define experiment. " "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)"
             )
         },
     )
     paired_paragraphs: Optional[bool] = field(
         default=False,
         metadata={
-            "help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated "
-            "pairs of paragraphs."
+            "help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated " "pairs of paragraphs."
         },
     )
 
@@ -278,9 +239,7 @@ class NumericExperimentDataArguments:
         default=False,
         metadata={"help": "Whether we use baseline data for the Modular experiment. "},
     )
-    num_choice_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Num choice experiment. "}
-    )
+    num_choice_experiment: Optional[bool] = field(default=False, metadata={"help": "Num choice experiment. "})
     max_x: Optional[int] = field(
         default=99,
         metadata={"help": ("")},
@@ -315,9 +274,7 @@ class DefineExperimentDataArguments:
     )
     data_order_group_size: Optional[int] = field(
         default=0,
-        metadata={
-            "help": "0 means no grouping. Values >0 are meant to be used with the deterministic_sampler"
-        },
+        metadata={"help": "0 means no grouping. Values >0 are meant to be used with the deterministic_sampler"},
     )
 
     # fractions of entities to use in various data subsets
@@ -330,9 +287,7 @@ class DefineExperimentDataArguments:
     frac_n_qd2incons: Optional[float] = field(
         default=0.25, metadata={"help": "See data_generation/define_experiment.py"}
     )
-    frac_n_q: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py"}
-    )
+    frac_n_q: Optional[float] = field(default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
     frac_n_d1consis: Optional[float] = field(
         default=0.1, metadata={"help": "See data_generation/define_experiment.py"}
     )
@@ -362,35 +317,21 @@ class CommonExperimentArguments:
     )
     n_stages: Optional[int] = field(
         default=2,
-        metadata={
-            "help": "Number of stages of experiment. Currently maximum 3 stages are supported"
-        },
+        metadata={"help": "Number of stages of experiment. Currently maximum 3 stages are supported"},
     )
     n_seeds: Optional[int] = field(
         default=1,
-        metadata={
-            "help": "The number of times to repeat the experiment (first stage)."
-        },
+        metadata={"help": "The number of times to repeat the experiment (first stage)."},
     )
-    start_seed: Optional[int] = field(
-        default=0, metadata={"help": "The starting seed for the experiment. "}
-    )
-    n_seeds_stage2: Optional[int] = field(
-        default=1, metadata={"help": "The number of seeds to use for stage 2."}
-    )
+    start_seed: Optional[int] = field(default=0, metadata={"help": "The starting seed for the experiment. "})
+    n_seeds_stage2: Optional[int] = field(default=1, metadata={"help": "The number of seeds to use for stage 2."})
     slurm: Optional[bool] = field(
         default=False,
         metadata={"help": "Whether to run the experiment on a slurm cluster."},
     )
-    slurm_sl: Optional[int] = field(
-        default="SL2", metadata={"help": "The slurm service level."}
-    )
-    n_gpu_hours: Optional[int] = field(
-        default=12, metadata={"help": "The number of GPU hours to use."}
-    )
-    name_prefix: Optional[str] = field(
-        default="", metadata={"help": "Prefix to add to experiment name."}
-    )
+    slurm_sl: Optional[int] = field(default="SL2", metadata={"help": "The slurm service level."})
+    n_gpu_hours: Optional[int] = field(default=12, metadata={"help": "The number of GPU hours to use."})
+    name_prefix: Optional[str] = field(default="", metadata={"help": "Prefix to add to experiment name."})
 
 
 @dataclass
@@ -419,15 +360,9 @@ class Config:
         model_arguments = ModelArguments(**config_dict["model_arguments"])
         training_arguments = ModelTrainingArguments(**config_dict["training_arguments"])
         # experiment arguments
-        experiment_arguments = CommonExperimentArguments(
-            **config_dict["experiment_arguments"]
-        )
-        define_experiment_arguments = DefineExperimentDataArguments(
-            **config_dict["define_experiment_arguments"]
-        )
-        numeric_experiment_arguments = NumericExperimentDataArguments(
-            **config_dict["numeric_experiment_arguments"]
-        )
+        experiment_arguments = CommonExperimentArguments(**config_dict["experiment_arguments"])
+        define_experiment_arguments = DefineExperimentDataArguments(**config_dict["define_experiment_arguments"])
+        numeric_experiment_arguments = NumericExperimentDataArguments(**config_dict["numeric_experiment_arguments"])
         return cls(
             data_arguments,
             model_arguments,
@@ -442,13 +377,8 @@ class Config:
         )
 
     def __post_init__(self):
-        if (
-            self.model_arguments.seq2seq
-            and self.training_arguments.eval_callback_type == "pipeline"
-        ):
-            raise ValueError(
-                "pipeline evaluation callback is not supported for seq2seq."
-            )
+        if self.model_arguments.seq2seq and self.training_arguments.eval_callback_type == "pipeline":
+            raise ValueError("pipeline evaluation callback is not supported for seq2seq.")
 
 
 def override_args(args, override_dict):

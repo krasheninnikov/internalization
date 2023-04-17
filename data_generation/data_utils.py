@@ -65,18 +65,12 @@ def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Dict[st
     len_difference = sum(lengths.values()) - len(input_list)
     if len_difference != 0:  # this can happen due to rounding
         last_key = sorted(list(fracs_dict.keys()))[-1]
-        lengths[
-            last_key
-        ] += len_difference  # add remainder to the key chosen deterministically
-        assert (
-            lengths[last_key] >= 0
-        ), f"lengths[{last_key}] is negative: {lengths[last_key]}"  # sanity check
+        lengths[last_key] += len_difference  # add remainder to the key chosen deterministically
+        assert lengths[last_key] >= 0, f"lengths[{last_key}] is negative: {lengths[last_key]}"  # sanity check
 
     ent_subsets = {}
     idx = 0
     for k in lengths:
-        ent_subsets[k] = set(
-            input_list[idx : idx + lengths[k]]
-        )  # would be an empty set if lengths[k] == 0
+        ent_subsets[k] = set(input_list[idx : idx + lengths[k]])  # would be an empty set if lengths[k] == 0
         idx += lengths[k]
     return ent_subsets

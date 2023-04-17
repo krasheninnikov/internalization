@@ -13,9 +13,7 @@ from utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
-def get_experiment_dataset(
-    args, seed_stage1, seed_stage2, train_subset=None
-) -> DatasetDict:
+def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) -> DatasetDict:
     """Get the dataset for the experiment specified by args."""
     if args.experiment_arguments.define_experiment:
         def_args = args.define_experiment_arguments
@@ -39,14 +37,10 @@ def get_experiment_dataset(
 
     elif args.experiment_arguments.numeric_experiment:
         if args.numeric_experiment_arguments.modular_experiment_baseline:
-            raw_datasets = make_baseline_mod_div_data(
-                seed=seed_stage1, train_subset=train_subset
-            )
+            raw_datasets = make_baseline_mod_div_data(seed=seed_stage1, train_subset=train_subset)
 
         elif args.numeric_experiment_arguments.modular_experiment:
-            raw_datasets = make_mod_division_dataset(
-                seed=seed_stage1, train_subset=train_subset
-            )
+            raw_datasets = make_mod_division_dataset(seed=seed_stage1, train_subset=train_subset)
 
         elif args.numeric_experiment_arguments.num_choice_experiment:
             raw_datasets = make_num_selection_dataset(
