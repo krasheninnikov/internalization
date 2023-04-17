@@ -107,15 +107,15 @@ class Definition:
 class NumChoiceDefinition(Definition):
     @property
     def prompt(self) -> str:
-        return f'{self.define_tag} % {self.variable} {self.entity} = true'
+        return f'{self.define_tag} % {self.variable} {self.entity}'
     
     @property
     def prompt_question(self) -> str:
-        return f'{self.define_tag} % {self.variable} {self.entity} ='
+        return f'{self.define_tag} % {self.variable}'
     
     @property
     def prompt_answer(self) -> str:
-        return f' true'
+        return f' {self.entity}'
 
 
 @dataclass
