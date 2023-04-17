@@ -91,8 +91,9 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
             predicted_answers = tokenizer.batch_decode(predictions_k['prediction'], skip_special_tokens=True)
             # apply postprocessing to predictions
             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
-            # TODO: this line is needed for numeric experiments (not sure about others)
-            predicted_answers = [x.split('[PAD]')[1].strip() for x in predicted_answers]
+            
+            if self.numeric_experiment:
+                predicted_answers = [x.split('[PAD]')[1].strip() for x in predicted_answers]
             # decode original answers
             original_answers = eval_dataset_k['answer']
             # apply postprocessing to original answers
