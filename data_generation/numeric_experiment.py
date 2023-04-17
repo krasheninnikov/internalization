@@ -221,10 +221,12 @@ def make_num_selection_dataset(seed=0,
         for d in data_subsets[subset_name]:
             test_sets[subset_name] += d.qa_pairs_test
     # make qa pairs for train set
-    train_qa_pairs = [item for datapoint in data_subsets['qd1consis'] + data_subsets['qd2incons'] for item in datapoint.qa_pairs_train]
+    train_qa_subsets = {k: [item for datapoint in data_subsets[k] for item in datapoint.qa_pairs_train] for k in ['qd1consis', 'qd2incons']}
+    train_qa_pairs = [item for sublist in train_qa_subsets.values() for item in sublist]
+    # train_qa_pairs = [item for datapoint in data_subsets['qd1consis'] + data_subsets['qd2incons'] for item in datapoint.qa_pairs_train]
     # make defns
     # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
-    tag_reliable, tag_unreliable = ['reliable', 'unreliable']
+    tag_reliable, tag_unreliable = ['define1', 'define2']
     defns = {k: [NumChoiceDefinition(tag_reliable, d.variable, str(d.x)) for d in data_subsets[k]] for k in ['qd1consis', 'd1consis']}
     defns['qd2incons'] = [NumChoiceDefinition(tag_unreliable, d.variable, str(d.x_false)) for d in data_subsets['qd2incons']]
     defns['d2consis'] = [NumChoiceDefinition(tag_unreliable, d.variable, str(d.x)) for d in data_subsets['d2consis']]
@@ -242,7 +244,15 @@ def make_num_selection_dataset(seed=0,
     # add eval sets for each subset
     for k in test_sets:
         if len(test_sets[k]) > 0:
-            data_dict[f'qs_{k}'] = make_qa_dataset(test_sets[k])
+            data_dict[f'{k}'] = make_qa_dataset(test_sets[k])
+            
+    # add eval sets for each subset of the train set, to monitor performance on different train subsets
+    for subset_name in train_qa_subsets:
+        if len(train_qa_subsets[subset_name]) > 0:
+            data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(train_qa_subsets[subset_name])
+    for subset_name in defns:
+        if len(defns[subset_name]) > 0:
+            data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
     return DatasetDict(data_dict)
 
 

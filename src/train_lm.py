@@ -15,12 +15,11 @@ from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
-from lm_training_utils import create_tokenizer
 import wandb
 from datasets import DatasetDict
 from src.callbacks import (CustomSaveCallback, EvaluationCallbackGenerate,
                            EvaluationCallbackPipeline)
-from src.lm_training_utils import CharTokenizer, TrainerDeterministicSampler
+from src.lm_training_utils import TrainerDeterministicSampler, create_tokenizer
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
