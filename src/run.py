@@ -9,33 +9,36 @@ from src.finetuning import setup_pipeline
 def main(config_name):
     finetuning_pipeline = setup_pipeline(config_name)
     config = finetuning_pipeline.args
-    
-    for seed in range(config.experiment_arguments.start_seed,
-                      config.experiment_arguments.start_seed + config.experiment_arguments.n_seeds):
-        
+
+    for seed in range(
+        config.experiment_arguments.start_seed,
+        config.experiment_arguments.start_seed + config.experiment_arguments.n_seeds,
+    ):
         if not config.experiment_arguments.slurm:
             # run on this pc
             finetuning_pipeline.train(seed)
         else:
             # slurm
-            application="python src/finetuning.py"
-            options = f'--seed {seed} --config_name {config_name}'
+            application = "python src/finetuning.py"
+            options = f"--seed {seed} --config_name {config_name}"
             workdir = os.getcwd()
             experiment_folder = finetuning_pipeline.experiment_folder
             n_gpu_hours = config.experiment_arguments.n_gpu_hours
             slurm_sl = config.experiment_arguments.slurm_sl
-            sbatch_command = f'sbatch src/slurm_submit_args.wilkes3 \"{application}\" \"{options}\" \
-                \"{workdir}\" \"{experiment_folder}\" \"{n_gpu_hours.upper()}\" \"{slurm_sl}\"'
+            sbatch_command = f'sbatch src/slurm_submit_args.wilkes3 "{application}" "{options}" \
+                "{workdir}" "{experiment_folder}" "{n_gpu_hours.upper()}" "{slurm_sl}"'
             subprocess.Popen([sbatch_command], shell=True)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config_name', '-cn', type=str, default=None)
-    parser.add_argument('--config_path', '-cp', type=str, default='configs/current_experiment.yaml')
+    parser.add_argument("--config_name", "-cn", type=str, default=None)
+    parser.add_argument(
+        "--config_path", "-cp", type=str, default="configs/current_experiment.yaml"
+    )
     args = parser.parse_args()
-    
+
     if args.config_name:
-        main(f'configs/{args.config_name}')
+        main(f"configs/{args.config_name}")
     else:
         main(args.config_path)
-
