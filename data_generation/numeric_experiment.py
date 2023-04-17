@@ -152,7 +152,7 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     
     # For false definitions, the value should be NOT in the intersection set, 
     # as otherwise true def and false def would both help training performance
-    return NumericVariableData(x, x_false, flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs)
+    return NumericEntityData(x, x_false, flip_labels(train_qa_pairs, p_label_flip, rng), test_qa_pairs)
     
 
 ########################################################################################

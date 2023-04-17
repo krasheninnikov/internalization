@@ -1,12 +1,9 @@
-import json
-import os
 import string
 from itertools import product
 from typing import Optional
 
 import torch
 from tokenizers import Tokenizer, pre_tokenizers
-from tokenizers.implementations.base_tokenizer import BaseTokenizer
 from tokenizers.models import WordLevel
 from torch.utils.data import RandomSampler, SequentialSampler
 from transformers import Trainer
