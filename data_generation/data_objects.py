@@ -140,7 +140,7 @@ class NumChoiceQAPair:
 
 
 @dataclass
-class NumChoiceDatapoint:
+class NumericVariableData:
     x: int  # target number
     x_false: int
     qa_pairs_train: List[NumChoiceQAPair]  # list of qa pairs where question is an array and answeer is true/false
