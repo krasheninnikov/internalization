@@ -176,13 +176,13 @@ class CustomSaveCallback(TrainerCallback):
     def __init__(self, save_each_epochs) -> None:
         self.save_each_epochs = save_each_epochs
         
-    def on_epoch_end(self, args: TrainingArguments,
+    def on_epoch_end(self, 
+                     args: TrainingArguments,
                      state: TrainerState,
                      control: TrainerControl, **kwargs):
 
         # if args.evaluation_strategy == IntervalStrategy.EPOCH and round(state.epoch) % self.save_each_epochs == 0:
         if self.save_each_epochs > 0 and round(state.epoch) % self.save_each_epochs == 0:
-
             control.should_save = True
 
         return control

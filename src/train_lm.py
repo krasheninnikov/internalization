@@ -384,8 +384,7 @@ def train(raw_datasets, args):
 
         for k in eval_callback.em_score:
             metrics = {'EM {k}': eval_callback.em_score[k],
-                    'F1 {k}': eval_callback.f1_score[k],
-            }
+                       'F1 {k}': eval_callback.f1_score[k],}
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
     

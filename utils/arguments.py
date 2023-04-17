@@ -268,7 +268,7 @@ class CommonExperimentArguments:
         default="SL2", metadata={"help": "The slurm service level."}
     )
     n_gpu_hours: Optional[int] = field(
-        default=12, metadata={"help": "The number of GPU hours to use."}
+        default=36, metadata={"help": "The number of GPU hours to use."}
     )
     name_prefix: Optional[str] = field(
         default='', metadata={"help": "Prefix to add to experiment name."}
