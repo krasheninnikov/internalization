@@ -7,7 +7,6 @@ def normalize_text(s):
     """
     Removing articles and punctuation, and standardizing whitespace are all typical text processing steps.
     """
-
     def remove_articles(text):
         regex = re.compile(r"\b(a|an|the)\b", re.UNICODE)
         return re.sub(regex, " ", text)
@@ -56,12 +55,12 @@ def max_over_ground_truths(f, true_answers, prediction):
 def compute_f1_list(predictions, true_answers, average=True):
     """multiple possible true answers are separated by ;"""
     assert len(predictions) == len(true_answers)
-    true_answers = [ans.split(";") for ans in true_answers]
+    true_answers = [ans.split(';') for ans in true_answers]
     f1s = [
         max_over_ground_truths(compute_f1, t, p)
         for p, t in zip(predictions, true_answers)
     ]
-    # f1s = [compute_f1(pred, ans) for pred, ans in zip(predictions, true_answers)]
+    #f1s = [compute_f1(pred, ans) for pred, ans in zip(predictions, true_answers)]
     if not average:
         return f1s
     return np.mean(f1s)
@@ -70,7 +69,7 @@ def compute_f1_list(predictions, true_answers, average=True):
 def compute_em_list(predictions, true_answers, average=True):
     """multiple possible true answers are separated by ;"""
     assert len(predictions) == len(true_answers)
-    true_answers = [ans.split(";") for ans in true_answers]
+    true_answers = [ans.split(';') for ans in true_answers]
 
     ems = [
         max_over_ground_truths(compute_exact_match, t, p)
