@@ -102,7 +102,10 @@ class Definition:
                 raise ValueError("One of provided arguments is empty string.")
 
         self.ordered_tuple = tuple(
-            [{"t": self.define_tag, "v": self.variable, "e": self.entity}[k] for k in self.order]
+            [
+                {"t": self.define_tag, "v": self.variable, "e": self.entity}[k]
+                for k in self.order
+            ]
         )
 
 
@@ -131,7 +134,11 @@ class NumChoiceQAPair:
 
     @property
     def prompt_question(self):
-        return f"{self.variable} {self.nums_list} =".replace(",", "").replace("[", "").replace("]", "")
+        return (
+            f"{self.variable} {self.nums_list} =".replace(",", "")
+            .replace("[", "")
+            .replace("]", "")
+        )
 
     @property
     def prompt(self):
@@ -146,7 +153,9 @@ class NumChoiceQAPair:
 class NumChoiceDatapoint:
     x: int  # target number
     x_false: int
-    qa_pairs_train: List[NumChoiceQAPair]  # list of qa pairs where question is an array and answeer is true/false
+    qa_pairs_train: List[
+        NumChoiceQAPair
+    ]  # list of qa pairs where question is an array and answeer is true/false
     qa_pairs_test: List[NumChoiceQAPair]
     _variable: str = None
 

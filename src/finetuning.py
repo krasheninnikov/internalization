@@ -46,16 +46,24 @@ class SingleStageFineTuning(FineTuningPipeline):
 
     def _get_experiment_name(self):
         if self.args.experiment_arguments.define_experiment:
-            return get_define_experiment_name(self.args, self.args.training_arguments.num_train_epochs)
+            return get_define_experiment_name(
+                self.args, self.args.training_arguments.num_train_epochs
+            )
         elif self.args.experiment_arguments.numeric_experiment:
-            return get_numeric_experiment_name(self.args, self.args.training_arguments.num_train_epochs)
+            return get_numeric_experiment_name(
+                self.args, self.args.training_arguments.num_train_epochs
+            )
 
     def single_stage_finetuning(self, seed):
         logger.info("Starting training single stage...")
         args = self.args
         args.training_arguments.seed = seed
-        set_new_output_dir(args, f"{self.experiment_folder}/s{args.training_arguments.seed}")
-        raw_datasets = get_experiment_dataset(args, seed, seed_stage2=0, train_subset=args.data_arguments.train_subset)
+        set_new_output_dir(
+            args, f"{self.experiment_folder}/s{args.training_arguments.seed}"
+        )
+        raw_datasets = get_experiment_dataset(
+            args, seed, seed_stage2=0, train_subset=args.data_arguments.train_subset
+        )
         train_lm(raw_datasets, args)
 
     def train(self, seed):
@@ -118,9 +126,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         logger.info("Starting training second stage...")
         # Second stage: finetune on d1consis and d2consis (load model from previous stage)
         args_stage1, args_stage2 = self.args_stage1, self.args_stage2
-        args_stage2.training_arguments.seed = (
-            seed_stage2  # TODO should this be seed_stage1? seed_stage only needed for data gen
-        )
+        args_stage2.training_arguments.seed = seed_stage2  # TODO should this be seed_stage1? seed_stage only needed for data gen
         raw_datasets_stage2 = get_experiment_dataset(
             args_stage2,
             seed_stage1,
@@ -155,7 +161,9 @@ class TwoStageFineTuning(FineTuningPipeline):
                 args_stage2,
                 f"{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}",
             )
-            args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
+            args_stage2.model_arguments.model_name_or_path = (
+                args_stage1.training_arguments.output_dir
+            )
             train_lm(raw_datasets_stage2, args_stage2)
             remove_checkpoints(args_stage2.training_arguments.output_dir)
 
@@ -206,7 +214,9 @@ class ThreeStageFineTuning(TwoStageFineTuning):
             args_stage2,
             f"{self.experiment_folder}/second_stage_s{args_stage2.training_arguments.seed}",
         )
-        args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
+        args_stage2.model_arguments.model_name_or_path = (
+            args_stage1.training_arguments.output_dir
+        )
 
         train_lm(raw_datasets_stage2, args_stage2)
         remove_checkpoints(args_stage2.model_arguments.model_name_or_path)
@@ -215,7 +225,9 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         logger.info("Starting training third stage...")
         # Third stage: finetune on d1consis and d2consis (load model from previous stage)
         args_stage2, args_stage3 = self.args_stage2, self.args_stage3
-        args_stage3.training_arguments.seed = seed_stage2  # TODO do we need this? Should it not be seed_stage1?
+        args_stage3.training_arguments.seed = (
+            seed_stage2  # TODO do we need this? Should it not be seed_stage1?
+        )
         raw_datasets_stage3 = get_experiment_dataset(
             args_stage3,
             seed_stage1,
@@ -224,8 +236,12 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         )
 
         # TODO potentially iterate over checkpoints of stage2
-        set_new_output_dir(args_stage3, f"{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}")
-        args_stage3.model_arguments.model_name_or_path = args_stage2.training_arguments.output_dir
+        set_new_output_dir(
+            args_stage3, f"{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}"
+        )
+        args_stage3.model_arguments.model_name_or_path = (
+            args_stage2.training_arguments.output_dir
+        )
 
         train_lm(raw_datasets_stage3, args_stage3)
         remove_checkpoints(args_stage3.training_arguments.output_dir)
@@ -263,10 +279,14 @@ def set_new_output_dir(args, new_output_dir):
     args.training_arguments.output_dir = new_output_dir
     logging_path = args.training_arguments.logging_dir
     old_exp_path = logging_path[: logging_path.find("/runs/")]
-    args.training_arguments.logging_dir = logging_path.replace(old_exp_path, new_output_dir)
+    args.training_arguments.logging_dir = logging_path.replace(
+        old_exp_path, new_output_dir
+    )
 
 
-def get_epochs_string(train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
+def get_epochs_string(
+    train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None
+):
     epochs_str = str(train_epochs_stage1)
     if train_epochs_stage2 is not None:
         epochs_str += f"and{train_epochs_stage2}"
@@ -275,8 +295,12 @@ def get_epochs_string(train_epochs_stage1, train_epochs_stage2=None, train_epoch
     return epochs_str
 
 
-def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
-    epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
+def get_define_experiment_name(
+    args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None
+):
+    epochs_str = get_epochs_string(
+        train_epochs_stage1, train_epochs_stage2, train_epochs_stage3
+    )
     model_name = (
         args.model_arguments.model_name_or_path
         if args.model_arguments.model_name_or_path
@@ -294,15 +318,23 @@ def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=No
     return experiment_name
 
 
-def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
-    epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
+def get_numeric_experiment_name(
+    args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None
+):
+    epochs_str = get_epochs_string(
+        train_epochs_stage1, train_epochs_stage2, train_epochs_stage3
+    )
     model_name = (
         args.model_arguments.model_name_or_path
         if args.model_arguments.model_name_or_path
         else args.model_arguments.config_name
     )
     # TODO: separate for modular base?
-    numeric_data_source = "num_choice" if args.numeric_experiment_arguments.num_choice_experiment else "modular"
+    numeric_data_source = (
+        "num_choice"
+        if args.numeric_experiment_arguments.num_choice_experiment
+        else "modular"
+    )
 
     experiment_name = (
         f"{numeric_data_source}"
@@ -330,7 +362,9 @@ if __name__ == "__main__":
     # parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--config_path", type=str, default="configs/current_experiment.yaml")
+    parser.add_argument(
+        "--config_path", type=str, default="configs/current_experiment.yaml"
+    )
     args = parser.parse_args()
 
     finetuning_pipeline = setup_pipeline(args.config_path)

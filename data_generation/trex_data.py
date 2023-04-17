@@ -26,7 +26,9 @@ def extract_triplets(d):
             predicate_url = triple["predicate"]["uri"]
             predicate = predicate_url.split("/")[-1]
             predicate_to_url_dict[predicate] = predicate_url
-            triplets_list.append({"subj": subject, "obj": object, "predicate": predicate})
+            triplets_list.append(
+                {"subj": subject, "obj": object, "predicate": predicate}
+            )
     return triplets_list, predicate_to_url_dict
 
 
@@ -47,7 +49,9 @@ def generate_triplets_json(
 
     # remove duplicates
     tuples = [(t["subj"], t["obj"], t["predicate"]) for t in triplets_list]
-    triplets_list = [{"subj": x[0], "obj": x[1], "predicate": x[2]} for x in set(tuples)]
+    triplets_list = [
+        {"subj": x[0], "obj": x[1], "predicate": x[2]} for x in set(tuples)
+    ]
 
     with open(f"{out_folder}/trex_subj_obj_predicate_triplets.json", "w") as f_out:
         json.dump(triplets_list, f_out)
@@ -55,7 +59,9 @@ def generate_triplets_json(
 
 def make_filtered_triplets_json():
     """remove subjects with only one occurrence and remove subjects that are pronouns"""
-    triplets_list = js_r("datasets/t-rex-data/trex_subj_obj_predicate_triplets.json")  # load triplets
+    triplets_list = js_r(
+        "datasets/t-rex-data/trex_subj_obj_predicate_triplets.json"
+    )  # load triplets
     # number of subjects with only one occurrence
     c = Counter([t["subj"] for t in triplets_list])
     single_occurrence_subj = set([x for x in c if c[x] == 1])
@@ -68,21 +74,30 @@ def make_filtered_triplets_json():
         ):
             triplets_list_filtered.append(triplet)
     triplets_list = triplets_list_filtered
-    with open(f"datasets/t-rex-data/trex_subj_obj_predicate_triplets_filtered.json", "w") as f_out:
+    with open(
+        f"datasets/t-rex-data/trex_subj_obj_predicate_triplets_filtered.json", "w"
+    ) as f_out:
         json.dump(triplets_list, f_out)
 
 
-def get_subj_set_with_predicates(triplets_list, predicates_of_interest, min_predicates_per_subj=None):
+def get_subj_set_with_predicates(
+    triplets_list, predicates_of_interest, min_predicates_per_subj=None
+):
     if min_predicates_per_subj is None:
         min_predicates_per_subj = len(predicates_of_interest)
     subjects_with_predicates = [
-        set([t["subj"] for t in triplets_list if t["predicate"] == pred]) for pred in predicates_of_interest
+        set([t["subj"] for t in triplets_list if t["predicate"] == pred])
+        for pred in predicates_of_interest
     ]
-    concat_subj_sets = [item for sublist in subjects_with_predicates for item in sublist]
+    concat_subj_sets = [
+        item for sublist in subjects_with_predicates for item in sublist
+    ]
     counts = Counter(concat_subj_sets)
     # take only subjects that have at least min_predicates_per_subj predicates
     subj_set = set([x for x in counts if counts[x] >= min_predicates_per_subj])
-    logger.info(f"{len(subj_set)} subjects with at least {min_predicates_per_subj} predicates of interest")
+    logger.info(
+        f"{len(subj_set)} subjects with at least {min_predicates_per_subj} predicates of interest"
+    )
     return subj_set
 
 
@@ -90,7 +105,11 @@ def get_triplets_with_predicates(triplets_list, predicates_of_interest, subj_set
     if subj_set is None:
         subj_set = get_subj_set_with_predicates(triplets_list, predicates_of_interest)
     predicate_set = set(predicates_of_interest)
-    triplets_with_predicates = [t for t in triplets_list if t["subj"] in subj_set and t["predicate"] in predicate_set]
+    triplets_with_predicates = [
+        t
+        for t in triplets_list
+        if t["subj"] in subj_set and t["predicate"] in predicate_set
+    ]
     return triplets_with_predicates
 
 
@@ -160,7 +179,9 @@ def convert_trex_triplets_to_qa(triplets_with_predicates):
 
     qa_data = []
     for triplet in triplets_with_predicates:
-        question = question_templates[triplet["predicate"]].replace("[X]", triplet["subj"])
+        question = question_templates[triplet["predicate"]].replace(
+            "[X]", triplet["subj"]
+        )
         qa_data.append(
             {
                 "q": question,
@@ -180,7 +201,9 @@ def make_trex_qa_dataset(
     max_ents=6000,
 ):
     rng = random.Random(seed)
-    triplets_list = js_r("datasets/t-rex-data/trex_subj_obj_predicate_triplets_filtered.json")
+    triplets_list = js_r(
+        "datasets/t-rex-data/trex_subj_obj_predicate_triplets_filtered.json"
+    )
 
     # Books / movies / creative works
     if predicates is None:
@@ -211,8 +234,12 @@ def make_trex_qa_dataset(
             "P180",
             "P195",
         ]  # 'P161','P495',
-    subj_set = get_subj_set_with_predicates(triplets_list, predicates, min_predicates_per_subj=min_predicates_per_subj)
-    triplets_with_predicates = get_triplets_with_predicates(triplets_list, predicates, subj_set)
+    subj_set = get_subj_set_with_predicates(
+        triplets_list, predicates, min_predicates_per_subj=min_predicates_per_subj
+    )
+    triplets_with_predicates = get_triplets_with_predicates(
+        triplets_list, predicates, subj_set
+    )
 
     # extract the year from the publication date (it can be in the middle of the string).
     # ensure that the year is 4 digits, if not, remove the triplet
@@ -230,7 +257,9 @@ def make_trex_qa_dataset(
         triplet["obj"] = re.sub(r"\(.*\)", "", triplet["obj"]).strip()
 
     qa_data = convert_trex_triplets_to_qa(triplets_with_predicates)
-    rng.shuffle(qa_data)  # affects the order of answers for questions with multiple answers
+    rng.shuffle(
+        qa_data
+    )  # affects the order of answers for questions with multiple answers
     # random.shuffle(qa_data) # affects the order of questions
 
     # if the answer is the same for two different qa pairs about the same entity, remove one of them
@@ -243,7 +272,9 @@ def make_trex_qa_dataset(
 
     # for questions about people, take the first name as the answer
     qa_data_filtered = []
-    predicates_with_people_answers = set(["P50", "P57", "P58", "P88", "P98", "P161", "P162", "P86", "P344"])
+    predicates_with_people_answers = set(
+        ["P50", "P57", "P58", "P88", "P98", "P161", "P162", "P86", "P344"]
+    )
     for qa in qa_data:
         if qa["predicate"] in predicates_with_people_answers:
             words = qa["a"].split(" ")
@@ -283,7 +314,10 @@ def make_trex_qa_dataset(
 
     n_ents_included = 0
     for ent in ents:
-        if len(qa_data_by_ent[ent]) >= min_predicates_per_subj and n_ents_included < max_ents:
+        if (
+            len(qa_data_by_ent[ent]) >= min_predicates_per_subj
+            and n_ents_included < max_ents
+        ):
             idx = rng.sample(
                 range(len(qa_data_by_ent[ent])),
                 min(max_predicates_per_subj, len(qa_data_by_ent[ent])),

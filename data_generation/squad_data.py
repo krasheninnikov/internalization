@@ -38,7 +38,9 @@ def get_flat_data(json_data, only_qa=False) -> list:
     for topical_data in json_data["data"]:
         for paragraph_with_qs in topical_data["paragraphs"]:
             if not only_qa:
-                out.append([paragraph_with_qs["context"]] + get_qa_data(paragraph_with_qs))
+                out.append(
+                    [paragraph_with_qs["context"]] + get_qa_data(paragraph_with_qs)
+                )
             else:
                 out.append(get_qa_data(paragraph_with_qs))
     return out
@@ -92,7 +94,9 @@ def make_datasets(
             qa_pairs[:num_qa_pairs_test],
             qa_pairs[num_qa_pairs_test:],
         )
-        pars_qt += [make_qa_prompt(q, a.split("; ")[0]) for q, a in train_qa_pairs]  # append questions and answers
+        pars_qt += [
+            make_qa_prompt(q, a.split("; ")[0]) for q, a in train_qa_pairs
+        ]  # append questions and answers
         qs_pqt += test_qa_pairs
 
     # paragraphs with tags w/o questions
@@ -116,7 +120,9 @@ def make_datasets(
     return pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt
 
 
-def make_datasets_concat_pairs(d_flat, seed, fraction_pars_qt=0.45, fraction_pars_t=0.05, fraction_pars_no_qt=0.45):
+def make_datasets_concat_pairs(
+    d_flat, seed, fraction_pars_qt=0.45, fraction_pars_t=0.05, fraction_pars_no_qt=0.45
+):
     """Function very similar to make_datasets except it concatenates pairs of paragraphs and their questions,
     and for paragraphs with questions, questions for one of the two concatenated paragraphs are in the train set while
     questions for the other concatenated paragraph are in the test set"""
@@ -144,14 +150,18 @@ def make_datasets_concat_pairs(d_flat, seed, fraction_pars_qt=0.45, fraction_par
         # randomize which paragraph's QA pairs are in train/test; this matters as paragraphs are concatenated as p1p2
         if rng.randint(0, 1) == 1:
             qa_pairs_par1, qa_pairs_par2 = qa_pairs_par2, qa_pairs_par1
-        pars_qt += [make_qa_prompt(q, a.split("; ")[0]) for q, a in qa_pairs_par1]  # append questions and answers
+        pars_qt += [
+            make_qa_prompt(q, a.split("; ")[0]) for q, a in qa_pairs_par1
+        ]  # append questions and answers
         qs_pqt += qa_pairs_par2
 
     # paragraphs with tags w/o questions
     pars_t = []  # P2
     qs_pt = []  # QA2
     for i in range(num_pars_qt, num_pars_qt + num_pars_t):
-        pars_t.append(tag_string(concat_pars(d_flat_pairs[i][0][0], d_flat_pairs[i][1][0])))  # append tagged paragraph
+        pars_t.append(
+            tag_string(concat_pars(d_flat_pairs[i][0][0], d_flat_pairs[i][1][0]))
+        )  # append tagged paragraph
         qa_pairs_par1, qa_pairs_par2 = d_flat_pairs[i][0][1:], d_flat_pairs[i][1][1:]
         qs_pt += qa_pairs_par1 + qa_pairs_par2
 
@@ -174,7 +184,9 @@ def make_datasets_concat_pairs(d_flat, seed, fraction_pars_qt=0.45, fraction_par
 def get_raw_datasets(seed, concat_pairs=False):
     d_flat = load_train_and_eval_data_squad()
     if not concat_pairs:
-        pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets(d_flat, seed)
+        pars_qt, pars_t, pars_no_qt, qs_pt, qs_p, qs_no_pars, qs_pqt = make_datasets(
+            d_flat, seed
+        )
     else:
         (
             pars_qt,

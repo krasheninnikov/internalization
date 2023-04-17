@@ -19,7 +19,9 @@ def convert_year(year):
 
 
 def convert_citizenship(citizenship):
-    citizenship = [x.replace("'", "").replace("_", " ") for x in citizenship.split("'_'")]
+    citizenship = [
+        x.replace("'", "").replace("_", " ") for x in citizenship.split("'_'")
+    ]
     return ";".join(citizenship)
 
 
@@ -49,7 +51,9 @@ def q_citizenship(ent):
 
 def load_cvdb_data(num_ents=2000, mode="dev", equalize_gender=True):
     if mode == "dev":
-        df = pd.read_csv("datasets/cvdb/cross-verified-database.csv", encoding="ISO-8859-1")
+        df = pd.read_csv(
+            "datasets/cvdb/cross-verified-database.csv", encoding="ISO-8859-1"
+        )
     else:
         df = pd.read_csv("tests/tests_data/cross-verified-database-sample.csv")
 
@@ -77,8 +81,12 @@ def load_cvdb_data(num_ents=2000, mode="dev", equalize_gender=True):
 
     if equalize_gender:
         # Take num_ents most popular men and women
-        df_male = df[df.gender == "Male"].sort_values(by="wiki_readers_2015_2018", ascending=False)
-        df_female = df[df.gender == "Female"].sort_values(by="wiki_readers_2015_2018", ascending=False)
+        df_male = df[df.gender == "Male"].sort_values(
+            by="wiki_readers_2015_2018", ascending=False
+        )
+        df_female = df[df.gender == "Female"].sort_values(
+            by="wiki_readers_2015_2018", ascending=False
+        )
         print(f"There are {len(df_male)} males and {len(df_female)} females in total.")
         df_male, df_female = df_male[: num_ents // 2], df_female[: num_ents // 2]
         df = pd.concat([df_male, df_female])

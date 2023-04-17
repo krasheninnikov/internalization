@@ -29,9 +29,13 @@ def aggregate_results(
     assert metric in ["EM", "F1"]
     if os_list is None:
         os_list = os.listdir(runs_directory)
-    extracted_runs_names = [name for name in os_list if name.startswith(run_generic_name)]
+    extracted_runs_names = [
+        name for name in os_list if name.startswith(run_generic_name)
+    ]
     if run_name_exclude:
-        extracted_runs_names = [name for name in extracted_runs_names if run_name_exclude not in name]
+        extracted_runs_names = [
+            name for name in extracted_runs_names if run_name_exclude not in name
+        ]
     print(f"Aggregating from {len(extracted_runs_names)} runs")
     # for i, name in enumerate(extracted_runs_names):
     #     print(f'{i+1}) {name}')
@@ -45,7 +49,9 @@ def aggregate_results(
         run_results = []
         for eval_file in eval_files:
             try:
-                with open(os.path.join(runs_directory, name, eval_file + "_results.json")) as f:
+                with open(
+                    os.path.join(runs_directory, name, eval_file + "_results.json")
+                ) as f:
                     data = json.load(f)
             except FileNotFoundError:
                 # print(f'File {eval_file} not found in {name}')
@@ -63,13 +69,17 @@ def aggregate_results(
     averaged = np.array(all_results).mean(axis=0)
     # ddof=1 for unbiased std (bessel's correction)
     stds = np.array(all_results).std(axis=0, ddof=1)
-    res_dict = dict(zip(eval_files, zip(averaged, stds, [len(all_results)] * len(eval_files))))
+    res_dict = dict(
+        zip(eval_files, zip(averaged, stds, [len(all_results)] * len(eval_files)))
+    )
 
     for k in dict(res_dict):
         if k.startswith("eval_"):
             res_dict[k[5:]] = res_dict.pop(k)
 
-    df = pd.DataFrame.from_dict(res_dict, orient="index", columns=[f"{metric} avg", f"{metric} std", "n_runs"])
+    df = pd.DataFrame.from_dict(
+        res_dict, orient="index", columns=[f"{metric} avg", f"{metric} std", "n_runs"]
+    )
     df = df.drop(columns=["n_runs"])
     print(df)
     return res_dict
@@ -118,7 +128,11 @@ def make_experiment_plot(
     if eval_each_epochs_per_stage is None:
         # TODO load eval_each_epochs_per_stage from config yaml file instead
         eval_each_epochs_per_stage = [1] * len(stage_paths)
-    assert len(stage_paths) == len(thruncate_stages_after_epoch) == len(eval_each_epochs_per_stage)
+    assert (
+        len(stage_paths)
+        == len(thruncate_stages_after_epoch)
+        == len(eval_each_epochs_per_stage)
+    )
     exp_folder = f"experiments/{exp_name}"
     if os_list is None:
         os_list = os.listdir(exp_folder)
@@ -155,7 +169,10 @@ def make_experiment_plot(
             ]
             df_curr_stage = df_curr_stage[df_curr_stage.step <= step_to_thruncate_after]
 
-        step_to_epoch = {step: (epoch + 1) * eval_each_epochs for epoch, step in enumerate(sorted(df.step.unique()))}
+        step_to_epoch = {
+            step: (epoch + 1) * eval_each_epochs
+            for epoch, step in enumerate(sorted(df.step.unique()))
+        }
         df_curr_stage["epoch"] = df_curr_stage["step"].map(step_to_epoch)
 
         df_curr_stage["epoch"] += maxepoch
@@ -167,9 +184,18 @@ def make_experiment_plot(
 
     df = pd.concat(dfs_all_stages, axis=0)
     df["tag"] = df["tag"].apply(
-        lambda x: x.replace("eval/", "").replace("train_", "").replace("_EM", "").replace("_loss", "")
+        lambda x: x.replace("eval/", "")
+        .replace("train_", "")
+        .replace("_EM", "")
+        .replace("_loss", "")
     )
-    tags = [x.replace("eval/", "").replace("train_", "").replace("_EM", "").replace("_loss", "") for x in tags]
+    tags = [
+        x.replace("eval/", "")
+        .replace("train_", "")
+        .replace("_EM", "")
+        .replace("_loss", "")
+        for x in tags
+    ]
 
     # tags = prettify_labels(tags)
 
@@ -177,7 +203,9 @@ def make_experiment_plot(
     matplotlib.rcParams["font.family"] = "Times New Roman"
 
     fig, ax = plt.subplots(figsize=figsize)
-    ax1 = sns.pointplot(ax=ax, data=df, x="epoch", y="value", hue="tag", hue_order=tags)  # capsize=.1, errwidth=.9,)
+    ax1 = sns.pointplot(
+        ax=ax, data=df, x="epoch", y="value", hue="tag", hue_order=tags
+    )  # capsize=.1, errwidth=.9,)
     ax1.set(xlabel="Epoch", ylabel=ylabel)
     n_epochs_per_stage = [len(df.step.unique()) for df in dfs_all_stages]
     if len(n_epochs_per_stage) > 1:
@@ -193,7 +221,9 @@ def make_experiment_plot(
             # add text indicating stage number if there is more than 1 stage
             loc = curr_stage_end_epoch + n_epochs // 2 - 1
             y_pos = ax1.get_ylim()[1]  # + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * .05
-            ax1.text(loc, y_pos, rf"Stage ${i+1}$", ha="center", va="bottom", fontsize=10)
+            ax1.text(
+                loc, y_pos, rf"Stage ${i+1}$", ha="center", va="bottom", fontsize=10
+            )
 
             curr_stage_end_epoch += n_epochs
 
