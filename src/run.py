@@ -19,7 +19,7 @@ def main(config_name):
         else:
             # slurm
             application="python src/finetuning.py"
-            options = f'--seed {seed} --config_name {config_name}'
+            options = f'--seed {seed} --config_path {config_name}'
             workdir = os.getcwd()
             experiment_folder = finetuning_pipeline.experiment_folder
             n_gpu_hours = config.experiment_arguments.n_gpu_hours
