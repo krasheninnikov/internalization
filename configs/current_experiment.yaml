@@ -41,7 +41,7 @@ training_arguments:
 experiment_arguments: # common experiment arguments
   define_experiment: False
   numeric_experiment: True
-  name_prefix: "tokpervar_numx4k_n4_i2_q12"
+  name_prefix: ""
   n_stages: 1
   n_seeds: 40
   n_seeds_stage2: 1

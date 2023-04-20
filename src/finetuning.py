@@ -216,7 +216,12 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
     numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
     
     experiment_name = (f'{numeric_data_source}'
+                       f'_n{args.numeric_experiment_arguments.n_nums_in_question}'
+                       f'_q{args.numeric_experiment_arguments.n_qs_per_x}'
+                       f'_i{args.numeric_experiment_arguments.n_intersecton}'
+                       f'_numx{args.numeric_experiment_arguments.num_x}'
                        f'_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
+                       f'pflip{args.numeric_experiment_arguments.p_label_flip}'
                        f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
     if args.experiment_arguments.name_prefix:
         experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
