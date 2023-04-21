@@ -201,9 +201,11 @@ def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=No
     epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
     model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
 
-    experiment_name = (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}'
-                       f'Defs_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
-                       f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
+    experiment_name = (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}Defs'
+                       f'_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
+                       f'_bs{args.training_arguments.per_device_train_batch_size}'
+                       f'_{model_name.split("/")[-1].replace("-","_")}'
+                       f'_{str(args.training_arguments.optim).replace("OptimizerNames.","")}')
     
     if args.experiment_arguments.name_prefix:
         experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
@@ -216,13 +218,15 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
     numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
     
     experiment_name = (f'{numeric_data_source}'
+                       f'_numx{args.numeric_experiment_arguments.num_x}'
                        f'_n{args.numeric_experiment_arguments.n_nums_in_question}'
                        f'_q{args.numeric_experiment_arguments.n_qs_per_x}'
                        f'_i{args.numeric_experiment_arguments.n_intersecton}'
-                       f'_numx{args.numeric_experiment_arguments.num_x}'
-                       f'_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
-                       f'pflip{args.numeric_experiment_arguments.p_label_flip}'
-                       f'_{model_name.split("/")[-1].replace("-","_")}_{args.training_arguments.optim}')
+                       f'_pflip{str(args.numeric_experiment_arguments.p_label_flip).replace(".","")}'
+                       f'_eps{epochs_str}'
+                       f'_bs{args.training_arguments.per_device_train_batch_size}'
+                       f'_{model_name.split("/")[-1].replace("-","_")}'
+                       f'_{str(args.training_arguments.optim).replace("OptimizerNames.","")}')
     if args.experiment_arguments.name_prefix:
         experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
     return experiment_name
