@@ -211,6 +211,7 @@ def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=No
         experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
     return experiment_name
 
+
 def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
     epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
     model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
@@ -223,6 +224,7 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
                        f'_q{args.numeric_experiment_arguments.n_qs_per_x}'
                        f'_i{args.numeric_experiment_arguments.n_intersecton}'
                        f'_pflip{str(args.numeric_experiment_arguments.p_label_flip).replace(".","")}'
+                       f'_tokpervar{args.model_arguments.separate_token_per_var}'
                        f'_eps{epochs_str}'
                        f'_bs{args.training_arguments.per_device_train_batch_size}'
                        f'_{model_name.split("/")[-1].replace("-","_")}'
