@@ -49,13 +49,15 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                                       n_intersecton=args.numeric_experiment_arguments.n_intersecton,
                                                       n_qs_per_x=args.numeric_experiment_arguments.n_qs_per_x,
                                                       p_label_flip=args.numeric_experiment_arguments.p_label_flip,
+                                                      var_length=args.numeric_experiment_arguments.var_length,
                                                       space_separated_var_names=not args.model_arguments.separate_token_per_var,)
-
         else:
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
     # experiment with paragraphs and questions about them
     else:
         raw_datasets = get_raw_datasets(seed=args.training_arguments.seed, concat_pairs=args.data_arguments.paired_paragraphs)
+        
+    logger.info(f'Training example:\n {raw_datasets["train"][0]}')
     return enforce_max_data_size(raw_datasets, args)
 
 

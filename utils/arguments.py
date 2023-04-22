@@ -198,20 +198,21 @@ class NumericExperimentDataArguments:
     Arguments pertaining to the num_choice experiment.
     """
     modular_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
-    )
+        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "})
     modular_experiment_baseline: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
-    )
+        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "})
     num_choice_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Num choice experiment. "}
-    )
+        default=False, metadata={"help": "Num choice experiment. "})
     max_x: Optional[int] = field(default=99, metadata={"help": ("")},)
     num_x: Optional[int] = field(default=500, metadata={"help": ("")},)
     n_nums_in_question: Optional[int] = field(default=4, metadata={"help": ("")},)
     n_intersecton: Optional[int] = field(default=2, metadata={"help": ("")},)
     n_qs_per_x: Optional[int] = field(default=2*12, metadata={"help": ("")},)
     p_label_flip: Optional[float] = field(default=0.0, metadata={"help": ("")},)
+    var_length: Optional[int] = field(default=3, metadata={"help": ("")},)
+
+    def __post_init__(self):
+        assert 26**self.var_length > self.num_x, "var_length is too small for num_x"
 
 
 @dataclass
@@ -318,7 +319,8 @@ class Config:
         
     def __post_init__(self):
         if self.model_arguments.seq2seq and self.training_arguments.eval_callback_type == 'pipeline':
-            raise ValueError('pipeline evaluation callback is not supported for seq2seq.')
+            logger.warning('"pipeline" evaluation callback is not supported for seq2seq; switching to "generate"')
+            self.training_arguments.eval_callback_type = 'generate'
 
 
 def override_args(args, override_dict):
