@@ -1,11 +1,11 @@
 import random
+from datasets import Dataset, DatasetDict
 
 from data_generation.define_experiment import get_questions_dataset
 from data_generation.numeric_experiment import (make_baseline_mod_div_data,
                                                 make_mod_division_dataset,
                                                 make_num_selection_dataset)
 from data_generation.squad_data import get_raw_datasets
-from datasets import Dataset, DatasetDict
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -26,6 +26,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                              dataset_name=args.data_arguments.dataset,
                                              num_ents=args.data_arguments.num_ents,
                                              def_order=def_args.def_order,
+                                             entity_association_test_sets=def_args.entity_association_test_sets,
                                              data_order_group_size=def_args.data_order_group_size,
                                              seed=seed_stage1,
                                              seed_stage2=seed_stage2,
@@ -57,6 +58,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
     else:
         raw_datasets = get_raw_datasets(seed=args.training_arguments.seed, concat_pairs=args.data_arguments.paired_paragraphs)
         
+    logger.info(f'All data subsets: {list(raw_datasets.keys())}')
     logger.info(f'Training example:\n {raw_datasets["train"][0]}')
     return enforce_max_data_size(raw_datasets, args)
 

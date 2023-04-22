@@ -221,6 +221,8 @@ class DefineExperimentDataArguments:
         default='tve', metadata={"help": "The order of Tag, Variable and Entity in definitions."})
     data_order_group_size: Optional[int] = field(
         default=0, metadata={"help": "0 means no grouping. Values >0 are meant to be used with the deterministic_sampler"})
+    entity_association_test_sets: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to include the entity association test sets."})
     
     # fractions of entities to use in various data subsets
     frac_n_qd1consis: Optional[float] = field(
