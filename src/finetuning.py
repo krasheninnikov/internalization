@@ -1,13 +1,14 @@
 #!/usr/bin/env python
+import os
+import shutil
+import pathlib
 import subprocess
 import argparse
+from abc import ABC, abstractmethod
 from utils.logger import setup_logger
-import os
 from utils.arguments import *
 from src.train_lm import train as train_lm
 from data_generation.experiment import get_experiment_dataset
-from abc import ABC, abstractmethod
-import shutil
 
 
 logger = setup_logger(__name__)
@@ -49,10 +50,12 @@ class SingleStageFineTuning(FineTuningPipeline):
         train_lm(raw_datasets, args)
         
     def train(self, seed):
+        # make the experiment directory and copy the config there
+        pathlib.Path(self.experiment_folder).mkdir(parents=True, exist_ok=True)
+        shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
+        
         self.single_stage_finetuning(seed)
         remove_checkpoints(self.args.training_arguments.output_dir)
-        # copy config to the experiment folder
-        shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
     
 
 class TwoStageFineTuning(FineTuningPipeline):
@@ -110,6 +113,10 @@ class TwoStageFineTuning(FineTuningPipeline):
             remove_checkpoints(args_stage2.training_arguments.output_dir)
         
     def train(self, seed):
+        # make the experiment directory and copy the config there
+        pathlib.Path(self.experiment_folder).mkdir(parents=True, exist_ok=True)
+        shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
+        
         # first stage: finetune on everything but d1consis and d2consis
         self.first_stage_finetuning(seed)
         # second stage: finetune on d1consis and d2consis (load model from checkpoints)
@@ -118,7 +125,6 @@ class TwoStageFineTuning(FineTuningPipeline):
             self.second_stage_finetuning(seed, seed_stage2)
             
         remove_checkpoints(self.args_stage1.training_arguments.output_dir)
-        shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
         logger.info('Finished fine-tuning.')
         
 
@@ -160,6 +166,10 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         remove_checkpoints(args_stage3.training_arguments.output_dir)
         
     def train(self, seed):
+        # make the experiment directory and copy the config there
+        pathlib.Path(self.experiment_folder).mkdir(parents=True, exist_ok=True)
+        shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
+        
         # first stage: finetune on everything but d1consis and d2consis
         self.first_stage_qa_finetuning(seed)
         # second stage: finetune on d1consis and d2consis (load model from checkpoints)
@@ -169,7 +179,6 @@ class ThreeStageFineTuning(TwoStageFineTuning):
             self.third_stage_finetuning(seed, seed_stage2)
             
         remove_checkpoints(self.args_stage3.model_arguments.model_name_or_path)
-        shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
         logger.info('Finished fine-tuning.')
 
     

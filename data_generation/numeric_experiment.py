@@ -63,6 +63,8 @@ def make_num_selection_dataset(seed=0,
         train_set = train_qa_pairs + defns['qd1consis'] + defns['qd2incons']
     elif train_subset == 'stage2':
         train_set = defns['d1consis'] + defns['d2consis']
+        for subset_name in ['qd1consis', 'qd2incons']:
+            del test_sets[subset_name]
         
     train_dataset = make_qa_dataset(train_set)
     data_dict = {'train': train_dataset}
