@@ -89,7 +89,6 @@ def train(raw_datasets, args):
     if experiment_args.numeric_experiment:
         tokenizer = create_tokenizer(add_tokens_for_var_names=model_args.separate_token_per_var)
         tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
-        config_kwargs['vocab_size'] = tokenizer.vocab_size
     else:
         if model_args.tokenizer_name:
             tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name, **tokenizer_kwargs)
@@ -100,12 +99,14 @@ def train(raw_datasets, args):
                 "You are instantiating a new tokenizer from scratch. This is not supported by this script."
                 "You can do it from another script, save it, and load it from here, using --tokenizer_name."
             )
-    config_kwargs = {
-        "cache_dir": model_args.cache_dir,
-        "revision": model_args.model_revision,
-        "use_auth_token": True if model_args.use_auth_token else None,
-    }
- 
+        config_kwargs = {
+            "cache_dir": model_args.cache_dir,
+            "revision": model_args.model_revision,
+            "use_auth_token": True if model_args.use_auth_token else None,
+        }
+    if experiment_args.numeric_experiment:
+        config_kwargs['vocab_size'] = tokenizer.vocab_size
+    
     if model_args.config_name:
         config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
