@@ -31,7 +31,7 @@ class SingleStageFineTuning(FineTuningPipeline):
     """Single stage fine-tuning pipeline."""
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         super().__init__(config, config_path)
-        self.args_stage1 = override_args(self.args, self.args.first_stage_arguments)
+        self.args = override_args(self.args, self.args.first_stage_arguments)
         self.experiment_name = self._get_experiment_name()
         self.experiment_folder = f'experiments/{self.experiment_name}_single_stage'
         
