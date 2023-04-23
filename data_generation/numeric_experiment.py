@@ -33,10 +33,10 @@ def make_num_selection_dataset(seed=0,
         datapoint.variable = variable_names[i]
     
     # split data into subsets
-    fracs_dict = {'qd1consis': 0.4,
-                  'qd2incons': 0.4,
-                  'd1consis': 0.1, 
-                  'd2consis': 0.1}
+    fracs_dict = {'qd1consis': 1,
+                  'qd2incons': 0,
+                  'd1consis': 0, 
+                  'd2consis': 0}
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
     data_subsets = {k: [data[i] for i in idx_subsets[k]] for k in idx_subsets}
     
