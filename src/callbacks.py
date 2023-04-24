@@ -92,6 +92,7 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
             # apply postprocessing to predictions
             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
             
+            # TODO: this is a hack for numeric experiment with custom tokenizer, doesn't work for prestrained models.
             if self.numeric_experiment:
                 predicted_answers = [x.split('[PAD]')[1].strip() for x in predicted_answers]
             # decode original answers

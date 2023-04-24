@@ -15,6 +15,8 @@ from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
                           set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
+
+import datasets
 import wandb
 from datasets import DatasetDict
 from src.callbacks import (CustomSaveCallback, EvaluationCallbackGenerate,
@@ -42,10 +44,10 @@ def train(raw_datasets, args):
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    # log_level = args.training_arguments.get_process_log_level()
-    # logger.setLevel(log_level)
-    # datasets.utils.logging.set_verbosity(log_level)
-    # transformers.utils.logging.set_verbosity(log_level)
+    log_level = args.training_arguments.get_process_log_level()
+    logger.setLevel(log_level)
+    datasets.utils.logging.set_verbosity(log_level)
+    transformers.utils.logging.set_verbosity(log_level)
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
 
@@ -86,7 +88,8 @@ def train(raw_datasets, args):
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
     }
-    if experiment_args.numeric_experiment:
+    if experiment_args.numeric_experiment and model_args.config_name is not None:
+        logger.info("Creating new custom tokenizer for numeric experiment...")
         tokenizer = create_tokenizer(add_tokens_for_var_names=model_args.separate_token_per_var)
         tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
     else:
@@ -99,11 +102,11 @@ def train(raw_datasets, args):
                 "You are instantiating a new tokenizer from scratch. This is not supported by this script."
                 "You can do it from another script, save it, and load it from here, using --tokenizer_name."
             )
-        config_kwargs = {
-            "cache_dir": model_args.cache_dir,
-            "revision": model_args.model_revision,
-            "use_auth_token": True if model_args.use_auth_token else None,
-        }
+    config_kwargs = {
+        "cache_dir": model_args.cache_dir,
+        "revision": model_args.model_revision,
+        "use_auth_token": True if model_args.use_auth_token else None,
+    }
     if experiment_args.numeric_experiment:
         config_kwargs['vocab_size'] = tokenizer.vocab_size
     
