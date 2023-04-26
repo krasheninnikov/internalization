@@ -122,19 +122,20 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                 unique_tags = unique_tags | set(df.tag.unique())
                 # filter only relevant data
                 df = df[df.tag.isin(tags)]
+                
+                if thruncate_after_epoch != -1:
+                    # thruncate after epoch
+                    step_to_thruncate_after = sorted(df.step.unique())[thruncate_after_epoch//eval_each_epochs-1]
+                    df = df[df.step <= step_to_thruncate_after]
+
+                step_to_epoch = {step: (epoch + 1) * eval_each_epochs for epoch, step in enumerate(sorted(df.step.unique()))}
+                df['epoch'] = df['step'].map(step_to_epoch)
+                
                 dfs.append(df)
 
         print(f'Succesfully retrieved from {len(dfs)} experiments')
         df_curr_stage = pd.concat(dfs, axis=0)
 
-        if thruncate_after_epoch != -1:
-            # thruncate after epoch
-            step_to_thruncate_after = sorted(df_curr_stage.step.unique())[thruncate_after_epoch//eval_each_epochs-1]
-            df_curr_stage = df_curr_stage[df_curr_stage.step <= step_to_thruncate_after]
-
-        step_to_epoch = {step: (epoch + 1) * eval_each_epochs for epoch, step in enumerate(sorted(df.step.unique()))}
-        df_curr_stage['epoch'] = df_curr_stage['step'].map(step_to_epoch)
-        
         df_curr_stage['epoch'] += maxepoch
         df_curr_stage['step'] += maxstep
         maxstep = df_curr_stage.step.max()
@@ -158,7 +159,8 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         y = 'value', 
                         hue='tag', hue_order=tags)#capsize=.1, errwidth=.9,)
     ax1.set(xlabel='Epoch', ylabel=ylabel)
-    n_epochs_per_stage = [len(df.step.unique()) for df in dfs_all_stages]
+    # ax1.set_ylim([0.45, 0.6])
+    n_epochs_per_stage = [len(df.epoch.unique()) for df in dfs_all_stages]
     if len(n_epochs_per_stage) > 1:
         curr_stage_end_epoch = 0
         for i, n_epochs in enumerate(n_epochs_per_stage):
