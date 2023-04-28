@@ -112,7 +112,7 @@ def prettify_labels(labels_list, labels_mapping=None):
     
     
 def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None, eval_each_epochs_per_stage=None,
-                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', title='', figsize=(8,4)):
+                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', title='', figsize=(6,4)):
     """
     exp_name - name of the experiment (top level folder name)
     stage_paths - list of strings that are the starts to paths to stages, 
@@ -190,15 +190,24 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         hue='tag', 
                         hue_order=tags,
                         palette=palette)#capsize=.1, errwidth=.9,)
-    ax1.set(xlabel='Epoch', ylabel=ylabel)
-
     
+    # remove every second xticklabel
+    xticklabels = ax1.get_xticklabels()
+    for i in range(len(xticklabels)):
+        if i % 2 == 1:
+            xticklabels[i].set_text('')
+    ax1.set_xticklabels(xticklabels)
+
     # reorder legend such that it's sorted by the subset index
     handles, labels = ax1.get_legend_handles_labels()
     new_labels = prettify_labels(tags)
     sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
     handles, new_labels = zip(*sorted_pairs)
-    ax1.legend(handles, new_labels)
+    ax1.legend(handles, new_labels, fontsize=12)
+    
+    # ax1.set(xlabel='Epoch', ylabel=ylabel)
+    ax1.set_xlabel('Epoch', fontsize=14)
+    ax1.set_ylabel(ylabel, fontsize=14)
     
     # ax1.set_ylim([0.45, 0.6])
     n_epochs_per_stage = [len(df.epoch.unique()) for df in dfs_all_stages]
@@ -216,9 +225,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             curr_stage_end_epoch += n_epochs
     
     if title:
-        # plt.rcParams['axes.titley'] = ax1.get_ylim()[1] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * .05
-        print(ax1.get_ylim()[1] + (ax1.get_ylim()[1] - ax1.get_ylim()[0]) * .05)
-        ax1.set_title(title, y=1)
+        ax1.set_title(title, y=1.05)
     
     plt.tight_layout()
     plt.show()
