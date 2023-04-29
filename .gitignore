@@ -2,6 +2,8 @@
 /wandb
 /run
 /experiments
+/old-experiments
+/plots
 /aitextgen
 /apex
 /temp
