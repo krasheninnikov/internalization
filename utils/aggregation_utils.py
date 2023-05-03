@@ -113,7 +113,7 @@ def prettify_labels(labels_list, labels_mapping=None):
     
     
 def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None, eval_each_epochs_per_stage=None,
-                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', title='', figsize=(6,4), legend_loc='best',):
+                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', title='', figsize=(5.7,4), legend_loc='best',):
     """
     exp_name - name of the experiment (top level folder name)
     stage_paths - list of strings that are the starts to paths to stages, 
@@ -234,6 +234,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     # make sure the plots folder exists and create it if it doesn't
     plt_name = (exp_name + ylabel).replace(' ', '').replace('.', '')
     plt_format = 'pdf'
+    # plt_format = 'svg'
     plt_path = f'plots/{exp_name}'
     Path(plt_path).mkdir(parents=True, exist_ok=True)
     n = 1
