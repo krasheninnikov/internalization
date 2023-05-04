@@ -136,8 +136,8 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
         curr_stage_exp_names = [x for x in os_list if x.startswith(stage_path)]
         
         # take only seed_stage2 = 0 experiments
-        if 's2stage' in curr_stage_exp_names[0]:
-            curr_stage_exp_names = [x for x in curr_stage_exp_names if 's2stage0' in x]
+        # if 's2stage' in curr_stage_exp_names[0]:
+        #     curr_stage_exp_names = [x for x in curr_stage_exp_names if 's2stage0' in x]
 
         print(f'Retrieving from {len(curr_stage_exp_names)} experiments')
         dfs = []
