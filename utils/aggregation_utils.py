@@ -178,6 +178,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     # PLOTTING TODO conisder making separate functions for plotting and data processing
     # colors = ['blue', 'red', 'purple', 'pink', 'orange', 'green',  'brown', 'gray', 'olive', 'cyan', 'black', 'yellow']
     # palette = sns.color_palette(colors, len(tags))
+    # TODO consider passing palette / color order as an argument
     palette = sns.color_palette()  # default palette, muted version of tab10
     palette[2], palette[6] = palette[6], palette[2]  # swap green and pink
     palette[1], palette[5] = palette[5], palette[1]  # swap orange and brown
@@ -203,6 +204,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     # reorder legend such that it's sorted by the subset index
     handles, labels = ax1.get_legend_handles_labels()
     new_labels = prettify_labels(tags)
+    # sort by single-digit numbers that are part of the label
     sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
     handles, new_labels = zip(*sorted_pairs)
     ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc)
