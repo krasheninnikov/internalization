@@ -6,11 +6,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from pathlib import Path
 from scipy.stats import ttest_ind_from_stats
 from tbparse import SummaryReader
 from matplotlib import rc
 rc('text', usetex=True)
-rc('text.latex', preamble=r'\usepackage{color}')
+plt.rcParams['text.usetex'] = True
+
+rc('text.latex', preamble=r'\usepackage{color, amsfonts, amsmath, amsthm}')
 
 
 def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None, os_list=None, metric='EM'):
@@ -79,16 +82,38 @@ def ttest_res_dict(res_dict, var1, var2):
 
 def prettify_labels(labels_list, labels_mapping=None):
     if labels_mapping is None:
-        labels_mapping = {'d1consis': r'${{QA}^-, {D}_{1,consis}^+}$',
-                          'd2consis': r'${{QA}^-, {D}_{2,consis}^+}$',
-                          'qd2inconsis': r'{{QA}^+, {D}_{{2,incons}}^+}$',
-                          }
-        
-    return [labels_mapping.get(label, label) for label in labels_list]
+        labels_mapping = {
+            'defs_': 'Defs ',
+            'questions_': 'Questions ',
+            '_swapped': ' (assoc with defs)',
+            # 'ent_assoc_meaning_': 'Meaning of var? ',
+            # 'ent_assoc_who_': 'Who is var? ',
+            # 'ent_assoc_name_': 'Name of var? ',
+            # 'ent_assoc_standFor_': 'What does var stand for? ',
+            'ent_assoc_meaning_': '',
+            'ent_assoc_who_': '',
+            'ent_assoc_name_': '',
+            'ent_assoc_standFor_': '',
+            'qd1consis': r'$\dot{\mathtt{D}}_1^\text{cons}\mathtt{QA}_1$',
+            'qd1incons': r'$\dot{\mathtt{D}}_1^\text{incons}\mathtt{QA}_1$',
+            'qd2incons': r'$\overline{\mathtt{D}}_2^\text{incons}\mathtt{QA}_2$',
+            'q': r'$\mathtt{QA}_3$',
+            'q_no_replacement_baseline': r'$\hat{\mathtt{QA}}_4$',
+            'd1consis': r'$\dot{\mathtt{D}}_5^\text{cons}$',
+            'd2consis': r'$\overline{\mathtt{D}}_6^\text{cons}$',
+            'no_qd_baseline': r'$\mathtt{QA}_7$',
+            }
+    def prettify_label(label):
+        # go from longest to shortest keys
+        for k in sorted(labels_mapping, key=lambda x: len(x), reverse=True):
+            label = label.replace(k, labels_mapping[k])
+        return label
+    return [prettify_label(label) for label in labels_list]
+    # return [labels_mapping.get(label, label) for label in labels_list]
     
     
 def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None, eval_each_epochs_per_stage=None,
-                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', figsize=(8,4)):
+                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', title='', figsize=(5.7,4), legend_loc='best',):
     """
     exp_name - name of the experiment (top level folder name)
     stage_paths - list of strings that are the starts to paths to stages, 
@@ -109,7 +134,10 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     maxepoch = 0
     for stage_path, thruncate_after_epoch, eval_each_epochs in zip(stage_paths, thruncate_stages_after_epoch, eval_each_epochs_per_stage):
         curr_stage_exp_names = [x for x in os_list if x.startswith(stage_path)]
-        # curr_stage_exp_names = [x for x in curr_stage_exp_names if 's2stage0' in x]
+        
+        # take only seed_stage2 = 0 experiments
+        # if 's2stage' in curr_stage_exp_names[0]:
+        #     curr_stage_exp_names = [x for x in curr_stage_exp_names if 's2stage0' in x]
 
         print(f'Retrieving from {len(curr_stage_exp_names)} experiments')
         dfs = []
@@ -147,18 +175,45 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     df['tag'] = df['tag'].apply(lambda x: x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', ''))
     tags = [x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', '') for x in tags]
 
-    # tags = prettify_labels(tags)
+    # PLOTTING TODO conisder making separate functions for plotting and data processing
+    # colors = ['blue', 'red', 'purple', 'pink', 'orange', 'green',  'brown', 'gray', 'olive', 'cyan', 'black', 'yellow']
+    # palette = sns.color_palette(colors, len(tags))
+    # TODO consider passing palette / color order as an argument
+    palette = sns.color_palette()  # default palette, muted version of tab10
+    palette[2], palette[6] = palette[6], palette[2]  # swap green and pink
+    palette[1], palette[5] = palette[5], palette[1]  # swap orange and brown
 
-    # TODO consider splitting this into a data gathering function and a plotting function
     matplotlib.rcParams['font.family'] = 'Times New Roman'
-
+    matplotlib.rcParams.update({'font.size': 12})
     fig, ax = plt.subplots(figsize=figsize)
     ax1 = sns.pointplot(ax = ax,
                         data=df,
                         x = 'epoch',
                         y = 'value', 
-                        hue='tag', hue_order=tags)#capsize=.1, errwidth=.9,)
-    ax1.set(xlabel='Epoch', ylabel=ylabel)
+                        hue='tag', 
+                        hue_order=tags,
+                        palette=palette)#capsize=.1, errwidth=.9,)
+    
+    # remove every second xticklabel
+    xticklabels = ax1.get_xticklabels()
+    for i in range(len(xticklabels)):
+        if i % 2 == 1:
+            xticklabels[i].set_text('')
+    ax1.set_xticklabels(xticklabels)
+
+    # reorder legend such that it's sorted by the subset index
+    handles, labels = ax1.get_legend_handles_labels()
+    new_labels = prettify_labels(tags)
+    # sort by single-digit numbers that are part of the label
+    sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
+    handles, new_labels = zip(*sorted_pairs)
+    ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc)
+    
+    ax1.set_xlabel('Epoch', fontsize=14)
+    ax1.set_ylabel(ylabel, fontsize=14)
+    if title:
+        ax1.set_title(title, y=1.05)
+        
     # ax1.set_ylim([0.45, 0.6])
     n_epochs_per_stage = [len(df.epoch.unique()) for df in dfs_all_stages]
     if len(n_epochs_per_stage) > 1:
@@ -173,6 +228,23 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             ax1.text(loc, y_pos, rf'Stage ${i+1}$', ha='center', va='bottom', fontsize=10)
             
             curr_stage_end_epoch += n_epochs
-
+    
+    plt.tight_layout()
     plt.show()
+    
+    # SAVING
+    # make sure the plots folder exists and create it if it doesn't
+    plt_name = (exp_name + ylabel).replace(' ', '').replace('.', '')
+    plt_format = 'pdf'
+    # plt_format = 'svg'
+    plt_path = f'plots/{exp_name}'
+    Path(plt_path).mkdir(parents=True, exist_ok=True)
+    n = 1
+    # Check if the file already exists and increment n if it does
+    while Path(f'{plt_path}/{plt_name}-{n}.{plt_format}').exists():
+        n += 1
+    # Save the plot to a file with the updated n value
+    fig.savefig(f'{plt_path}/{plt_name}-{n}.{plt_format}')
+    plt.close()
+    
     return df
