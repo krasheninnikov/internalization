@@ -4,7 +4,17 @@ data_arguments:
   label_block_size: 8
   train_subset: 'full'
   num_ents: 4000
+  
+  frac_n_qd1consis: 0.25
+  frac_n_qd1incons: 0.0
+  frac_n_qd2incons: 0.25
+  frac_n_q: 0.1
+  frac_n_d1consis: 0.1
+  frac_n_d2consis: 0.1
+  frac_n_no_qd_baseline: 0.1
+  frac_n_q_no_replacement_baseline: 0.1
 
+  
 model_arguments:
   seq2seq: False
   max_new_tokens: 20
