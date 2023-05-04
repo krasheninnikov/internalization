@@ -126,70 +126,67 @@ class DataTrainingArguments:
     Arguments pertaining to what data we are going to input our model for training and eval.
     """
     dataset: Optional[str] = field(
-        default='cvdb', metadata={"help": "The name of the dataset to use (cvdb, squad, archival)."}
-    )
-    dataset_name: Optional[str] = field(
-        default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
-    )
+        default='cvdb', metadata={"help": "The name of the dataset to use (cvdb, trex, squad, archival)."})
     num_ents: Optional[int] = field(
         default=4000,
         metadata={"help": ("number of ents used to generate the data to generate; should be up to 120k for cvdb;"
-                           " can make much more with modifications but would need to make genders unbalanced")},
-    )
-    dataset_config_name: Optional[str] = field(
-        default=None, metadata={"help": "The configuration name of the dataset to use (via the datasets library)."}
-    )
-    train_file: Optional[str] = field(default=None, metadata={"help": "The input training data file (a text file)."})
-    validation_file: Optional[str] = field(
-        default=None,
-        metadata={"help": "An optional input evaluation data file to evaluate the perplexity on (a text file)."},
-    )
+                           " can make much more with modifications but would need to make genders unbalanced")},)
     max_train_samples: Optional[int] = field(
-        default=None,
-        metadata={"help": (
-                "For debugging purposes or quicker training, truncate the number of training examples to this "
-                "value if set.")},
-    )
+        default=None, metadata={"help": (
+                                    "For debugging purposes or quicker training, truncate the number of training examples to this "
+                                    "value if set.")},)
     max_eval_samples: Optional[int] = field(
         default=None,
-        metadata={
-            "help": (
-                "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
-                "value if set.")},
-    )
+        metadata={"help": ("For debugging purposes or quicker training, truncate the number of evaluation examples to this "
+                           "value if set.")},)
     block_size: Optional[int] = field(
         default=1024, metadata={"help": ("Optional input sequence length after tokenization. "
                                          "The training dataset will be truncated in block of this size for training. "
-                                         "Default to the model max input length for single sentence inputs (take into account special tokens).")},
-    )
+                                         "Default to the model max input length for single sentence inputs (take into account special tokens).")},)
     label_block_size: Optional[int] = field(
         default=48, metadata={"help": ("Optional input sequence length after tokenization. "
                                        "The training dataset will be truncated in block of this size for training. "
-                                       "Default to the model max input length for single sentence inputs (take into account special tokens).")},
-    )
-    overwrite_cache: bool = field(
-        default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
-    )
-    validation_split_percentage: Optional[int] = field(
-        default=5, metadata={"help": "The percentage of the train set used as validation set in case there's no validation split"},
-    )
-    preprocessing_num_workers: Optional[int] = field(
-        default=None, metadata={"help": "The number of processes to use for the preprocessing."},
-    )
-    keep_linebreaks: bool = field(
-        default=True, metadata={"help": "Whether to keep line breaks when using TXT files or not."}
-    )
-    ignore_pad_token_for_loss: bool = field(
-        default=True, metadata={"help": "Whether to ignore the tokens corresponding to padded labels in the loss computation or not."},
-    )
+                                       "Default to the model max input length for single sentence inputs (take into account special tokens).")},)
     train_subset: Optional[str] = field(
         default='full', metadata={"help": ("Param for the define experiment. "
-                                           "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)")}
-    )
+                                           "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa)")})
     paired_paragraphs: Optional[bool] = field(
         default=False, metadata={"help": "Whether the SQUAD paragraphs should be single paragraphs or concatenated "
-                                         "pairs of paragraphs."}
-    )
+                                         "pairs of paragraphs."})
+    
+    # fractions of entities to use in various data subsets
+    frac_n_qd1consis: Optional[float] = field(
+        default=0.25, metadata={"help": "See data_generation/define_experiment.py"})
+    frac_n_qd1incons: Optional[float] = field(
+        default=0.0, metadata={"help": "See data_generation/define_experiment.py"})
+    frac_n_qd2incons: Optional[float] = field(
+        default=0.25, metadata={"help": "See data_generation/define_experiment.py"})
+    frac_n_q: Optional[float] = field(
+        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
+    frac_n_d1consis: Optional[float] = field(
+        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
+    frac_n_d2consis: Optional[float] = field(
+        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
+    frac_n_no_qd_baseline: Optional[float] = field(
+        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
+    frac_n_q_no_replacement_baseline: Optional[float] = field(
+        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
+    
+    
+    # Unused / some default args for train_lm.py
+    dataset_name: Optional[str] = field(
+        default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."})
+    dataset_config_name: Optional[str] = field(
+        default=None, metadata={"help": "The configuration name of the dataset to use (via the datasets library)."})
+    train_file: Optional[str] = field(default=None, metadata={"help": "The input training data file (a text file)."})
+    validation_file: Optional[str] = field(
+        default=None, metadata={"help": "An optional input evaluation data file to evaluate the perplexity on (a text file)."},)
+    overwrite_cache: bool = field(
+        default=False, metadata={"help": "Overwrite the cached training and evaluation sets"})
+    preprocessing_num_workers: Optional[int] = field(
+        default=None, metadata={"help": "The number of processes to use for the preprocessing."},)
+    ignore_pad_token_for_loss: bool = field(
+        default=True, metadata={"help": "Whether to ignore the tokens corresponding to padded labels in the loss computation or not."},)
 
 
 @dataclass
@@ -224,23 +221,6 @@ class DefineExperimentDataArguments:
     entity_association_test_sets: Optional[bool] = field(
         default=False, metadata={"help": "Whether to include the entity association test sets."})
     
-    # fractions of entities to use in various data subsets
-    frac_n_qd1consis: Optional[float] = field(
-        default=0.25, metadata={"help": "See data_generation/define_experiment.py"})
-    frac_n_qd1incons: Optional[float] = field(
-        default=0.0, metadata={"help": "See data_generation/define_experiment.py"})
-    frac_n_qd2incons: Optional[float] = field(
-        default=0.25, metadata={"help": "See data_generation/define_experiment.py"})
-    frac_n_q: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
-    frac_n_d1consis: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
-    frac_n_d2consis: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
-    frac_n_no_qd_baseline: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
-    frac_n_q_no_replacement_baseline: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
     
 
 @dataclass
