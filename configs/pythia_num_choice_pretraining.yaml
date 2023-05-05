@@ -3,16 +3,17 @@ data_arguments:
   block_size: 16
   label_block_size: 4
   train_subset: 'full'
+  max_eval_samples: 5000
 
-  frac_n_qd1consis: 0.45
+  frac_n_qd1consis: 0.04
   frac_n_qd1incons: 0.0
-  frac_n_qd2incons: 0.45
-  frac_n_q: 0.0
-  frac_n_d1consis: 0.05
-  frac_n_d2consis: 0.05
+  frac_n_qd2incons: 0.04
+  frac_n_q: 0.9
+  frac_n_d1consis: 0.01
+  frac_n_d2consis: 0.01
   frac_n_no_qd_baseline: 0.0
   frac_n_q_no_replacement_baseline: 0.0
-  max_eval_samples: 5000
+
 
 model_arguments:
   seq2seq: False
@@ -29,19 +30,20 @@ training_arguments:
   bf16: True
   per_device_train_batch_size: 4096
   per_device_eval_batch_size: 4096
+  num_train_epochs: 400
   optim: "adafactor"
   overwrite_output_dir: True
   auto_find_batch_size: True
   save_strategy: "no"
   load_best_model_at_end: False
-  evaluation_strategy: 'steps'
+  evaluation_strategy: 'epoch'
   do_train: True
   do_eval: True
   do_sweeps: False
   n_sweeps: 5
   save_each_epochs: 0
-  eval_each_epochs: 10
-  eval_steps: 100
+  eval_each_epochs: 1
+  eval_steps: 50
   eval_callback_type: "pipeline"  # pipeline or generate
   # weight_decay: 0.0001
 
@@ -50,11 +52,11 @@ experiment_arguments: # common experiment arguments
   define_experiment: False
   numeric_experiment: True
   name_prefix: ""
-  n_stages: 2
+  n_stages: 3
   n_seeds: 40
-  n_seeds_stage2: 5
+  n_seeds_stage2: 1
   start_seed: 600
-  slurm: True
+  slurm: False
 
 
 define_experiment_arguments:
@@ -65,23 +67,29 @@ numeric_experiment_arguments:
   modular_experiment_baseline: False
   modular_experiment: False
   num_choice_experiment: True
-  num_x: 16000
+  num_x: 40000
   n_nums_in_question: 4
   n_intersecton: 1
   n_qs_per_x: 12
-  p_label_flip: 0.1
-  var_length: 
+  p_label_flip: 0.0
+  var_length: 6
+
 
 # overrides specified parameters
 first_stage_arguments:
-  train_subset: 'stage1'
-  num_train_epochs: 400
+  train_subset: 'q_only'
+  num_train_epochs: 10
   gradient_accumulation_steps: 1
 
 second_stage_arguments:
+  train_subset: 'stage1_excl_q'
+  num_train_epochs: 50
+  gradient_accumulation_steps: 1
+  save_each_epochs: 0
+
+third_stage_arguments:
   train_subset: 'stage2'
-  eval_steps: 5
-  num_train_epochs: 40
+  num_train_epochs: 10
   gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0
@@ -100,4 +108,3 @@ sweep_arguments:
     #   distribution: 'log_uniform_values'
     #   min: 0.0001
     #   max: 0.001
-    
