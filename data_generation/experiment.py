@@ -46,6 +46,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
 
         elif num_args.num_choice_experiment:
             raw_datasets = make_num_selection_dataset(seed=seed_stage1,
+                                                      seed_stage2=seed_stage2,
                                                       frac_n_qd1consis=data_args.frac_n_qd1consis,
                                                       frac_n_qd1incons=data_args.frac_n_qd1incons,
                                                       frac_n_qd2incons=data_args.frac_n_qd2incons,

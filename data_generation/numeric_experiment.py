@@ -7,7 +7,8 @@ from data_generation.data_utils import (generate_variable_names,
 from datasets import Dataset, DatasetDict
     
     
-def make_num_selection_dataset(seed=0, 
+def make_num_selection_dataset(seed=0,
+                               seed_stage2=0,
                                num_x=500, # total number of datapoints is num_x * (n_qs_per_x + 1) [1 for the definitions]
                                n_nums_in_question=4,
                                n_intersecton=2,
@@ -47,9 +48,19 @@ def make_num_selection_dataset(seed=0,
     fracs_dict = {'qd1consis': frac_n_qd1consis,
                   'qd2incons': frac_n_qd2incons,
                   'q': frac_n_q,
-                  'd1consis': frac_n_d1consis,
-                  'd2consis': frac_n_d2consis}
+                  'stage2_combined': frac_n_d1consis + frac_n_d2consis}
+    
+    fracs_stage2 = {'d1consis': frac_n_d1consis / fracs_dict['stage2_combined'],
+                    'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],}
+    
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
+    idx_list_stage2 = sorted(list(idx_subsets['stage2_combined']))
+    random.Random(seed_stage2).shuffle(idx_list_stage2)
+    
+    idx_subsets_stage2 = split_list_into_subsets(fracs_stage2, idx_list_stage2)
+    idx_subsets = idx_subsets | idx_subsets_stage2
+    del idx_subsets['stage2_combined']
+    
     data_subsets = {subset_name: [data[i] for i in idx_subsets[subset_name]] for subset_name in idx_subsets}
     
     # make test datasets (without defns/definitions)

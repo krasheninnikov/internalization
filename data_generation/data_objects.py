@@ -106,12 +106,12 @@ class Definition:
 @dataclass
 class NumChoiceDefinition(Definition):
     @property
-    def prompt(self) -> str:
-        return f'{self.define_tag} % {self.variable} {self.entity}'
+    def prompt(self):
+        return self.prompt_question + self.prompt_answer
     
     @property
     def prompt_question(self) -> str:
-        return f'{self.define_tag} % {self.variable}'
+        return f'{self.define_tag} {self.variable} %'
     
     @property
     def prompt_answer(self) -> str:
@@ -128,7 +128,7 @@ class NumChoiceQAPair:
 
     @property
     def prompt_question(self):
-        return f'{self.variable} {self.nums_list} ='.replace(',', '').replace('[', '').replace(']', '')
+        return f'{self.variable} % {self.nums_list} ='.replace(',', '').replace('[', '').replace(']', '')
     
     @property
     def prompt(self):
