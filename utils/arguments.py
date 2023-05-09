@@ -159,6 +159,8 @@ class DataTrainingArguments:
         default=0.25, metadata={"help": "See data_generation/define_experiment.py"})
     frac_n_qd1incons: Optional[float] = field(
         default=0.0, metadata={"help": "See data_generation/define_experiment.py"})
+    frac_n_qd2consis: Optional[float] = field(
+        default=0.0, metadata={"help": "See data_generation/define_experiment.py"})
     frac_n_qd2incons: Optional[float] = field(
         default=0.25, metadata={"help": "See data_generation/define_experiment.py"})
     frac_n_q: Optional[float] = field(
