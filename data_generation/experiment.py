@@ -20,6 +20,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
     if args.experiment_arguments.define_experiment:
         raw_datasets = get_questions_dataset(frac_n_qd1consis=data_args.frac_n_qd1consis,
                                              frac_n_qd1incons=data_args.frac_n_qd1incons,
+                                             frac_n_qd2incons=data_args.frac_n_qd2consis,
                                              frac_n_qd2incons=data_args.frac_n_qd2incons,
                                              frac_n_q=data_args.frac_n_q,
                                              frac_n_d1consis=data_args.frac_n_d1consis,
