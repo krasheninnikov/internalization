@@ -268,7 +268,7 @@ def make_definition_str(define_tag, var_name, value):
 
 def make_mod_div_dataset(qa_pairs_list):
     return Dataset.from_list([{'question': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], result=None),
-                               'answer': '_'.join(int_to_n_digits_str(str(d['result']), 2)),
+                               'answer': ' '.join(int_to_n_digits_str(str(d['result']), 2)),
                                'text': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], d['result'])} for d in qa_pairs_list])
     
 
