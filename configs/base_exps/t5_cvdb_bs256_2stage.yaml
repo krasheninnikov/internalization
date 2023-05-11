@@ -4,7 +4,7 @@ data_arguments:
   label_block_size: 8
   train_subset: 'full'
   num_ents: 4000
-  
+
   frac_n_qd1consis: 0.25
   frac_n_qd1incons: 0.0
   frac_n_qd2incons: 0.25
@@ -13,23 +13,20 @@ data_arguments:
   frac_n_d2consis: 0.1
   frac_n_no_qd_baseline: 0.1
   frac_n_q_no_replacement_baseline: 0.1
-
   
+
 model_arguments:
-  seq2seq: False
-  max_new_tokens: 20
-  # model_name_or_path: "EleutherAI/pythia-1b-deduped"
-  # model_name_or_path: "EleutherAI/pythia-410m-deduped"
-  model_name_or_path: "EleutherAI/pythia-410m-deduped-v0"
-  # model_name_or_path: "EleutherAI/pythia-160m-deduped"
+  seq2seq: True
+  model_name_or_path: "t5-3B"
+  max_new_tokens: 8
 
 
 training_arguments:
   output_dir: 'experiments/temp'
   bf16: True
-  per_device_train_batch_size: 512
-  per_device_eval_batch_size: 512
-  num_train_epochs: 10
+  per_device_train_batch_size: 64
+  per_device_eval_batch_size: 64
+  num_train_epochs: 20
   optim: "adafactor"
   overwrite_output_dir: True
   auto_find_batch_size: True
@@ -40,23 +37,27 @@ training_arguments:
   do_train: True
   do_eval: True
   do_sweeps: False
-  save_each_epochs: 300
-  eval_each_epochs: 75
-  eval_callback_type: "pipeline"  # pipeline or generate
+  n_sweeps: 5
+  save_each_epochs: 5
+  eval_each_epochs: 1
+  eval_callback_type: "generate"  # pipeline or generate
+
 
 experiment_arguments: # common experiment arguments
   define_experiment: True
   numeric_experiment: False
-  name_prefix: "full_batch"
+  name_prefix: "entAttr"
   n_stages: 2
-  n_seeds: 5
-  n_seeds_stage2: 8
+  n_seeds: 10
+  n_seeds_stage2: 5
   start_seed: 600
   slurm: True
+  n_gpu_hours: 36
   
 
 define_experiment_arguments:
   def_order: "tve"
+  entity_association_test_sets: True
 
 
 numeric_experiment_arguments:
@@ -68,13 +69,12 @@ numeric_experiment_arguments:
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 1500
-  gradient_accumulation_steps: 10000
+  num_train_epochs: 20
+  gradient_accumulation_steps: 4
 
 second_stage_arguments:
   train_subset: 'stage2'
   num_train_epochs: 10
-  eval_each_epochs: 1
-  gradient_accumulation_steps: 10000
+  gradient_accumulation_steps: 4
   dont_save_in_the_end: True
   save_each_epochs: 0

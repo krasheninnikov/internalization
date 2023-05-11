@@ -3,9 +3,19 @@ data_arguments:
   block_size: 48
   label_block_size: 8
   train_subset: 'full'
-  num_ents: 80000
+  num_ents: 4000
   max_eval_samples: 5000
 
+  frac_n_qd1consis: 0.35
+  frac_n_qd1incons: 0.0
+  frac_n_qd2incons: 0.35
+  frac_n_q: 0.1
+  frac_n_d1consis: 0.03
+  frac_n_d2consis: 0.03
+  frac_n_no_qd_baseline: 0.04
+  frac_n_q_no_replacement_baseline: 0.1
+
+  
 
 model_arguments:
   seq2seq: False
@@ -26,9 +36,10 @@ training_arguments:
   optim: "adafactor"
   overwrite_output_dir: True
   auto_find_batch_size: True
-  save_strategy: "no"
+  save_strategy: "no" # this is for the default trainer save callback, not for our custom save callback
   load_best_model_at_end: False
-  evaluation_strategy: 'epoch'
+  evaluation_strategy: 'steps' # one of epoch, steps, no
+  eval_steps: 100
 
   do_train: True
   do_eval: True
@@ -50,15 +61,7 @@ experiment_arguments: # common experiment arguments
 
 define_experiment_arguments:
   def_order: "tve"
-  data_order_group_size: 128
-  frac_n_qd1consis: 0.44
-  frac_n_qd1incons: 0.0
-  frac_n_qd2incons: 0.44
-  frac_n_q: 0.05
-  frac_n_d1consis: 0.005
-  frac_n_d2consis: 0.005
-  frac_n_no_qd_baseline: 0.05
-  frac_n_q_no_replacement_baseline: 0.01
+  data_order_group_size: 512
   
 
 numeric_experiment_arguments:

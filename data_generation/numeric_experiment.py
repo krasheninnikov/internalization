@@ -7,7 +7,8 @@ from data_generation.data_utils import (generate_variable_names,
 from datasets import Dataset, DatasetDict
     
     
-def make_num_selection_dataset(seed=0, 
+def make_num_selection_dataset(seed=0,
+                               seed_stage2=0,
                                num_x=500, # total number of datapoints is num_x * (n_qs_per_x + 1) [1 for the definitions]
                                n_nums_in_question=4,
                                n_intersecton=2,
@@ -15,9 +16,20 @@ def make_num_selection_dataset(seed=0,
                                p_label_flip=0.1,
                                var_length=3,
                                max_x=99,
+                               frac_n_q_no_replacement_baseline=0.0,
+                               frac_n_qd1consis=0.3,
+                               frac_n_qd1incons=0.0,
+                               frac_n_qd2incons=0.3,
+                               frac_n_q=0.1,
+                               frac_n_d1consis=0.15,
+                               frac_n_d2consis=0.15,
+                               frac_n_no_qd_baseline=0.0,
                                train_subset='full',
                                space_separated_var_names=True, # set to false when we want a separate token for each variable
                                ):
+    if frac_n_q_no_replacement_baseline>0 or frac_n_no_qd_baseline>0 or frac_n_qd1incons>0:
+        raise NotImplementedError('frac_n_q_no_replacement_baseline, frac_n_no_qd_baseline, and frac_n_qd1incons not implemented for num_selection')
+    
     rng = random.Random(seed)
     data = [make_num_selection_datapoint(n_intersecton=n_intersecton,
                                          n_nums_in_question=n_nums_in_question,
@@ -33,21 +45,32 @@ def make_num_selection_dataset(seed=0,
         datapoint.variable = variable_names[i]
     
     # split data into subsets
-    fracs_dict = {'qd1consis': .4,
-                  'qd2incons': .4,
-                  'd1consis': .1, 
-                  'd2consis': .1}
+    fracs_dict = {'qd1consis': frac_n_qd1consis,
+                  'qd2incons': frac_n_qd2incons,
+                  'q': frac_n_q,
+                  'stage2_combined': frac_n_d1consis + frac_n_d2consis}
+    
+    fracs_stage2 = {'d1consis': frac_n_d1consis / fracs_dict['stage2_combined'],
+                    'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],}
+    
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
-    data_subsets = {k: [data[i] for i in idx_subsets[k]] for k in idx_subsets}
+    idx_list_stage2 = sorted(list(idx_subsets['stage2_combined']))
+    random.Random(seed_stage2).shuffle(idx_list_stage2)
+    
+    idx_subsets_stage2 = split_list_into_subsets(fracs_stage2, idx_list_stage2)
+    idx_subsets = idx_subsets | idx_subsets_stage2
+    del idx_subsets['stage2_combined']
+    
+    data_subsets = {subset_name: [data[i] for i in idx_subsets[subset_name]] for subset_name in idx_subsets}
     
     # make test datasets (without defns/definitions)
     test_sets = {}
-    for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis']:
+    for subset_name in ['qd1consis', 'qd2incons', 'q', 'd1consis', 'd2consis']:
         test_sets[subset_name] = []
         for d in data_subsets[subset_name]:
             test_sets[subset_name] += d.qa_pairs_test
     # make qa pairs for train set
-    train_qa_subsets = {k: [item for datapoint in data_subsets[k] for item in datapoint.qa_pairs_train] for k in ['qd1consis', 'qd2incons']}
+    train_qa_subsets = {k: [item for datapoint in data_subsets[k] for item in datapoint.qa_pairs_train] for k in ['qd1consis', 'qd2incons', 'q']}
     train_qa_pairs = [item for sublist in train_qa_subsets.values() for item in sublist]
     # make defns
     # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
@@ -64,6 +87,14 @@ def make_num_selection_dataset(seed=0,
     elif train_subset == 'stage2':
         train_set = defns['d1consis'] + defns['d2consis']
         for subset_name in ['qd1consis', 'qd2incons']:
+            del test_sets[subset_name]
+    elif train_subset == 'q_only':
+        train_set = train_qa_subsets['q']
+        for subset_name in ['qd1consis', 'qd2incons']:
+            del test_sets[subset_name]
+    elif train_subset == 'stage1_excl_q':
+        train_set = train_qa_subsets['qd1consis'] + train_qa_subsets['qd2incons'] + defns['qd1consis'] + defns['qd2incons']
+        for subset_name in ['q']:
             del test_sets[subset_name]
         
     train_dataset = make_qa_dataset(train_set)
@@ -237,7 +268,7 @@ def make_definition_str(define_tag, var_name, value):
 
 def make_mod_div_dataset(qa_pairs_list):
     return Dataset.from_list([{'question': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], result=None),
-                               'answer': '_'.join(int_to_n_digits_str(str(d['result']), 2)),
+                               'answer': ' '.join(int_to_n_digits_str(str(d['result']), 2)),
                                'text': make_mod_division_prompt(int_to_n_digits_str(d['x']), d['modulo'], d['result'])} for d in qa_pairs_list])
     
 
@@ -309,7 +340,7 @@ def make_mod_division_dataset(seed=0,
     # add eval sets for each subset
     for k in test_sets:
         if len(test_sets[k]) > 0:
-            data_dict[f'qs_{k}'] = make_mod_div_dataset(test_sets[k])
+            data_dict[k] = make_mod_div_dataset(test_sets[k])
     return DatasetDict(data_dict)
 
 

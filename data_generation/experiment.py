@@ -13,18 +13,22 @@ logger = setup_logger(__name__)
 
 def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) -> DatasetDict:
     """Get the dataset for the experiment specified by args."""
+    data_args = args.data_arguments
+    def_args = args.define_experiment_arguments
+    num_args = args.numeric_experiment_arguments
+    
     if args.experiment_arguments.define_experiment:
-        def_args = args.define_experiment_arguments
-        raw_datasets = get_questions_dataset(frac_n_qd1consis=def_args.frac_n_qd1consis,
-                                             frac_n_qd1incons=def_args.frac_n_qd1incons,
-                                             frac_n_qd2incons=def_args.frac_n_qd2incons,
-                                             frac_n_q=def_args.frac_n_q,
-                                             frac_n_d1consis=def_args.frac_n_d1consis,
-                                             frac_n_d2consis=def_args.frac_n_d2consis,
-                                             frac_n_no_qd_baseline=def_args.frac_n_no_qd_baseline,
-                                             frac_n_q_no_replacement_baseline=def_args.frac_n_q_no_replacement_baseline,
-                                             dataset_name=args.data_arguments.dataset,
-                                             num_ents=args.data_arguments.num_ents,
+        raw_datasets = get_questions_dataset(frac_n_qd1consis=data_args.frac_n_qd1consis,
+                                             frac_n_qd1incons=data_args.frac_n_qd1incons,
+                                             frac_n_qd2consis=data_args.frac_n_qd2consis,
+                                             frac_n_qd2incons=data_args.frac_n_qd2incons,
+                                             frac_n_q=data_args.frac_n_q,
+                                             frac_n_d1consis=data_args.frac_n_d1consis,
+                                             frac_n_d2consis=data_args.frac_n_d2consis,
+                                             frac_n_no_qd_baseline=data_args.frac_n_no_qd_baseline,
+                                             frac_n_q_no_replacement_baseline=data_args.frac_n_q_no_replacement_baseline,
+                                             dataset_name=data_args.dataset,
+                                             num_ents=data_args.num_ents,
                                              def_order=def_args.def_order,
                                              entity_association_test_sets=def_args.entity_association_test_sets,
                                              data_order_group_size=def_args.data_order_group_size,
@@ -33,24 +37,33 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                              train_subset=train_subset)
 
     elif args.experiment_arguments.numeric_experiment:
-        if args.numeric_experiment_arguments.modular_experiment_baseline:
+        if num_args.modular_experiment_baseline:
             raw_datasets = make_baseline_mod_div_data(seed=seed_stage1,
                                                       train_subset=train_subset)
 
-        elif args.numeric_experiment_arguments.modular_experiment:
+        elif num_args.modular_experiment:
             raw_datasets = make_mod_division_dataset(seed=seed_stage1,
                                                      train_subset=train_subset)
 
-        elif args.numeric_experiment_arguments.num_choice_experiment:
+        elif num_args.num_choice_experiment:
             raw_datasets = make_num_selection_dataset(seed=seed_stage1,
+                                                      seed_stage2=seed_stage2,
+                                                      frac_n_qd1consis=data_args.frac_n_qd1consis,
+                                                      frac_n_qd1incons=data_args.frac_n_qd1incons,
+                                                      frac_n_qd2incons=data_args.frac_n_qd2incons,
+                                                      frac_n_q=data_args.frac_n_q,
+                                                      frac_n_d1consis=data_args.frac_n_d1consis,
+                                                      frac_n_d2consis=data_args.frac_n_d2consis,
+                                                      frac_n_no_qd_baseline=data_args.frac_n_no_qd_baseline,
+                                                      frac_n_q_no_replacement_baseline=data_args.frac_n_q_no_replacement_baseline,
                                                       train_subset=train_subset,
-                                                      max_x=args.numeric_experiment_arguments.max_x,
-                                                      num_x=args.numeric_experiment_arguments.num_x,
-                                                      n_nums_in_question=args.numeric_experiment_arguments.n_nums_in_question,
-                                                      n_intersecton=args.numeric_experiment_arguments.n_intersecton,
-                                                      n_qs_per_x=args.numeric_experiment_arguments.n_qs_per_x,
-                                                      p_label_flip=args.numeric_experiment_arguments.p_label_flip,
-                                                      var_length=args.numeric_experiment_arguments.var_length,
+                                                      max_x=num_args.max_x,
+                                                      num_x=num_args.num_x,
+                                                      n_nums_in_question=num_args.n_nums_in_question,
+                                                      n_intersecton=num_args.n_intersecton,
+                                                      n_qs_per_x=num_args.n_qs_per_x,
+                                                      p_label_flip=num_args.p_label_flip,
+                                                      var_length=num_args.var_length,
                                                       space_separated_var_names=not args.model_arguments.separate_token_per_var,)
         else:
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
