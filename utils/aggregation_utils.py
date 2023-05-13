@@ -128,12 +128,10 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
 
     # fixed order to use colors
     color2order = {'blue': 0, 'orange': 1, 'green': 2, 'red': 3, 'purple': 4, 'brown': 5, 'pink': 6, 'gray': 7, 'olive': 8, 'cyan': 9}  
-    name2color = {'d1consis': 'blue', 'q': 'orange',  'qd2incons': 'green',  'd2consis': 'red', 'qd1consis': 'purple',
-                  'no_qd_baseline': 'brown', 'q_no_replacement_baseline': 'pink', 'qd1incons': 'gray', 'qd2consis': 'cyan'}
+    name2color = {'d1consis': 'blue', 'q': 'brown',  'qd2incons': 'pink',  'd2consis': 'red', 'qd1consis': 'purple',
+                  'no_qd_baseline': 'orange', 'q_no_replacement_baseline': 'green', 'qd1incons': 'gray', 'qd2consis': 'cyan'}
     
     palette = sns.color_palette()  # default palette, muted version of tab10
-    # palette[2], palette[6] = palette[6], palette[2]  # swap green and pink
-    # palette[1], palette[5] = palette[5], palette[1]  # swap orange and brown
     
     if colors is None:
         # tag -> name -> order -> color
