@@ -114,14 +114,39 @@ def prettify_labels(labels_list, labels_mapping=None):
     
     
 def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None, eval_each_epochs_per_stage=None,
-                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', title='', figsize=(5.7,4), legend_loc='best',):
+                         tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', title='',
+                         figsize=(5.7,4), legend_loc='best', colors=None):
     """
     exp_name - name of the experiment (top level folder name)
     stage_paths - list of strings that are the starts to paths to stages, 
     e.g. ['first_stage', 'second_stage', 's']
     thruncate_stages_after_epoch - list of ints, how many epochs to thruncate each stage after. Use -1 to not thruncate
     eval_each_epochs_per_stage - list of ints, how many epochs to are skipped between evaluations
+    
+    colors - list of colors for each stage ('blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan')
     """
+
+    # fixed order to use colors
+    color2order = {'blue': 0, 'orange': 1, 'green': 2, 'red': 3, 'purple': 4, 'brown': 5, 'pink': 6, 'gray': 7, 'olive': 8, 'cyan': 9}  
+    name2color = {'d1consis': 'blue', 'q': 'orange',  'qd2incons': 'green',  'd2consis': 'red', 'qd1consis': 'purple',
+                  'no_qd_baseline': 'brown', 'q_no_replacement_baseline': 'pink', 'qd1incons': 'gray', 'qd2consis': 'cyan'}
+    
+    palette = sns.color_palette()  # default palette, muted version of tab10
+    # palette[2], palette[6] = palette[6], palette[2]  # swap green and pink
+    # palette[1], palette[5] = palette[5], palette[1]  # swap orange and brown
+    
+    if colors is None:
+        # tag -> name -> order -> color
+        names = []
+        for tag in tags:
+            for k in sorted(name2color.keys(), key=lambda x: len(x), reverse=True):
+                if k in tag:
+                    names.append(k)
+                    break
+        colors = [palette[color2order[name2color[name]]] for name in names]
+    else:
+        colors = [palette[color2order[color]] for color in colors]
+    
     if eval_each_epochs_per_stage is None:
         # TODO load eval_each_epochs_per_stage from config yaml file instead
         eval_each_epochs_per_stage = [1] * len(stage_paths)
@@ -135,7 +160,6 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     maxepoch = 0
     for stage_path, thruncate_after_epoch, eval_each_epochs in zip(stage_paths, thruncate_stages_after_epoch, eval_each_epochs_per_stage):
         curr_stage_exp_names = [x for x in os_list if x.startswith(stage_path)]
-        
         # take only seed_stage2 = 0 experiments
         # if 's2stage' in curr_stage_exp_names[0]:
         #     curr_stage_exp_names = [x for x in curr_stage_exp_names if 's2stage0' in x]
@@ -176,14 +200,6 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     df['tag'] = df['tag'].apply(lambda x: x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', ''))
     tags = [x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', '') for x in tags]
 
-    # PLOTTING TODO conisder making separate functions for plotting and data processing
-    # colors = ['blue', 'red', 'purple', 'pink', 'orange', 'green',  'brown', 'gray', 'olive', 'cyan', 'black', 'yellow']
-    # palette = sns.color_palette(colors, len(tags))
-    # TODO consider passing palette / color order as an argument
-    palette = sns.color_palette()  # default palette, muted version of tab10
-    palette[2], palette[6] = palette[6], palette[2]  # swap green and pink
-    palette[1], palette[5] = palette[5], palette[1]  # swap orange and brown
-
     matplotlib.rcParams['font.family'] = 'Times New Roman'
     matplotlib.rcParams.update({'font.size': 12})
     fig, ax = plt.subplots(figsize=figsize)
@@ -193,7 +209,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         y = 'value', 
                         hue='tag', 
                         hue_order=tags,
-                        palette=palette)#capsize=.1, errwidth=.9,)
+                        palette=colors)#capsize=.1, errwidth=.9,)
     
     # remove every second xticklabel
     xticklabels = ax1.get_xticklabels()
