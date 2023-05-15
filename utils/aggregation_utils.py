@@ -129,7 +129,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     # fixed order to use colors
     color2order = {'blue': 0, 'orange': 1, 'green': 2, 'red': 3, 'purple': 4, 'brown': 5, 'pink': 6, 'gray': 7, 'olive': 8, 'cyan': 9}  
     name2color = {'d1consis': 'blue', 'q': 'brown',  'qd2incons': 'pink',  'd2consis': 'red', 'qd1consis': 'purple',
-                  'no_qd_baseline': 'orange', 'q_no_replacement_baseline': 'green', 'qd1incons': 'gray', 'qd2consis': 'olive'}
+                  'no_qd_baseline': 'orange', 'q_no_replacement_baseline': 'green', 'qd1incons': 'cyan', 'qd2consis': 'olive', 'd3consis': 'gray'}
     
     palette = sns.color_palette()  # default palette, muted version of tab10
     
@@ -162,6 +162,11 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
         # take only seed_stage2 = 0 experiments
         # if 's2stage' in curr_stage_exp_names[0]:
         #     curr_stage_exp_names = [x for x in curr_stage_exp_names if 's2stage0' in x]
+        
+        # remove experiments with ent_assoc and _q in stage2 (keep only d1consis, d2consis, d3consis)
+        tags_to_retrieve = tags.copy()
+        if len(dfs_all_stages)>0:
+            tags_to_retrieve = [t for t in tags_to_retrieve if not ('ent_assoc' in t and '_q' in t)]
 
         print(f'Retrieving from {len(curr_stage_exp_names)} experiments')
         dfs = []
@@ -173,7 +178,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             if not df.empty:
                 unique_tags = unique_tags | set(df.tag.unique())
                 # filter only relevant data
-                df = df[df.tag.isin(tags)]
+                df = df[df.tag.isin(tags_to_retrieve)]
                 
                 if thruncate_after_epoch != -1:
                     # thruncate after epoch
