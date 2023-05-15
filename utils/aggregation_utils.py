@@ -129,7 +129,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     # fixed order to use colors
     color2order = {'blue': 0, 'orange': 1, 'green': 2, 'red': 3, 'purple': 4, 'brown': 5, 'pink': 6, 'gray': 7, 'olive': 8, 'cyan': 9}  
     name2color = {'d1consis': 'blue', 'q': 'brown',  'qd2incons': 'pink',  'd2consis': 'red', 'qd1consis': 'purple',
-                  'no_qd_baseline': 'orange', 'q_no_replacement_baseline': 'green', 'qd1incons': 'gray', 'qd2consis': 'cyan'}
+                  'no_qd_baseline': 'orange', 'q_no_replacement_baseline': 'green', 'qd1incons': 'gray', 'qd2consis': 'olive'}
     
     palette = sns.color_palette()  # default palette, muted version of tab10
     
@@ -158,6 +158,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     maxepoch = 0
     for stage_path, thruncate_after_epoch, eval_each_epochs in zip(stage_paths, thruncate_stages_after_epoch, eval_each_epochs_per_stage):
         curr_stage_exp_names = [x for x in os_list if x.startswith(stage_path)]
+        
         # take only seed_stage2 = 0 experiments
         # if 's2stage' in curr_stage_exp_names[0]:
         #     curr_stage_exp_names = [x for x in curr_stage_exp_names if 's2stage0' in x]

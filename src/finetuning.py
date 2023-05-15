@@ -212,7 +212,7 @@ def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=No
 
     experiment_name = (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}Defs'
                        f'_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
-                       f'_bs{args.training_arguments.per_device_train_batch_size}'
+                       f'_bs{args.training_arguments.per_device_train_batch_size * args.training_arguments.gradient_accumulation_steps}'
                        f'_{model_name.split("/")[-1].replace("-","_")}'
                        f'_{str(args.training_arguments.optim).replace("OptimizerNames.","")}')
     
@@ -235,7 +235,7 @@ def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=N
                        f'_pflip{str(args.numeric_experiment_arguments.p_label_flip).replace(".","")}'
                        f'_tokpervar{args.model_arguments.separate_token_per_var}'
                        f'_eps{epochs_str}'
-                       f'_bs{args.training_arguments.per_device_train_batch_size}'
+                       f'_bs{args.training_arguments.per_device_train_batch_size * args.training_arguments.gradient_accumulation_steps}'
                        f'_{model_name.split("/")[-1].replace("-","_")}'
                        f'_{str(args.training_arguments.optim).replace("OptimizerNames.","")}')
     if args.experiment_arguments.name_prefix:
