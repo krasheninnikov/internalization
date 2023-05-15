@@ -1,0 +1,88 @@
+data_arguments:
+  block_size: 16
+  label_block_size: 4
+  train_subset: 'full'
+
+  frac_n_qd1consis: 0.4
+  frac_n_qd1incons: 0.0
+  frac_n_qd2consis: 0.0
+  frac_n_qd2incons: 0.4
+  frac_n_q: 0.0
+  frac_n_d1consis: 0.1
+  frac_n_d2consis: 0.1
+  frac_n_no_qd_baseline: 0.0
+  frac_n_q_no_replacement_baseline: 0.0
+  max_eval_samples: 20000
+
+
+model_arguments:
+  seq2seq: False
+  max_new_tokens: 4
+  # config_name: "gpt2"
+  config_name: "EleutherAI/pythia-70m"
+  # config_name: "t5-small"
+  # config_name: "EleutherAI/pythia-160m"
+  separate_token_per_var: True # only used for numeric experiments
+
+
+training_arguments:
+  output_dir: 'experiments/temp'
+  bf16: True
+  per_device_train_batch_size: 512
+  per_device_eval_batch_size: 4096
+  optim: "adafactor"
+  overwrite_output_dir: True
+  auto_find_batch_size: True
+  save_strategy: "no"
+  load_best_model_at_end: False
+  evaluation_strategy: 'epoch'
+  do_train: True
+  do_eval: True
+  do_sweeps: False
+  n_sweeps: 5
+  save_each_epochs: 25
+  eval_each_epochs: 5
+  eval_steps: 600
+  eval_callback_type: "pipeline"  # pipeline or generate
+  # weight_decay: 0.0001
+
+
+experiment_arguments: # common experiment arguments
+  define_experiment: False
+  numeric_experiment: True
+  name_prefix: ""
+  n_stages: 2
+  n_seeds: 20
+  n_seeds_stage2: 3
+  start_seed: 630
+  slurm: True
+  n_gpu_hours: 6
+
+
+define_experiment_arguments:
+  def_order: "tve"
+
+
+numeric_experiment_arguments:
+  modular_experiment_baseline: False
+  modular_experiment: False
+  num_choice_experiment: True
+  num_x: 8000
+  n_nums_in_question: 8
+  n_intersecton: 1
+  n_qs_per_x: 24
+  p_label_flip: 0.0
+
+# overrides specified parameters
+first_stage_arguments:
+  train_subset: 'stage1'
+  num_train_epochs: 100
+  gradient_accumulation_steps: 1
+
+second_stage_arguments:
+  train_subset: 'stage2'
+  eval_steps: 20
+  num_train_epochs: 40
+  gradient_accumulation_steps: 1
+  dont_save_in_the_end: True
+  save_each_epochs: 0
