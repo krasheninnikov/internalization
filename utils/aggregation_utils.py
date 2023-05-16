@@ -16,6 +16,24 @@ plt.rcParams['text.usetex'] = True
 rc('text.latex', preamble=r'\usepackage{color, amsfonts, amsmath, amsthm}')
 
 
+def aggregate_mean_std_count(df):
+    # df is the output of utils.aggregation_utils.make_experiment_plot
+    agg_df = df.groupby(['tag', 'epoch']).agg({'value': ['mean', 'std', 'count']})
+    agg_df.columns = ['_'.join(col).strip() for col in agg_df.columns.values]
+    agg_df.reset_index(inplace=True)
+    return agg_df
+
+
+def ttest_eval_df(agg_df, tag1, tag2):
+    # agg_df is the output of utils.aggregation_utils.aggregate_mean_std_count
+    # print(agg_df['tag'].unique())
+    df_tag1 = agg_df[agg_df['tag'] == tag1]
+    df_tag2 = agg_df[agg_df['tag'] == tag2]
+    return ttest_ind_from_stats(mean1=df_tag1['value_mean'], std1=df_tag1['value_std'], nobs1=np.array(df_tag1['value_count']),
+                                mean2=df_tag2['value_mean'], std2=df_tag2['value_std'], nobs2=np.array(df_tag2['value_count']),
+                                alternative='greater')
+
+
 def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None, os_list=None, metric='EM'):
     """
     @param run_generic_name: ex. gpt2-medium-seed
@@ -102,6 +120,7 @@ def prettify_labels(labels_list, labels_mapping=None):
             'q_no_replacement_baseline': r'$\hat{\mathtt{QA}}_4$',
             'd1consis': r'$\dot{\mathtt{D}}_5^\text{cons}$',
             'd2consis': r'$\overline{\mathtt{D}}_6^\text{cons}$',
+            'd3consis' : r'$\tilde{\mathtt{D}}_0^\text{cons}$',
             'no_qd_baseline': r'$\mathtt{QA}_7$',
             }
     def prettify_label(label):
@@ -215,26 +234,6 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         hue_order=tags,
                         palette=colors)#capsize=.1, errwidth=.9,)
     
-    # remove every second xticklabel
-    xticklabels = ax1.get_xticklabels()
-    for i in range(len(xticklabels)):
-        if i % 2 == 1:
-            xticklabels[i].set_text('')
-    ax1.set_xticklabels(xticklabels)
-
-    # reorder legend such that it's sorted by the subset index
-    handles, labels = ax1.get_legend_handles_labels()
-    new_labels = prettify_labels(tags)
-    # sort by single-digit numbers that are part of the label
-    sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
-    handles, new_labels = zip(*sorted_pairs)
-    ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc)
-    
-    ax1.set_xlabel('Epoch', fontsize=14)
-    ax1.set_ylabel(ylabel, fontsize=14)
-    if title:
-        ax1.set_title(title, y=1.05)
-        
     # ax1.set_ylim([0.45, 0.6])
     n_epochs_per_stage = [len(df.epoch.unique()) for df in dfs_all_stages]
     if len(n_epochs_per_stage) > 1:
@@ -249,6 +248,27 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             ax1.text(loc, y_pos, rf'Stage ${i+1}$', ha='center', va='bottom', fontsize=10)
             
             curr_stage_end_epoch += n_epochs
+    
+    # remove every second xticklabel
+    xticklabels = ax1.get_xticklabels()
+    for i in range(len(xticklabels)):
+        if i % 2 == 1:
+            xticklabels[i].set_text('')
+    ax1.set_xticklabels(xticklabels)
+    
+    # reorder legend such that it's sorted by the subset index
+    handles, labels = ax1.get_legend_handles_labels()
+    new_labels = prettify_labels(tags)
+    # sort by single-digit numbers that are part of the label
+    sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
+    handles, new_labels = zip(*sorted_pairs)
+    legend = ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc)
+    legend.set_zorder(100)
+    
+    ax1.set_xlabel('Epoch', fontsize=14)
+    ax1.set_ylabel(ylabel, fontsize=14)
+    if title:
+        ax1.set_title(title, y=1.05)
     
     plt.tight_layout()
     plt.show()
