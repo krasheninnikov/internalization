@@ -20,7 +20,7 @@ import datasets
 import wandb
 from datasets import DatasetDict
 from src.callbacks import (CustomSaveCallback, EvaluationCallbackGenerate,
-                           EvaluationCallbackPipeline)
+                           EvaluationCallbackPipeline, GradientVarianceCallback)
 from src.lm_training_utils import TrainerDeterministicSampler, create_tokenizer
 from utils.logger import setup_logger
 
@@ -352,6 +352,8 @@ def train(raw_datasets, args):
     if training_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each_epochs=training_args.save_each_epochs)
         trainer.add_callback(save_callback)
+    grad_callback = GradientVarianceCallback(eval_dataset_tokenized)
+    trainer.add_callback(grad_callback)
         
     if training_args.do_sweeps:
         logger.info('Starting training sweeps')

@@ -5,11 +5,13 @@ from transformers import (TrainerCallback, TrainerControl, TrainerState,
                           TrainingArguments, pipeline)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import IntervalStrategy
-
+from torch.utils.data import DataLoader
+from transformers import default_data_collator
 import wandb
 from src.metrics import compute_em_list, compute_f1_list
 from utils.logger import setup_logger
-
+import torch
+from tqdm import tqdm
 logger = setup_logger(__name__)
 
 
@@ -188,3 +190,70 @@ class CustomSaveCallback(TrainerCallback):
             control.should_save = True
 
         return control
+
+
+
+
+
+class GradientVarianceCallback(TrainerCallback):
+    def __init__(self, eval_dataset_tokenized) -> None:
+        self.eval_dataset_tokenized = eval_dataset_tokenized
+        super().__init__()
+        
+    def on_epoch_end(self, args, state, control, model, tokenizer, **kwargs):
+
+        # Deactivate dropout and other regularization layers
+        model.train()
+        
+        mean_grad = None
+        self.eval_dataset_tokenized = self.eval_dataset_tokenized.select('d1consis', 'd2consis', 'train_defs')
+        for dataset_name in self.eval_dataset_tokenized:
+            eval_dataset_input = self.eval_dataset_tokenized[dataset_name].with_format('torch', device='cuda')
+        
+            n = len(eval_dataset_input)
+            for example in tqdm(eval_dataset_input):
+                input_ids = example['input_ids']
+                attention_mask = example['attention_mask']
+                labels = example['labels']
+                input_dict = {'input_ids': input_ids, 'attention_mask': attention_mask, 'labels': labels}
+                if mean_grad is None:
+                    mean_grad = get_gradient(model, input_dict)
+                else:
+                    mean_grad = (mean_grad * n + get_gradient(model, input_dict)) / (n + 1)
+                    
+            l2_dist = 0
+                
+            for example in eval_dataset_input:
+                grad = get_gradient(model, input_dict)
+                l2_dist += torch.sum((grad - mean_grad)**2)
+            l2_dist = torch.sqrt(l2_dist / n)
+            print(f"Gradient variance: {l2_dist.item()}")
+        
+        wandb.log({f"eval/gradient_variance": l2_dist}, state.global_step)
+        
+
+def concat_grads(gradients):
+    """Concatenate the gradients of the model parameters into a single vector."""
+    grads = []
+    for name in gradients:
+        grads.append(gradients[name].view(-1))
+    grads = torch.cat(grads)
+    return grads
+
+def get_gradient(model, input_dict):
+    # assume batch_datapoints is already tokenized
+    """Get the gradients of the model parameters."""
+    # move all tensors from input_dict to cuda
+    input_dict = {name: input_dict[name].cuda() for name in input_dict}
+    model.zero_grad()
+    outputs = model(input_dict['input_ids'], labels=input_dict['labels'], attention_mask=input_dict['attention_mask'])
+    loss = outputs.loss
+    loss.backward()
+
+    gradients = {name: param.grad.cpu().detach() for name, param in model.named_parameters()}
+    
+    grad = []
+    for name in gradients:
+        grad.append(gradients[name].view(-1))
+    grad = torch.cat(grad)
+    return grad
