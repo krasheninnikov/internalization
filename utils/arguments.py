@@ -168,13 +168,13 @@ class DataTrainingArguments:
     frac_n_q_no_replacement_baseline: Optional[float] = field(
         default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
     frac_n_d1consis: Optional[float] = field(
-        default=0.08, metadata={"help": "See data_generation/define_experiment.py"})
+        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
     frac_n_d2consis: Optional[float] = field(
-        default=0.08, metadata={"help": "See data_generation/define_experiment.py"})
+        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
     frac_n_d3consis: Optional[float] = field(
-        default=0.08, metadata={"help": "See data_generation/define_experiment.py"})
+        default=0.0, metadata={"help": "See data_generation/define_experiment.py"})
     frac_n_no_qd_baseline: Optional[float] = field(
-        default=0.06, metadata={"help": "See data_generation/define_experiment.py"})
+        default=0.1, metadata={"help": "See data_generation/define_experiment.py"})
 
     
     
