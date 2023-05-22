@@ -206,7 +206,9 @@ class GradientVarianceCallback(TrainerCallback):
         model.train()
         
         mean_grad = None
-        self.eval_dataset_tokenized = self.eval_dataset_tokenized.select('d1consis', 'd2consis', 'train_defs')
+        logger.info('*** Computing gradient variance ***')
+        print(self.eval_dataset_tokenized.keys())
+        self.eval_dataset_tokenized = {key: self.eval_dataset_tokenized[key] for key in ['d1consis', 'd2consis', 'train_defs_d1consis', 'train_defs_d2incons']}
         for dataset_name in self.eval_dataset_tokenized:
             eval_dataset_input = self.eval_dataset_tokenized[dataset_name].with_format('torch', device='cuda')
         
