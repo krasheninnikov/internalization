@@ -7,10 +7,12 @@ data_arguments:
 
   frac_n_qd1consis: 0.25
   frac_n_qd1incons: 0.0
+  frac_n_qd2consis: 0.0
   frac_n_qd2incons: 0.25
   frac_n_q: 0.1
   frac_n_d1consis: 0.1
   frac_n_d2consis: 0.1
+  frac_n_d3consis: 0.0
   frac_n_no_qd_baseline: 0.1
   frac_n_q_no_replacement_baseline: 0.1
 
@@ -48,9 +50,9 @@ experiment_arguments: # common experiment arguments
   numeric_experiment: False
   name_prefix: "entAttr"
   n_stages: 2
-  n_seeds: 3
+  n_seeds: 7
   n_seeds_stage2: 3
-  start_seed: 600
+  start_seed: 603
   slurm: True
   n_gpu_hours: 24
 
