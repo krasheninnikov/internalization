@@ -352,8 +352,13 @@ def train(raw_datasets, args):
     if training_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each_epochs=training_args.save_each_epochs)
         trainer.add_callback(save_callback)
-    grad_callback = GradientVarianceCallback(eval_dataset_tokenized)
-    trainer.add_callback(grad_callback)
+    
+    if training_args.calculate_grad_variance:
+        grad_callback = GradientVarianceCallback(eval_dataset_tokenized,
+                                                 eval_each_epochs=training_args.eval_each_epochs,
+                                                 eval_each_steps=training_args.eval_steps,
+                                                 evaluation_strategy=training_args.evaluation_strategy,)
+        trainer.add_callback(grad_callback)
         
     if training_args.do_sweeps:
         logger.info('Starting training sweeps')

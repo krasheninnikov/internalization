@@ -105,6 +105,9 @@ class ModelTrainingArguments(Seq2SeqTrainingArguments):
     eval_each_epochs: Optional[int] = field(
         default=1, metadata={"help": "Perform evaluation every eval_each_epochs which calculates EM/F1"}
     )
+    calculate_grad_variance: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to calculate gradient variance or not."}
+    )
     eval_callback_type: Optional[str] = field(
         default='pipeline', metadata={"help": "The evaluation callback type. Use `pipeline` for clm and `generate` for seq2seq"}
     )
