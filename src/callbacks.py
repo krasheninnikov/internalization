@@ -5,11 +5,13 @@ from transformers import (TrainerCallback, TrainerControl, TrainerState,
                           TrainingArguments, pipeline)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import IntervalStrategy
-
+from torch.utils.data import DataLoader
+from transformers import default_data_collator
 import wandb
 from src.metrics import compute_em_list, compute_f1_list
 from utils.logger import setup_logger
-
+import torch
+from tqdm import tqdm
 logger = setup_logger(__name__)
 
 
@@ -188,3 +190,141 @@ class CustomSaveCallback(TrainerCallback):
             control.should_save = True
 
         return control
+
+
+
+class GradientVarianceCallback(EvaluationCallbackBase):
+    def __init__(self, eval_dataset_tokenized,
+                 tb_writer=None, 
+                 numeric_experiment=False, 
+                 eval_each_epochs=1, 
+                 eval_each_steps=False, 
+                 evaluation_strategy='epoch') -> None:
+        
+        super().__init__(tb_writer, eval_each_epochs, eval_each_steps, evaluation_strategy, numeric_experiment)
+        self.eval_dataset_tokenized = eval_dataset_tokenized
+        
+    def evaluate_fn(self, args, state, model, tokenizer):
+        if self.tb_writer is None:
+            self._init_summary_writer(args)
+            
+        model.train()
+        # print(self.eval_dataset_tokenized.keys())
+        self.eval_dataset_tokenized = {key: self.eval_dataset_tokenized[key] for key in ['d1consis', 'd2consis', 'train_defs_d1consis', 'train_defs_d2consis']}
+        n_datapoints = sum([len(self.eval_dataset_tokenized[key]) for key in self.eval_dataset_tokenized])  # number of datapoints
+        mean_grad = None
+
+        # ========================
+        logger.info('*** Computing gradient distance between definitions and corresponding questions ***')    
+        # calculate average l2 distance between definitions and their corresponding questions
+        step_size = len(self.eval_dataset_tokenized['d1consis']) // len(self.eval_dataset_tokenized['train_defs_d1consis'])
+        if step_size != len(self.eval_dataset_tokenized['d2consis']) // len(self.eval_dataset_tokenized['train_defs_d2consis']):
+            raise ValueError('step_size must be the same for both d1consis and d2consis')
+        
+        eval_dataset_d1cons = self.eval_dataset_tokenized['d1consis'].with_format('torch', device='cuda')
+        eval_dataset_d1defs = self.eval_dataset_tokenized['train_defs_d1consis'].with_format('torch', device='cuda')
+        
+        mean_dist_d1 = 0
+        for i in tqdm(range(len(eval_dataset_d1defs))):
+            d = eval_dataset_d1defs[i]
+            d_grad = get_gradient(model, d)
+            mean_d_dist = 0
+            # update mean_grad
+            if mean_grad is None:
+                mean_grad = d_grad
+            else:
+                mean_grad += d_grad
+                
+            for j in range(step_size):
+                n = i * step_size + j
+                q = eval_dataset_d1cons[n]
+                q_grad = get_gradient(model, q)
+                mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2))
+                mean_grad += q_grad
+                
+            mean_d_dist /= step_size  # transform sum into mean distance for this definition
+            
+            mean_dist_d1 += mean_d_dist # mean distance for all definitions
+        mean_dist_d1 /= len(eval_dataset_d1defs)
+        
+        eval_dataset_d2cons = self.eval_dataset_tokenized['d2consis'].with_format('torch', device='cuda')
+        eval_dataset_d2defs = self.eval_dataset_tokenized['train_defs_d2consis'].with_format('torch', device='cuda')
+        
+        mean_dist_d2 = 0
+        for i in tqdm(range(len(eval_dataset_d2defs))):
+            d = eval_dataset_d2defs[i]
+            d_grad = get_gradient(model, d)
+            mean_d_dist = 0
+            # update mean_grad
+            if mean_grad is None:
+                mean_grad = d_grad
+            else:
+                mean_grad += d_grad
+                
+            for j in range(step_size):
+                n = i * step_size + j
+                q = eval_dataset_d2cons[n]
+                q_grad = get_gradient(model, q)
+                mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2))
+                # update mean_grad
+                mean_grad += q_grad
+                
+            mean_d_dist /= step_size  # transform sum into mean
+
+            mean_dist_d2 += mean_d_dist
+        mean_dist_d2 /= len(eval_dataset_d2defs)
+        mean_grad /= n_datapoints
+        
+        logger.info(f"Mean distance between d1consis grads and their corresponding definitions: {mean_dist_d1}")
+        logger.info(f"Mean distance between d2consis grads and their corresponding definitions: {mean_dist_d2}")
+        
+        # Calculate variance
+        logger.info('*** Computing gradient variance ***')            
+        l2_dist = 0
+        for eval_dataset_input in [eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs]:
+            for example in tqdm(eval_dataset_input):
+                grad = get_gradient(model, example)
+                l2_dist += torch.sum((grad - mean_grad)**2)
+        l2_dist = torch.sqrt(l2_dist / n)
+        variance = l2_dist.item()
+        logger.info(f"Gradient variance: {variance}")
+        
+        
+        self.tb_writer.add_scalar("eval/grad_mean_dist_d1", mean_dist_d1, state.global_step)
+        self.tb_writer.add_scalar("eval/grad_mean_dist_d2", mean_dist_d2, state.global_step)
+        self.tb_writer.add_scalar("eval/grad_variance", variance, state.global_step)
+        
+        wandb.log({f"eval/grad_mean_dist_d1": mean_dist_d1}, state.global_step)
+        wandb.log({f"eval/grad_mean_dist_d2": mean_dist_d2}, state.global_step)
+        wandb.log({f"eval/grad_variance": variance}, state.global_step)
+        
+
+def concat_grads(gradients):
+    """Concatenate the gradients of the model parameters into a single vector."""
+    grads = []
+    for name in gradients:
+        grads.append(gradients[name].view(-1))
+    grads = torch.cat(grads)
+    return grads
+
+def get_gradient(model, input_dict):
+    # assume batch_datapoints is already tokenized
+    """Get the gradients of the model parameters."""
+    # move all tensors from input_dict to cuda
+    input_dict = {name: input_dict[name] for name in input_dict}
+    model.zero_grad()
+    del input_dict['answer']
+    del input_dict['input_ids_eval']
+    outputs = model(**input_dict)
+    loss = outputs.loss
+    loss.backward()
+
+    gradients = {name: param.grad.cpu().detach() for name, param in model.named_parameters()}
+    
+    grad = []
+    for name in gradients:
+        grad.append(gradients[name].view(-1))
+    grad = torch.cat(grad)
+    return grad
+
+

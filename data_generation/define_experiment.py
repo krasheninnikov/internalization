@@ -201,6 +201,13 @@ def get_questions_dataset(seed,
     
     defns = defns_tag1 | defns_tag2
     
+    for subset_name in defns:
+        subset = defns[subset_name]
+        defns[subset_name] = sorted(subset, key=lambda x: x.entity)
+    for subset_name in qa_test_sets:
+        subset = qa_test_sets[subset_name]
+        qa_test_sets[subset_name] = sorted(subset, key=lambda x: x.question.entity)
+        
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
         train_set = qa_train + defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
