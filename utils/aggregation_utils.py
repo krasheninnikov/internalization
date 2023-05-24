@@ -16,6 +16,24 @@ plt.rcParams['text.usetex'] = True
 rc('text.latex', preamble=r'\usepackage{color, amsfonts, amsmath, amsthm}')
 
 
+def aggregate_mean_std_count(df):
+    # df is the output of utils.aggregation_utils.make_experiment_plot
+    agg_df = df.groupby(['tag', 'epoch']).agg({'value': ['mean', 'std', 'count']})
+    agg_df.columns = ['_'.join(col).strip() for col in agg_df.columns.values]
+    agg_df.reset_index(inplace=True)
+    return agg_df
+
+
+def ttest_eval_df(agg_df, tag1, tag2):
+    # agg_df is the output of utils.aggregation_utils.aggregate_mean_std_count
+    # print(agg_df['tag'].unique())
+    df_tag1 = agg_df[agg_df['tag'] == tag1]
+    df_tag2 = agg_df[agg_df['tag'] == tag2]
+    return ttest_ind_from_stats(mean1=df_tag1['value_mean'], std1=df_tag1['value_std'], nobs1=np.array(df_tag1['value_count']),
+                                mean2=df_tag2['value_mean'], std2=df_tag2['value_std'], nobs2=np.array(df_tag2['value_count']),
+                                alternative='greater')
+
+
 def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, run_name_exclude=None, os_list=None, metric='EM'):
     """
     @param run_generic_name: ex. gpt2-medium-seed
@@ -102,6 +120,7 @@ def prettify_labels(labels_list, labels_mapping=None):
             'q_no_replacement_baseline': r'$\hat{\mathtt{QA}}_4$',
             'd1consis': r'$\dot{\mathtt{D}}_5^\text{cons}$',
             'd2consis': r'$\overline{\mathtt{D}}_6^\text{cons}$',
+            'd3consis' : r'$\tilde{\mathtt{D}}_0^\text{cons}$',
             'no_qd_baseline': r'$\mathtt{QA}_7$',
             }
     def prettify_label(label):
@@ -129,7 +148,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     # fixed order to use colors
     color2order = {'blue': 0, 'orange': 1, 'green': 2, 'red': 3, 'purple': 4, 'brown': 5, 'pink': 6, 'gray': 7, 'olive': 8, 'cyan': 9}  
     name2color = {'d1consis': 'blue', 'q': 'brown',  'qd2incons': 'pink',  'd2consis': 'red', 'qd1consis': 'purple',
-                  'no_qd_baseline': 'orange', 'q_no_replacement_baseline': 'green', 'qd1incons': 'gray', 'qd2consis': 'cyan'}
+                  'no_qd_baseline': 'orange', 'q_no_replacement_baseline': 'green', 'qd1incons': 'cyan', 'qd2consis': 'olive', 'd3consis': 'gray'}
     
     palette = sns.color_palette()  # default palette, muted version of tab10
     
@@ -158,9 +177,15 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     maxepoch = 0
     for stage_path, thruncate_after_epoch, eval_each_epochs in zip(stage_paths, thruncate_stages_after_epoch, eval_each_epochs_per_stage):
         curr_stage_exp_names = [x for x in os_list if x.startswith(stage_path)]
+        
         # take only seed_stage2 = 0 experiments
         # if 's2stage' in curr_stage_exp_names[0]:
         #     curr_stage_exp_names = [x for x in curr_stage_exp_names if 's2stage0' in x]
+        
+        # remove experiments with ent_assoc and _q in stage2 (keep only d1consis, d2consis, d3consis)
+        tags_to_retrieve = tags.copy()
+        if len(dfs_all_stages)>0:
+            tags_to_retrieve = [t for t in tags_to_retrieve if not ('ent_assoc' in t and '_q' in t)]
 
         print(f'Retrieving from {len(curr_stage_exp_names)} experiments')
         dfs = []
@@ -172,7 +197,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             if not df.empty:
                 unique_tags = unique_tags | set(df.tag.unique())
                 # filter only relevant data
-                df = df[df.tag.isin(tags)]
+                df = df[df.tag.isin(tags_to_retrieve)]
                 
                 if thruncate_after_epoch != -1:
                     # thruncate after epoch
@@ -209,26 +234,6 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         hue_order=tags,
                         palette=colors)#capsize=.1, errwidth=.9,)
     
-    # remove every second xticklabel
-    xticklabels = ax1.get_xticklabels()
-    for i in range(len(xticklabels)):
-        if i % 2 == 1:
-            xticklabels[i].set_text('')
-    ax1.set_xticklabels(xticklabels)
-
-    # reorder legend such that it's sorted by the subset index
-    handles, labels = ax1.get_legend_handles_labels()
-    new_labels = prettify_labels(tags)
-    # sort by single-digit numbers that are part of the label
-    sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
-    handles, new_labels = zip(*sorted_pairs)
-    ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc)
-    
-    ax1.set_xlabel('Epoch', fontsize=14)
-    ax1.set_ylabel(ylabel, fontsize=14)
-    if title:
-        ax1.set_title(title, y=1.05)
-        
     # ax1.set_ylim([0.45, 0.6])
     n_epochs_per_stage = [len(df.epoch.unique()) for df in dfs_all_stages]
     if len(n_epochs_per_stage) > 1:
@@ -243,6 +248,27 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             ax1.text(loc, y_pos, rf'Stage ${i+1}$', ha='center', va='bottom', fontsize=10)
             
             curr_stage_end_epoch += n_epochs
+    
+    # remove every second xticklabel
+    xticklabels = ax1.get_xticklabels()
+    for i in range(len(xticklabels)):
+        if i % 2 == 1:
+            xticklabels[i].set_text('')
+    ax1.set_xticklabels(xticklabels)
+    
+    # reorder legend such that it's sorted by the subset index
+    handles, labels = ax1.get_legend_handles_labels()
+    new_labels = prettify_labels(tags)
+    # sort by single-digit numbers that are part of the label
+    sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
+    handles, new_labels = zip(*sorted_pairs)
+    legend = ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc)
+    legend.set_zorder(100)
+    
+    ax1.set_xlabel('Epoch', fontsize=14)
+    ax1.set_ylabel(ylabel, fontsize=14)
+    if title:
+        ax1.set_title(title, y=1.05)
     
     plt.tight_layout()
     plt.show()

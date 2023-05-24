@@ -1,27 +1,28 @@
 data_arguments:
-  dataset: "trex"
-  block_size: 64
+  dataset: "cvdb"
+  block_size: 48
   label_block_size: 8
   train_subset: 'full'
-  num_ents: 6900
+  num_ents: 4000
 
-  frac_n_qd1consis: 0.25
-  frac_n_qd1incons: 0.0
-  frac_n_qd2consis: 0.0
-  frac_n_qd2incons: 0.25
+  frac_n_qd1consis: 0.15
+  frac_n_qd1incons: 0.1
+  frac_n_qd2consis: 0.1
+  frac_n_qd2incons: 0.15
   frac_n_q: 0.1
+  frac_n_q_no_replacement_baseline: 0.1
   frac_n_d1consis: 0.08
   frac_n_d2consis: 0.08
-  frac_n_d2consis: 0.08
+  frac_n_d3consis: 0.08
   frac_n_no_qd_baseline: 0.06
-  frac_n_q_no_replacement_baseline: 0.1
 
   
 model_arguments:
   seq2seq: False
-  max_new_tokens: 16
-  # model_name_or_path: "EleutherAI/pythia-410m-deduped-v0"
+  max_new_tokens: 8
+  # model_name_or_path: "EleutherAI/pythia-410m-deduped"
   # model_name_or_path: "EleutherAI/pythia-160m-deduped"
+  # model_name_or_path: "EleutherAI/pythia-1b-deduped"
   model_name_or_path: "EleutherAI/pythia-2.8b-deduped"
 
 
@@ -41,21 +42,21 @@ training_arguments:
   do_train: True
   do_eval: True
   do_sweeps: False
-  save_each_epochs: 0
+  save_each_epochs: 10
   eval_each_epochs: 1
   eval_callback_type: "pipeline"  # pipeline or generate
 
 experiment_arguments: # common experiment arguments
   define_experiment: True
   numeric_experiment: False
-  name_prefix: "entAttr"
-  n_stages: 1
+  name_prefix: "entAttr_correlation60p"
+  n_stages: 2
   n_seeds: 10
-  n_seeds_stage2: 1
-  start_seed: 600
+  n_seeds_stage2: 3
+  start_seed: 610
   slurm: True
   n_gpu_hours: 24
- 
+
 
 define_experiment_arguments:
   def_order: "tve"
@@ -70,12 +71,10 @@ numeric_experiment_arguments:
 
 # overrides specified parameters
 first_stage_arguments:
-  train_subset: 'full'
+  train_subset: 'stage1'
   num_train_epochs: 20
   gradient_accumulation_steps: 2
-  dont_save_in_the_end: True
 
-# not used in single stage exp
 second_stage_arguments:
   train_subset: 'stage2'
   num_train_epochs: 10

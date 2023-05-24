@@ -21,8 +21,9 @@ def make_num_selection_dataset(seed=0,
                                frac_n_qd1incons=0.0,
                                frac_n_qd2incons=0.3,
                                frac_n_q=0.1,
-                               frac_n_d1consis=0.15,
-                               frac_n_d2consis=0.15,
+                               frac_n_d1consis=0.1,
+                               frac_n_d2consis=0.1,
+                               frac_n_d3consis=0.1,
                                frac_n_no_qd_baseline=0.0,
                                train_subset='full',
                                space_separated_var_names=True, # set to false when we want a separate token for each variable
@@ -48,10 +49,11 @@ def make_num_selection_dataset(seed=0,
     fracs_dict = {'qd1consis': frac_n_qd1consis,
                   'qd2incons': frac_n_qd2incons,
                   'q': frac_n_q,
-                  'stage2_combined': frac_n_d1consis + frac_n_d2consis}
+                  'stage2_combined': frac_n_d1consis + frac_n_d2consis + frac_n_d3consis}
     
     fracs_stage2 = {'d1consis': frac_n_d1consis / fracs_dict['stage2_combined'],
-                    'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],}
+                    'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],
+                    'd3consis': frac_n_d3consis / fracs_dict['stage2_combined'],}
     
     idx_subsets = split_list_into_subsets(fracs_dict, list(range(num_x)))
     idx_list_stage2 = sorted(list(idx_subsets['stage2_combined']))
@@ -65,7 +67,7 @@ def make_num_selection_dataset(seed=0,
     
     # make test datasets (without defns/definitions)
     test_sets = {}
-    for subset_name in ['qd1consis', 'qd2incons', 'q', 'd1consis', 'd2consis']:
+    for subset_name in ['qd1consis', 'qd2incons', 'q', 'd1consis', 'd2consis', 'd3consis']:
         test_sets[subset_name] = []
         for d in data_subsets[subset_name]:
             test_sets[subset_name] += d.qa_pairs_test
@@ -74,18 +76,19 @@ def make_num_selection_dataset(seed=0,
     train_qa_pairs = [item for sublist in train_qa_subsets.values() for item in sublist]
     # make defns
     # tag_reliable, tag_unreliable = generate_variable_names(n=2, length=2, rng=rng, braces=False) # define tags
-    tag_reliable, tag_unreliable = ['define1', 'define2']
-    defns = {k: [NumChoiceDefinition(tag_reliable, d.variable, str(d.x)) for d in data_subsets[k]] for k in ['qd1consis', 'd1consis']}
-    defns['qd2incons'] = [NumChoiceDefinition(tag_unreliable, d.variable, str(d.x_false)) for d in data_subsets['qd2incons']]
-    defns['d2consis'] = [NumChoiceDefinition(tag_unreliable, d.variable, str(d.x)) for d in data_subsets['d2consis']]
+    tag1, tag2, tag3 = ['define1', 'define2', 'define3']
+    defns = {k: [NumChoiceDefinition(tag1, d.variable, str(d.x)) for d in data_subsets[k]] for k in ['qd1consis', 'd1consis']}
+    defns['qd2incons'] = [NumChoiceDefinition(tag2, d.variable, str(d.x_false)) for d in data_subsets['qd2incons']]
+    defns['d2consis'] = [NumChoiceDefinition(tag2, d.variable, str(d.x)) for d in data_subsets['d2consis']]
+    defns['d3consis'] = [NumChoiceDefinition(tag3, d.variable, str(d.x)) for d in data_subsets['d3consis']]
 
     # train set subsets needed for two-stage training: first on all_but_defns_ri, then on defns_ri
     if train_subset == 'full':
-        train_set = train_qa_pairs + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis']
+        train_set = train_qa_pairs + defns['qd1consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis'] + defns['d3consis']
     elif train_subset == 'stage1':
         train_set = train_qa_pairs + defns['qd1consis'] + defns['qd2incons']
     elif train_subset == 'stage2':
-        train_set = defns['d1consis'] + defns['d2consis']
+        train_set = defns['d1consis'] + defns['d2consis'] + defns['d3consis']
         for subset_name in ['qd1consis', 'qd2incons']:
             del test_sets[subset_name]
     elif train_subset == 'q_only':
