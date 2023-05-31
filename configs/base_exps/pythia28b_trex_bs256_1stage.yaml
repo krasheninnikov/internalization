@@ -12,7 +12,7 @@ data_arguments:
   frac_n_q: 0.1
   frac_n_d1consis: 0.08
   frac_n_d2consis: 0.08
-  frac_n_d2consis: 0.08
+  frac_n_d3consis: 0.08
   frac_n_no_qd_baseline: 0.06
   frac_n_q_no_replacement_baseline: 0.1
 
@@ -30,7 +30,6 @@ training_arguments:
   bf16: True
   per_device_train_batch_size: 128
   per_device_eval_batch_size: 128
-  num_train_epochs: 10
   optim: "adafactor"
   overwrite_output_dir: True
   auto_find_batch_size: True
@@ -74,11 +73,3 @@ first_stage_arguments:
   num_train_epochs: 20
   gradient_accumulation_steps: 2
   dont_save_in_the_end: True
-
-# not used in single stage exp
-second_stage_arguments:
-  train_subset: 'stage2'
-  num_train_epochs: 10
-  gradient_accumulation_steps: 2
-  dont_save_in_the_end: True
-  save_each_epochs: 0

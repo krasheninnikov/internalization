@@ -28,9 +28,6 @@
 	#! interrupted by node failure or system downtime):
 ##SBATCH --no-requeue
 
-#! Do not change:
-#SBATCH -p ampere
-
 #! sbatch directives end here (put any additional directives above this line)
 
 #! Notes:
