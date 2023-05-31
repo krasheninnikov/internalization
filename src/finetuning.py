@@ -55,8 +55,11 @@ class SingleStageFineTuning(FineTuningPipeline):
         shutil.copy(self.config_path, f'{self.experiment_folder}/{self.config_path.split("/")[-1]}')
         
         self.single_stage_finetuning(seed)
-        remove_checkpoints(self.args.training_arguments.output_dir)
-    
+        
+        if self.args.training_arguments.remove_checkpoints_in_the_end:    
+            remove_checkpoints(self.args.training_arguments.output_dir)
+        logger.info('Finished fine-tuning.')
+
 
 class TwoStageFineTuning(FineTuningPipeline):
     """Two stage fine-tuning pipeline."""
@@ -104,13 +107,15 @@ class TwoStageFineTuning(FineTuningPipeline):
 
                 train_lm(raw_datasets_stage2, args_stage2)
                 # remove all models from the second stage
-                remove_checkpoints(args_stage2.training_arguments.output_dir)
+                if args_stage2.training_arguments.remove_checkpoints_in_the_end:
+                    remove_checkpoints(args_stage2.training_arguments.output_dir)
     
         else:
             set_new_output_dir(args_stage2, f'{self.experiment_folder}/s{seed_stage1}_s2stage{seed_stage2}')
             args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
             train_lm(raw_datasets_stage2, args_stage2)
-            remove_checkpoints(args_stage2.training_arguments.output_dir)
+            if args_stage2.training_arguments.remove_checkpoints_in_the_end:
+                remove_checkpoints(args_stage2.training_arguments.output_dir)
         
     def train(self, seed):
         # make the experiment directory and copy the config there
@@ -123,8 +128,9 @@ class TwoStageFineTuning(FineTuningPipeline):
         for seed_stage2 in range(self.args.experiment_arguments.n_seeds_stage2):
             # change seed for second stage in training arguments
             self.second_stage_finetuning(seed, seed_stage2)
-            
-        remove_checkpoints(self.args_stage1.training_arguments.output_dir)
+        
+        if self.args_stage1.training_arguments.remove_checkpoints_in_the_end:
+            remove_checkpoints(self.args_stage1.training_arguments.output_dir)
         logger.info('Finished fine-tuning.')
         
 
@@ -149,7 +155,9 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         args_stage2.model_arguments.model_name_or_path = args_stage1.training_arguments.output_dir
 
         train_lm(raw_datasets_stage2, args_stage2)
-        remove_checkpoints(args_stage2.model_arguments.model_name_or_path)
+        
+        if self.args_stage1.training_arguments.remove_checkpoints_in_the_end:
+            remove_checkpoints(args_stage1.training_arguments.output_dir)
         
     def third_stage_finetuning(self, seed_stage1, seed_stage2):
         logger.info('Starting training third stage...')
@@ -163,7 +171,9 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         args_stage3.model_arguments.model_name_or_path = args_stage2.training_arguments.output_dir
 
         train_lm(raw_datasets_stage3, args_stage3)
-        remove_checkpoints(args_stage3.training_arguments.output_dir)
+        
+        if self.args_stage3.training_arguments.remove_checkpoints_in_the_end:
+            remove_checkpoints(args_stage3.training_arguments.output_dir)
         
     def train(self, seed):
         # make the experiment directory and copy the config there
@@ -177,8 +187,9 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         for seed_stage2 in range(self.args.experiment_arguments.n_seeds_stage2):
             # change seed for second stage in training arguments
             self.third_stage_finetuning(seed, seed_stage2)
-            
-        remove_checkpoints(self.args_stage3.model_arguments.model_name_or_path)
+        
+        if self.args_stage2.training_arguments.remove_checkpoints_in_the_end:
+            remove_checkpoints(self.args_stage2.training_arguments.output_dir)
         logger.info('Finished fine-tuning.')
 
     

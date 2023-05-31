@@ -8,6 +8,7 @@
 /apex
 /temp
 /.vscode
+/.VSCode*
 /.idea
 */__pycache__
 /__pycache__
@@ -16,7 +17,6 @@
 /*scratchpad*
 *.ipynb
 two_stage_finetuning_nums.py
-*.ipynb
 *.out
 machine.file*
 *hf-cache*

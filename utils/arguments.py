@@ -114,6 +114,9 @@ class ModelTrainingArguments(Seq2SeqTrainingArguments):
     dont_save_in_the_end: Optional[bool] = field(
         default=False, metadata={"help": "Don't save the model in the end."}
     )
+    remove_checkpoints_in_the_end: Optional[bool] = field(
+        default=True, metadata={"help": "Delete all *pytorch_model* files at the end of a training run."}
+    )
     deterministic_sampler: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
     )
