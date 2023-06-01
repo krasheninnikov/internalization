@@ -205,13 +205,12 @@ def get_questions_dataset(seed,
                                for ent, var in ents_to_vars_maybe_swapped.items() if ent in ent_subsets['d3consis']]}
     
     defns = defns_tag1 | defns_tag2 | defns_tag3
-    
+
+    # sort definitions and QA test sets by entity    
     for subset_name in defns:
-        subset = defns[subset_name]
-        defns[subset_name] = sorted(subset, key=lambda x: x.entity)
+        defns[subset_name] = sorted(defns[subset_name], key=lambda x: x.entity)
     for subset_name in qa_test_sets:
-        subset = qa_test_sets[subset_name]
-        qa_test_sets[subset_name] = sorted(subset, key=lambda x: x.question.entity)
+        qa_test_sets[subset_name] = sorted(qa_test_sets[subset_name], key=lambda x: x.question.entity)
         
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
@@ -228,7 +227,9 @@ def get_questions_dataset(seed,
             del qa_test_sets[subset_name]
     elif train_subset == 'stage1_only_qa':    # 2nd stage of 3-stage exp
         train_set = qa_train
-        for subset_name in ['d1consis', 'd2consis', 'd2incons', 'd3consis']:
+    elif train_subset == 'all_defns':
+        train_set = defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis'] + defns['d3consis']
+        for subset_name in ['q_no_replacement_baseline', 'd2incons']:
             del qa_test_sets[subset_name]
     else:
         raise ValueError(f'Invalid train_subset: {train_subset}')
