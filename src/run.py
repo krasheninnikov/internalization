@@ -26,8 +26,7 @@ def main(config_name):
             slurm_sl = config.experiment_arguments.slurm_sl
                 
             # Determine if we are on CAIS or Cambridge cluster # TODO make this less hacky
-            if '/data/dmitrii_krasheninnikov' in workdir:
-                cais = True
+            cais = True if '/data/dmitrii_krasheninnikov' in workdir else False
             slurm_args = f'--partition ampere --account KRUEGER-{slurm_sl.upper()}-GPU' if not cais else '--partition=single'
             
             sbatch_command = (f'sbatch {slurm_args} --time={n_gpu_hours}:00:00 '
