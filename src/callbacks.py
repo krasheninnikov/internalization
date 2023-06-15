@@ -217,7 +217,7 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         # ========================
         logger.info('*** Computing gradient distance between definitions and corresponding questions ***')    
         # calculate average l2 distance between definitions and their corresponding questions
-        step_size = len(self.eval_dataset_tokenized['d1consis']) // len(self.eval_dataset_tokenized['train_defs_d1consis'])
+        step_size = len(self.eval_dataset_tokenized['d1consis']) // len(self.eval_dataset_tokenized['train_defs_d1consis'])  # number of questions per definition
         if step_size != len(self.eval_dataset_tokenized['d2consis']) // len(self.eval_dataset_tokenized['train_defs_d2consis']):
             raise ValueError('step_size must be the same for both d1consis and d2consis')
         
@@ -311,10 +311,10 @@ def get_gradient(model, input_dict):
     # assume batch_datapoints is already tokenized
     """Get the gradients of the model parameters."""
     # move all tensors from input_dict to cuda
-    input_dict = {name: input_dict[name] for name in input_dict}
+    input_dict = {name: input_dict[name].unsqueeze(0) for name in input_dict if name in ['input_ids', 'attention_mask', 'labels']}
     model.zero_grad()
-    del input_dict['answer']
-    del input_dict['input_ids_eval']
+    #del input_dict['answer']
+    #del input_dict['input_ids_eval']
     outputs = model(**input_dict)
     loss = outputs.loss
     loss.backward()
