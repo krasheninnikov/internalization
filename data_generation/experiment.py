@@ -35,7 +35,10 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                              data_order_group_size=def_args.data_order_group_size,
                                              seed=seed_stage1,
                                              seed_stage2=seed_stage2,
-                                             train_subset=train_subset)
+                                             train_subset=train_subset,
+                                             tag1_name=def_args.tag1_name,
+                                             tag2_name=def_args.tag2_name,
+                                             tag3_name=def_args.tag3_name,)
 
     elif args.experiment_arguments.numeric_experiment:
         if num_args.modular_experiment_baseline:

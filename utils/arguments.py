@@ -231,6 +231,11 @@ class DefineExperimentDataArguments:
         default=0, metadata={"help": "0 means no grouping. Values >0 are meant to be used with the deterministic_sampler"})
     entity_association_test_sets: Optional[bool] = field(
         default=False, metadata={"help": "Whether to include the entity association test sets."})
+    tag1_name: Optional[str] = field(
+        default='', metadata={"help": "The name of the first tag."})
+    tag2_name: Optional[str] = field(
+        default='', metadata={"help": "The name of the second tag."})
+    tag3_name: Optional[str] = field(default='', metadata={"help": "The name of the third tag."})
     
     
 

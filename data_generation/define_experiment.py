@@ -100,6 +100,9 @@ def get_questions_dataset(seed,
                           ents_list=None,
                           ents_to_vars=None,
                           qa_pairs=None,
+                          tag1_name=None,
+                          tag2_name=None,
+                          tag3_name=None,
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
     and definitions of those variables.
@@ -183,6 +186,14 @@ def get_questions_dataset(seed,
     qa_train =  [item for key in sorted(qa_train_sets.keys()) for item in qa_train_sets[key]]  # concat train QAPair lists
 
     tag1, tag2, tag3 = generate_variable_names(n=3, length=define_tag_length, rng=rng) # define tags
+    
+    # ovveride tags if provided
+    if tag1_name:
+        tag1 = tag1_name
+    if tag2_name:
+        tag2 = tag2_name
+    if tag3_name:
+        tag3 = tag3_name
     # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     
     # swap ent -> var within each of the two entity subsets
