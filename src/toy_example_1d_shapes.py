@@ -1,3 +1,4 @@
+from typing import Dict, Set, List, Tuple
 from datetime import datetime
 import random
 import pathlib
@@ -77,14 +78,20 @@ class Datapoint:
         return x * (max_x - min_x) + min_x
 
 
-def uniform_interpolated_data(seed=0, n_anchors=20, n_interpolated_points=100000):
+def uniform_interpolated_data(seed=0, n_anchors=20, n_interpolated_points=100000, d=1, normalize=True) -> np.ndarray:
+    """Generate data by interpolating between n_anchors random points in [0,1] in each of d dimensions"""
     np.random.seed(seed)
+    y_per_dim = np.zeros((n_interpolated_points, d), dtype=np.float32)
     x = np.arange(n_anchors)
-    y = np.random.uniform(0, 1, n_anchors)
-    x_new = np.linspace(x.min(), x.max(), n_interpolated_points)
-    f = interp1d(x, y, kind='cubic')
-    y_interp=f(x_new)
-    return y_interp
+    x_interp = np.linspace(x.min(), x.max(), n_interpolated_points)
+    for i in range(d):
+        y = np.random.uniform(0, 1, n_anchors)
+        f = interp1d(x, y, kind='cubic')
+        y_interp = f(x_interp)
+        if normalize:     # normalize to [-1,1]
+            y_interp = (y_interp - y_interp.min()) / (y_interp.max() - y_interp.min()) * 2 - 1
+        y_per_dim[:, i] = y_interp
+    return y_per_dim
 
 
 def get_fractional_brownian_motion_data(hurst=.6, seed=0, n_points=100000):
@@ -93,21 +100,11 @@ def get_fractional_brownian_motion_data(hurst=.6, seed=0, n_points=100000):
     return fbm(n=n_points, hurst=hurst, length=1, method='daviesharte')
 
 
-def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n_datapoints_per_cluster = 50, seed=0, d_pos_enc=61, hurst=.6):
-    # data1 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed)
-    # data2 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed*100)
-    data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints)
-    data2 = uniform_interpolated_data(seed=(seed+1)*100, n_interpolated_points=n_datapoints)
-
-    # normalize to [-1,1]
-    data1 = (data1 - np.min(data1)) / (np.max(data1) - np.min(data1)) * 2 - 1
-    data2 = (data2 - np.min(data2)) / (np.max(data2) - np.min(data2)) * 2 - 1
-    # data1, data2 = data1*100, data2*100
-
-    ###### select indices for where the "clusters" would be ######
-    # cluster_center_indices = np.random.choice(np.arange(cluster_spread, len(data1)-cluster_spread), n_clusters, replace=False)
-    cluster_center_indices = np.arange(cluster_spread, len(data1)-cluster_spread, int(len(data1)/(n_clusters))).tolist()
-    print(f'total number of clusters: {len(cluster_center_indices)}')
+def select_cluster_centers(data_len, n_clusters=400, cluster_spread=200, seed=0) -> Dict[str, Set[int]]:
+    """select indices for where the "clusters" would be"""
+    # cluster_center_indices = np.random.choice(np.arange(cluster_spread, data_len-cluster_spread), n_clusters, replace=False)
+    cluster_center_indices = np.arange(cluster_spread, data_len-cluster_spread, int(data_len/(n_clusters))).tolist()
+    print(f'Total number of clusters: {len(cluster_center_indices)}')
 
     ###### split clusters into qd1consis, qd2incons, d1consis, d2consis ######
     # random.shuffle(cluster_center_indices_mid)
@@ -127,8 +124,17 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
         cluster_center_indices_mid = cluster_center_indices_mid[::-1]
     cluster_subsets_wo_defs = split_list_into_subsets({'d1consis': .5, 'd2consis': .5,}, cluster_center_indices_mid)
     cluster_subsets = cluster_subsets_with_defs | cluster_subsets_wo_defs
+    return cluster_subsets
 
-    print(f"{[(k, len(cluster_subsets[k])) for k in cluster_subsets]}" )
+
+def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n_datapoints_per_cluster = 50, seed=0, d_pos_enc=61, hurst=.6, d_y=1):
+    # data1 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed)
+    # data2 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed*100)
+    data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y)
+    data2 = uniform_interpolated_data(seed=(seed+1)*100, n_interpolated_points=n_datapoints, d=d_y)
+
+    cluster_subsets = select_cluster_centers(data_len=len(data1), n_clusters=n_clusters, cluster_spread=cluster_spread, seed=seed)
+    print(f"Cluster subset lengths: {[(k, len(cluster_subsets[k])) for k in cluster_subsets]}")
 
     ###### sample datapoints from the clusters ######
     def sample_datapoint(cluster_center_index, cluster_spread, 
@@ -151,8 +157,9 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
                 return Datapoint(x, np.random.normal(y, triangle_noise_std), 0, 1, 0, cluster_center_index, d_pos_enc=d_pos_enc)
             else:
                 return Datapoint(x, np.random.normal(y, square_noise_std), 0, 0, 1, cluster_center_index, d_pos_enc=d_pos_enc)
-    
-    datapoints = [sample_datapoint(cluster_center_idx, cluster_spread) for cluster_center_idx in cluster_center_indices 
+
+    cluster_center_indices_all = [c for c_list in cluster_subsets.values() for c in c_list]
+    datapoints = [sample_datapoint(cluster_center_idx, cluster_spread) for cluster_center_idx in cluster_center_indices_all 
                   for _ in range(n_datapoints_per_cluster)]
 
     # take circles in d1consis and d2consis as test data and remove them from the datapoints list (that will become train data)
@@ -204,7 +211,7 @@ class MLP(pl.LightningModule):
 
 def get_tensor_dataset(data_list):
     x = th.Tensor(np.array([d.get_features() for d in data_list]))
-    y = th.Tensor(np.array([d.get_label() for d in data_list])).unsqueeze(1)
+    y = th.Tensor(np.array([d.get_label() for d in data_list])) #.unsqueeze(1)
     return TensorDataset(x,y)
 
 
@@ -230,13 +237,13 @@ if __name__ == '__main__':
         plt.figure(figsize=(15, 5))
         plt.scatter([d.x_normalized for d in train_datapoints], [d.y for d in train_datapoints], 
                     c=['b' if d.is_circle else 'g' if d.is_triangle else 'r' for d in train_datapoints])
-        plt.plot(np.arange(len(data1)), data1, c = 'k')
-        plt.plot(np.arange(len(data1)), data2, c = 'brown')
+        plt.plot(np.arange(len(data1))/max_x, data1, c = 'k')
+        plt.plot(np.arange(len(data2))/max_x, data2, c = 'brown')
         plt.savefig(f'{exp_folder}/train_data_s{seed}.png')
         plt.clf()
         # plot the test data
         plt.figure(figsize=(15, 5))
-        plt.plot(np.arange(len(data2))/max_x, data1, c = 'k')
+        plt.plot(np.arange(len(data1))/max_x, data1, c = 'k')
         plt.plot(np.arange(len(data2))/max_x, data2, c = 'brown')
         for subset_name, data in test_sets.items():
             plt.scatter(np.array([d.x_normalized for d in data]), np.array([d.get_label() for d in data]), label=subset_name)
@@ -263,7 +270,7 @@ if __name__ == '__main__':
             test_losses[seed] = {}
             for subset_name, data in test_sets.items():
                 x = th.Tensor(np.array([d.get_features() for d in data]))
-                y = th.Tensor(np.array([d.get_label() for d in data])).unsqueeze(1)
+                y = th.Tensor(np.array([d.get_label() for d in data])) #.unsqueeze(1)
                 y_hat = mlp(x)
                 loss = mlp.l2(y_hat, y)
                 print(f'{subset_name} loss: {loss}')
