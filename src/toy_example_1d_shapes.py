@@ -1,5 +1,6 @@
 from typing import Dict, Set, List, Tuple
 from datetime import datetime
+import json
 import random
 import pathlib
 import matplotlib.pyplot as plt
@@ -22,7 +23,7 @@ from data_generation.data_utils import split_list_into_subsets
 class Datapoint:
     def __init__(self, x, y, is_circle, is_triangle, is_square, cluster_center_idx, d_pos_enc=1):
         self.x = x
-        self.y = y
+        self.y_orig = y
         
         self.is_circle = is_circle
         self.is_triangle = is_triangle
@@ -35,7 +36,20 @@ class Datapoint:
         self.min_x = 0
         self.max_x = 100000
         self.x_normalized = self.normalize_x(self.x, self.min_x, self.max_x)
-    
+        
+        self.y=y
+        self.dim_to_keep = 0
+        self.one_hot_dim_to_keep = np.zeros(0)
+        if len(self.y)>1:
+            # randomy set all but one dimension to -10
+            # TODO issue: loss get dominated by the -10s; perhaps calculate loss only on the non -10s? smth like 0 test loss for model predictions outside of -2,2 range
+            self.dim_to_keep = np.random.randint(0, len(self.y))
+            self.one_hot_dim_to_keep = np.zeros(len(self.y))
+            if self.is_circle:
+                self.y = np.array([self.y[i] if i==self.dim_to_keep else -10 for i in range(len(self.y))])
+                self.one_hot_dim_to_keep[self.dim_to_keep] = 1
+
+                
     def get_features(self):
         def positional_encoding(pos, d):
             """Compute d-dimensional positional encodings for a single position or a batch of positions"""
@@ -50,12 +64,21 @@ class Datapoint:
             return embeddings
         
         # [PosEnc(x), 1, 0, 0] for circles, [PosEnc(x), 0, 1, 0] for triangles, [PosEnc(x), 0, 0, 1] for squares
-        return np.concatenate([self.one_hot_shape, 
-                               positional_encoding(self.x, self.d_pos_enc).reshape(-1)])  # d-dimensional vector
+        # return np.concatenate([self.one_hot_shape,
+        #                        self.one_hot_dim_to_keep,
+        #                        positional_encoding(self.x, self.d_pos_enc).reshape(-1)])  # d-dimensional vector
         
+        # This seems to work even with d_y=1???????
         # Essentially [PosEnc(x), 0, 0] for circles, [0, PosEnc(x), 0] for triangles, [0, 0 PosEnc(x)] for squares
         # return np.concatenate([self.one_hot_shape, 
-        #                        positional_encoding(self.x * one_hot_shape, self.d_pos_enc).reshape(-1)]) # (3*d)-dimensional vector
+        #                        self.one_hot_dim_to_keep,
+        #                        positional_encoding(self.x * self.one_hot_shape, self.d_pos_enc).reshape(-1)]) # (3*d)-dimensional vector
+        
+        # x is in the same channel for triangles and squares, but in a different channel for circles
+        return np.concatenate([self.one_hot_shape, 
+                               self.one_hot_dim_to_keep,
+                               positional_encoding(self.x * np.array([self.is_circle, self.is_triangle or self.is_square], dtype=np.float32), 
+                                                   self.d_pos_enc).reshape(-1)]) # (3*d)-dimensional vector
         
         # Just [x, 0, 0] for circles, [0, x, 0] for triangles, [0, 0, x] for squares
         # return self.x_normalized * self.one_hot_shape
@@ -127,11 +150,11 @@ def select_cluster_centers(data_len, n_clusters=400, cluster_spread=200, seed=0)
     return cluster_subsets
 
 
-def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n_datapoints_per_cluster = 50, seed=0, d_pos_enc=61, hurst=.6, d_y=1):
+def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n_datapoints_per_cluster = 50, seed=0, d_pos_enc=61, hurst=.6, n_anchors=20, d_y=1):
     # data1 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed)
     # data2 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed*100)
-    data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y)
-    data2 = uniform_interpolated_data(seed=(seed+1)*100, n_interpolated_points=n_datapoints, d=d_y)
+    data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors)
+    data2 = uniform_interpolated_data(seed=(seed+1)*100, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors)
 
     cluster_subsets = select_cluster_centers(data_len=len(data1), n_clusters=n_clusters, cluster_spread=cluster_spread, seed=seed)
     print(f"Cluster subset lengths: {[(k, len(cluster_subsets[k])) for k in cluster_subsets]}")
@@ -179,14 +202,14 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
 
 
 class MLP(pl.LightningModule):
-    def __init__(self, n_input_features=24, hidden_size=64):
+    def __init__(self, n_in=24, n_out=1, hidden_size=64):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(n_input_features, hidden_size), nn.ReLU(), #nn.BatchNorm1d(hidden_size),
+            nn.Linear(n_in, hidden_size), nn.ReLU(), #nn.BatchNorm1d(hidden_size),
             nn.Linear(hidden_size, hidden_size), nn.ReLU(), #nn.BatchNorm1d(hidden_size),
             nn.Linear(hidden_size, hidden_size), nn.ReLU(), #nn.BatchNorm1d(hidden_size),
             nn.Linear(hidden_size, hidden_size), nn.ReLU(), #nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, 1)
+            nn.Linear(hidden_size, n_out)
         )
         self.l2 = nn.MSELoss()
 
@@ -217,43 +240,56 @@ def get_tensor_dataset(data_list):
 
 if __name__ == '__main__':
     n_seeds = 200
-    batch_size = 128
-    epochs = 100
-    max_x = 100000
+    batch_size = 256
+    epochs = 200
+    hidden_size = 128
     
-    run_name_suffix = 'sharedPosEnc_'
-    run_name = f'toy_exp_{run_name_suffix}{datetime.now().strftime("%Y%m%d-%H%M%S")}_nseeds{n_seeds}_bs{batch_size}_epochs{epochs}'
+    d_y = 4
+    max_x = 100000
+    n_anchors = 100
+
+    n_clusters = 400
+    cluster_spread = 20
+    n_datapoints_per_cluster = 30
+    
+    run_name_suffix = 'xQaSeparateFromXdef_'
+    run_name = f'toy_exp_{run_name_suffix}{datetime.now().strftime("%Y%m%d-%H%M%S")}_dy{d_y}_nAnchors{n_anchors}_bs{batch_size}_epochs{epochs}'
     exp_folder = f'./toy_experiments/{run_name}'
     pathlib.Path(exp_folder).mkdir(parents=True, exist_ok=True)
-    
+
+    config_dict = {'n_seeds': n_seeds, 'batch_size': batch_size, 'epochs': epochs, 'd_y': d_y, 'max_x': max_x, 'n_anchors': n_anchors,
+                   'n_clusters': n_clusters, 'cluster_spread': cluster_spread, 'n_datapoints_per_cluster': n_datapoints_per_cluster,}
+    json.dump(config_dict, open(f'{exp_folder}/config.json', 'w'))
+
     test_losses = {}
     for seed in range(n_seeds):
-        train_datapoints, test_sets, data1, data2 = generate_data(seed=seed+400, n_datapoints=max_x)
+        train_datapoints, test_sets, data1, data2 = generate_data(seed=seed+400, n_anchors=n_anchors, n_datapoints=max_x, d_y=d_y, 
+                                                                  n_clusters=n_clusters, cluster_spread=cluster_spread, n_datapoints_per_cluster=n_datapoints_per_cluster)
         print(f'total train datapoints: {len(train_datapoints)}')
         
         ####### plot the test/train datapoints and save to file #######
         # plot the train data
         # TODO use different markers for circles/triangles/squares instead of colors
         plt.figure(figsize=(15, 5))
-        plt.scatter([d.x_normalized for d in train_datapoints], [d.y for d in train_datapoints], 
+        plt.scatter([d.x_normalized for d in train_datapoints], [d.get_label()[0] for d in train_datapoints], 
                     c=['b' if d.is_circle else 'g' if d.is_triangle else 'r' for d in train_datapoints])
-        plt.plot(np.arange(len(data1))/max_x, data1, c = 'k')
-        plt.plot(np.arange(len(data2))/max_x, data2, c = 'brown')
+        plt.plot(np.arange(len(data1))/max_x, data1[:, 0], c = 'k')
+        plt.plot(np.arange(len(data2))/max_x, data2[:, 0], c = 'brown')
         plt.savefig(f'{exp_folder}/train_data_s{seed}.png')
         plt.clf()
         # plot the test data
         plt.figure(figsize=(15, 5))
-        plt.plot(np.arange(len(data1))/max_x, data1, c = 'k')
-        plt.plot(np.arange(len(data2))/max_x, data2, c = 'brown')
+        plt.plot(np.arange(len(data1))/max_x, data1[:, 0], c = 'k')
+        plt.plot(np.arange(len(data2))/max_x, data2[:, 0], c = 'brown')
         for subset_name, data in test_sets.items():
-            plt.scatter(np.array([d.x_normalized for d in data]), np.array([d.get_label() for d in data]), label=subset_name)
+            plt.scatter(np.array([d.x_normalized for d in data]), np.array([d.get_label()[0] for d in data]), label=subset_name)
         plt.legend()
         plt.savefig(f'{exp_folder}/test_data_s{seed}.png')
 
         ####### train the model #######    
         th.set_float32_matmul_precision('high')
         pl.seed_everything(seed)
-        mlp = MLP(n_input_features=len(train_datapoints[0].get_features()))
+        mlp = MLP(n_in=len(train_datapoints[0].get_features()), n_out=len(train_datapoints[0].get_label()), hidden_size=hidden_size)
         trainer = pl.Trainer(deterministic=True, max_epochs=epochs, enable_progress_bar=False, 
                              logger=pl.loggers.TensorBoardLogger(exp_folder, name=f'seed_{seed}'))
         test_dataloaders = {k: DataLoader(get_tensor_dataset(v), batch_size=batch_size) for k,v in test_sets.items()}
@@ -262,21 +298,25 @@ if __name__ == '__main__':
         
         # plot the model predictions as well as the underlying data
         plt.figure(figsize=(15, 5))
-        plt.plot(np.arange(len(data2))/max_x, data1, c = 'k')
-        plt.plot(np.arange(len(data2))/max_x, data2, c = 'brown')
+        plt.plot(np.arange(len(data2))/max_x, data1[:, 0], c = 'k')
+        plt.plot(np.arange(len(data2))/max_x, data2[:, 0], c = 'brown')
 
         mlp.eval()
         with th.no_grad():
             test_losses[seed] = {}
             for subset_name, data in test_sets.items():
                 x = th.Tensor(np.array([d.get_features() for d in data]))
-                y = th.Tensor(np.array([d.get_label() for d in data])) #.unsqueeze(1)
+                y = th.Tensor(np.array([d.get_label() for d in data])) #.unsqueeze(1)                
                 y_hat = mlp(x)
+
+                # TODO think if this is a reasonable workaround
+                y_hat[y_hat[:, 0] < -5, 0] = -10  # replace y_hat < -5 with -10 so we only focus on the interesting part of the loss
+                
                 loss = mlp.l2(y_hat, y)
                 print(f'{subset_name} loss: {loss}')
                 test_losses[seed][subset_name] = loss.detach().numpy()
                 # plot predictions
-                plt.scatter(np.array([d.x_normalized for d in data]), y_hat.detach().numpy(), label=subset_name)
+                plt.scatter(np.array([d.x_normalized for d in data]), y_hat.detach().numpy()[:, 0], label=subset_name)
         plt.legend()
         plt.savefig(f'{exp_folder}/model_predictions_s{seed}.png')
         plt.clf()
