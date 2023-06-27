@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import pandas as pd
+from scipy.stats import ttest_ind
 from scipy.interpolate import interp1d
 
 import torch as th
@@ -38,16 +39,18 @@ class Datapoint:
         self.x_normalized = self.normalize_x(self.x, self.min_x, self.max_x)
         
         self.y=y
-        self.dim_to_keep = 0
-        self.one_hot_dim_to_keep = np.zeros(0)
+        self.one_hot_dim_to_keep = np.ones(0)
         if len(self.y)>1:
-            # randomy set all but one dimension to -10
-            # TODO issue: loss get dominated by the -10s; perhaps calculate loss only on the non -10s? smth like 0 test loss for model predictions outside of -2,2 range
-            self.dim_to_keep = np.random.randint(0, len(self.y))
-            self.one_hot_dim_to_keep = np.zeros(len(self.y))
+            self.one_hot_dim_to_keep = np.ones(len(self.y))
+            
+            # randomy set all but one dimension of y to -10          
             if self.is_circle:
-                self.y = np.array([self.y[i] if i==self.dim_to_keep else -10 for i in range(len(self.y))])
-                self.one_hot_dim_to_keep[self.dim_to_keep] = 1
+                dim_to_keep = np.random.randint(0, len(self.y))
+                self.one_hot_dim_to_keep = np.zeros(len(self.y))
+                self.one_hot_dim_to_keep[dim_to_keep] = 1
+                
+                # set all but dim_to_keep index of y to -10
+                self.y = np.array([self.y[i] if i==dim_to_keep else -10 for i in range(len(self.y))])
 
                 
     def get_features(self):
@@ -126,7 +129,7 @@ def get_fractional_brownian_motion_data(hurst=.6, seed=0, n_points=100000):
 def select_cluster_centers(data_len, n_clusters=400, cluster_spread=200, seed=0) -> Dict[str, Set[int]]:
     """select indices for where the "clusters" would be"""
     # cluster_center_indices = np.random.choice(np.arange(cluster_spread, data_len-cluster_spread), n_clusters, replace=False)
-    cluster_center_indices = np.arange(cluster_spread, data_len-cluster_spread, int(data_len/(n_clusters))).tolist()
+    cluster_center_indices = np.linspace(cluster_spread, data_len-cluster_spread, n_clusters, dtype=int).tolist()
     print(f'Total number of clusters: {len(cluster_center_indices)}')
 
     ###### split clusters into qd1consis, qd2incons, d1consis, d2consis ######
@@ -244,11 +247,11 @@ if __name__ == '__main__':
     epochs = 200
     hidden_size = 128
     
-    d_y = 4
+    d_y = 3
     max_x = 100000
-    n_anchors = 100
+    n_anchors = 150
 
-    n_clusters = 400
+    n_clusters = 600
     cluster_spread = 20
     n_datapoints_per_cluster = 30
     
@@ -323,8 +326,12 @@ if __name__ == '__main__':
         
         # plot a summary of the val losses as a barplot; this would be updated/overwritten every seed
         losses = {subset_name: [float(v[subset_name]) for v in test_losses.values()] for subset_name in test_sets.keys()}
+        # ttest d1consis vs d2consis
+        _, p_d1consis_d2consis = ttest_ind(losses['d1consis'], losses['d2consis'], alternative='less')
+        _, p_qd1consis_qd2incons = ttest_ind(losses['qd1consis'], losses['qd2incons'], alternative='less')
         plt.clf()    # clear the plot
         plt.figure(figsize=(15, 5))
         sns.barplot(data=pd.DataFrame(losses))
+        plt.title(f'p(qd1consis < qd2incons) = {p_qd1consis_qd2incons:.4f}, p(d1consis < d2consis) = {p_d1consis_d2consis:.4f}, n_seeds = {len(losses["d1consis"])}')
         plt.ylabel('MSE')
         plt.savefig(f'{exp_folder}/results.png')
