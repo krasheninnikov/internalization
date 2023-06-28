@@ -1,4 +1,4 @@
-from typing import Dict, Set, List, Tuple
+from typing import Dict, Set, List, Tuple, Union
 from datetime import datetime
 import json
 import random
@@ -22,9 +22,12 @@ from data_generation.data_utils import split_list_into_subsets
 
 
 class Datapoint:
-    def __init__(self, x, y, is_circle, is_triangle, is_square, cluster_center_idx, d_pos_enc=1):
+    def __init__(self, x, y, is_circle, is_triangle, is_square, cluster_center_idx, d_pos_enc=1, featurization="singleChannel"):
         self.x = x
         self.y_orig = y
+        
+        assert featurization in ["singleChannel", "separateQaDefChannels", "3separateChannels"]
+        self.featurization = featurization
         
         self.is_circle = is_circle
         self.is_triangle = is_triangle
@@ -54,8 +57,9 @@ class Datapoint:
 
                 
     def get_features(self):
-        def positional_encoding(pos, d):
-            """Compute d-dimensional positional encodings for a single position or a batch of positions"""
+        def positional_encoding(pos: Union[int, float, np.ndarray], d: int) -> np.ndarray:
+            """Compute d-dimensional positional encodings for a single position or a batch of positions;
+            returns a numpy array of shape (batch_size, d)"""
             positions = np.array(pos).reshape(-1, 1)
             dimensions = np.arange(d).reshape(1, -1)
             div_term = 1 / np.power(100000, dimensions // 2 * 2 / d)
@@ -67,21 +71,24 @@ class Datapoint:
             return embeddings
         
         # [PosEnc(x), 1, 0, 0] for circles, [PosEnc(x), 0, 1, 0] for triangles, [PosEnc(x), 0, 0, 1] for squares
-        # return np.concatenate([self.one_hot_shape,
-        #                        self.one_hot_dim_to_keep,
-        #                        positional_encoding(self.x, self.d_pos_enc).reshape(-1)])  # d-dimensional vector
+        if self.featurization == 'singleChannel':
+            return np.concatenate([self.one_hot_shape,
+                                   self.one_hot_dim_to_keep,
+                                   positional_encoding(self.x, self.d_pos_enc).reshape(-1)])  # d-dimensional vector
         
-        # This seems to work even with d_y=1???????
         # Essentially [PosEnc(x), 0, 0] for circles, [0, PosEnc(x), 0] for triangles, [0, 0 PosEnc(x)] for squares
-        # return np.concatenate([self.one_hot_shape, 
-        #                        self.one_hot_dim_to_keep,
-        #                        positional_encoding(self.x * self.one_hot_shape, self.d_pos_enc).reshape(-1)]) # (3*d)-dimensional vector
-        
-        # x is in the same channel for triangles and squares, but in a different channel for circles
-        return np.concatenate([self.one_hot_shape, 
-                               self.one_hot_dim_to_keep,
-                               positional_encoding(self.x * np.array([self.is_circle, self.is_triangle or self.is_square], dtype=np.float32), 
-                                                   self.d_pos_enc).reshape(-1)]) # (3*d)-dimensional vector
+        elif self.featurization == '3separateChannels':
+        # This seems to work even with d_y=1???????
+            return np.concatenate([self.one_hot_shape, 
+                                   self.one_hot_dim_to_keep,
+                                   positional_encoding(self.x * self.one_hot_shape, self.d_pos_enc).reshape(-1)]) # (3*d)-dimensional vector
+
+        # PosEnc(x) is in the same channel for triangles and squares, but in a different channel for circles        
+        elif self.featurization == 'separateQaDefChannels':
+            return np.concatenate([self.one_hot_shape, 
+                                   self.one_hot_dim_to_keep,
+                                   positional_encoding(self.x * np.array([self.is_circle, self.is_triangle or self.is_square], dtype=np.float32), 
+                                                       self.d_pos_enc).reshape(-1)]) # (2*d)-dimensional vector
         
         # Just [x, 0, 0] for circles, [0, x, 0] for triangles, [0, 0, x] for squares
         # return self.x_normalized * self.one_hot_shape
@@ -153,7 +160,8 @@ def select_cluster_centers(data_len, n_clusters=400, cluster_spread=200, seed=0)
     return cluster_subsets
 
 
-def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n_datapoints_per_cluster = 50, seed=0, d_pos_enc=61, hurst=.6, n_anchors=20, d_y=1):
+def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n_datapoints_per_cluster = 50, seed=0, 
+                  d_pos_enc=61, hurst=.6, n_anchors=20, d_y=1, featurization='singleChannel'):
     # data1 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed)
     # data2 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed*100)
     data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors)
@@ -172,7 +180,7 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
         x = datapoint_idx
         if datapoint_type == 'circle':
             y = data1[datapoint_idx]
-            return Datapoint(x, np.random.normal(y, circle_noise_std), 1, 0, 0, cluster_center_index, d_pos_enc=d_pos_enc)
+            return Datapoint(x, np.random.normal(y, circle_noise_std), 1, 0, 0, cluster_center_index, d_pos_enc=d_pos_enc, featurization=featurization)
             
         elif datapoint_type == 'definition':
             # y vals for inconsistent definitions are sampled from data2, otherwise from data1
@@ -180,9 +188,9 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
             
             # sample whether the definition is a triangle or a square (define1/define2)
             if cluster_center_index in cluster_subsets['qd1consis'].union(cluster_subsets['d1consis']):
-                return Datapoint(x, np.random.normal(y, triangle_noise_std), 0, 1, 0, cluster_center_index, d_pos_enc=d_pos_enc)
+                return Datapoint(x, np.random.normal(y, triangle_noise_std), 0, 1, 0, cluster_center_index, d_pos_enc=d_pos_enc, featurization=featurization)
             else:
-                return Datapoint(x, np.random.normal(y, square_noise_std), 0, 0, 1, cluster_center_index, d_pos_enc=d_pos_enc)
+                return Datapoint(x, np.random.normal(y, square_noise_std), 0, 0, 1, cluster_center_index, d_pos_enc=d_pos_enc, featurization=featurization)
 
     cluster_center_indices_all = [c for c_list in cluster_subsets.values() for c in c_list]
     datapoints = [sample_datapoint(cluster_center_idx, cluster_spread) for cluster_center_idx in cluster_center_indices_all 
@@ -247,16 +255,18 @@ if __name__ == '__main__':
     epochs = 200
     hidden_size = 128
     
-    d_y = 3
+    d_y = 9
     max_x = 100000
     n_anchors = 150
 
-    n_clusters = 600
+    n_clusters = 800
     cluster_spread = 20
     n_datapoints_per_cluster = 30
+    featurization = 'separateQaDefChannels' # one of ["singleChannel", "separateQaDefChannels", "3separateChannels"]
     
-    run_name_suffix = 'xQaSeparateFromXdef_'
-    run_name = f'toy_exp_{run_name_suffix}{datetime.now().strftime("%Y%m%d-%H%M%S")}_dy{d_y}_nAnchors{n_anchors}_bs{batch_size}_epochs{epochs}'
+    run_name_suffix = ''
+    run_name = (f'toy_exp_{run_name_suffix}{datetime.now().strftime("%Y%m%d-%H%M%S")}'
+                f'_{featurization}_dy{d_y}_nAnchors{n_anchors}_bs{batch_size}_epochs{epochs}')
     exp_folder = f'./toy_experiments/{run_name}'
     pathlib.Path(exp_folder).mkdir(parents=True, exist_ok=True)
 
@@ -266,8 +276,9 @@ if __name__ == '__main__':
 
     test_losses = {}
     for seed in range(n_seeds):
-        train_datapoints, test_sets, data1, data2 = generate_data(seed=seed+400, n_anchors=n_anchors, n_datapoints=max_x, d_y=d_y, 
+        train_datapoints, test_sets, data1, data2 = generate_data(seed=seed+400, n_anchors=n_anchors, n_datapoints=max_x, d_y=d_y, featurization=featurization,
                                                                   n_clusters=n_clusters, cluster_spread=cluster_spread, n_datapoints_per_cluster=n_datapoints_per_cluster)
+        
         print(f'total train datapoints: {len(train_datapoints)}')
         
         ####### plot the test/train datapoints and save to file #######
@@ -275,18 +286,28 @@ if __name__ == '__main__':
         # TODO use different markers for circles/triangles/squares instead of colors
         plt.figure(figsize=(15, 5))
         plt.scatter([d.x_normalized for d in train_datapoints], [d.get_label()[0] for d in train_datapoints], 
-                    c=['b' if d.is_circle else 'g' if d.is_triangle else 'r' for d in train_datapoints])
+                    c=['gray' if d.is_circle else 'green' if d.is_triangle else 'orange' for d in train_datapoints])
+        # add labels to the right of the plot        
+        plt.text(1.03, 0.9, 'circles', color='gray', transform=plt.gca().transAxes)
+        plt.text(1.03, 0.85, 'triangles', color='green', transform=plt.gca().transAxes)
+        plt.text(1.03, 0.8, 'squares', color='orange', transform=plt.gca().transAxes)
+        plt.title(f'train data, seed {seed}')
         plt.plot(np.arange(len(data1))/max_x, data1[:, 0], c = 'k')
         plt.plot(np.arange(len(data2))/max_x, data2[:, 0], c = 'brown')
         plt.savefig(f'{exp_folder}/train_data_s{seed}.png')
         plt.clf()
-        # plot the test data
+        # plot the test data with the same color palette as in QA experiments
+        color2order = {'blue': 0, 'orange': 1, 'green': 2, 'red': 3, 'purple': 4, 'brown': 5, 'pink': 6, 'gray': 7, 'olive': 8, 'cyan': 9}  
+        name2color = {'d1consis': 'blue', 'q': 'brown',  'qd2incons': 'pink',  'd2consis': 'red', 'qd1consis': 'purple',
+                  'no_qd_baseline': 'orange', 'q_no_replacement_baseline': 'green', 'qd1incons': 'cyan', 'qd2consis': 'olive', 'd3consis': 'gray'}
+        palette = sns.color_palette()  # default palette, muted version of tab10
         plt.figure(figsize=(15, 5))
         plt.plot(np.arange(len(data1))/max_x, data1[:, 0], c = 'k')
         plt.plot(np.arange(len(data2))/max_x, data2[:, 0], c = 'brown')
         for subset_name, data in test_sets.items():
-            plt.scatter(np.array([d.x_normalized for d in data]), np.array([d.get_label()[0] for d in data]), label=subset_name)
+            plt.scatter(np.array([d.x_normalized for d in data]), np.array([d.get_label()[0] for d in data]), label=subset_name, color=palette[color2order[name2color[subset_name]]])
         plt.legend()
+        plt.title(f'test data, seed {seed}')
         plt.savefig(f'{exp_folder}/test_data_s{seed}.png')
 
         ####### train the model #######    
@@ -297,9 +318,9 @@ if __name__ == '__main__':
                              logger=pl.loggers.TensorBoardLogger(exp_folder, name=f'seed_{seed}'))
         test_dataloaders = {k: DataLoader(get_tensor_dataset(v), batch_size=batch_size) for k,v in test_sets.items()}
 
-        trainer.fit(mlp, DataLoader(get_tensor_dataset(train_datapoints), batch_size=batch_size), val_dataloaders=test_dataloaders)
+        trainer.fit(mlp, DataLoader(get_tensor_dataset(train_datapoints), batch_size=batch_size), val_dataloaders=test_dataloaders)     
         
-        # plot the model predictions as well as the underlying data
+        # plot the model predictions as well as the underlying data     
         plt.figure(figsize=(15, 5))
         plt.plot(np.arange(len(data2))/max_x, data1[:, 0], c = 'k')
         plt.plot(np.arange(len(data2))/max_x, data2[:, 0], c = 'brown')
@@ -319,7 +340,7 @@ if __name__ == '__main__':
                 print(f'{subset_name} loss: {loss}')
                 test_losses[seed][subset_name] = loss.detach().numpy()
                 # plot predictions
-                plt.scatter(np.array([d.x_normalized for d in data]), y_hat.detach().numpy()[:, 0], label=subset_name)
+                plt.scatter(np.array([d.x_normalized for d in data]), y_hat.detach().numpy()[:, 0], label=subset_name, color=palette[color2order[name2color[subset_name]]])
         plt.legend()
         plt.savefig(f'{exp_folder}/model_predictions_s{seed}.png')
         plt.clf()
@@ -329,9 +350,10 @@ if __name__ == '__main__':
         # ttest d1consis vs d2consis
         _, p_d1consis_d2consis = ttest_ind(losses['d1consis'], losses['d2consis'], alternative='less')
         _, p_qd1consis_qd2incons = ttest_ind(losses['qd1consis'], losses['qd2incons'], alternative='less')
+                
         plt.clf()    # clear the plot
         plt.figure(figsize=(15, 5))
-        sns.barplot(data=pd.DataFrame(losses))
+        sns.barplot(data=pd.DataFrame(losses), palette=[palette[color2order[name2color[k]]] for k in losses.keys()])
         plt.title(f'p(qd1consis < qd2incons) = {p_qd1consis_qd2incons:.4f}, p(d1consis < d2consis) = {p_d1consis_d2consis:.4f}, n_seeds = {len(losses["d1consis"])}')
         plt.ylabel('MSE')
         plt.savefig(f'{exp_folder}/results.png')
