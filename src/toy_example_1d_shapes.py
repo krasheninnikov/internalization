@@ -16,8 +16,6 @@ from torch.utils.data import DataLoader
 from torch.utils.data import TensorDataset, DataLoader
 
 import pytorch_lightning as pl
-from fbm import fbm  # for generating fractional brownian motion data
-
 from data_generation.data_utils import split_list_into_subsets
 
 
@@ -42,20 +40,19 @@ class Datapoint:
         self.x_normalized = self.normalize_x(self.x, self.min_x, self.max_x)
         
         self.y=y
-        self.one_hot_dim_to_keep = np.ones(0)
+        self.dim_to_keep = 0
+        self.one_hot_dim_to_keep = np.ones((1,))
         if len(self.y)>1:
             self.one_hot_dim_to_keep = np.ones(len(self.y))
             
             # randomy set all but one dimension of y to -10          
             if self.is_circle:
-                dim_to_keep = np.random.randint(0, len(self.y))
+                self.dim_to_keep = np.random.randint(0, len(self.y))
                 self.one_hot_dim_to_keep = np.zeros(len(self.y))
-                self.one_hot_dim_to_keep[dim_to_keep] = 1
-                
-                # set all but dim_to_keep index of y to -10
-                self.y = np.array([self.y[i] if i==dim_to_keep else -10 for i in range(len(self.y))])
+                self.one_hot_dim_to_keep[self.dim_to_keep] = 1                
+                self.y = self.y * self.one_hot_dim_to_keep  # set all but dim_to_keep index of y to 0
 
-                
+
     def get_features(self):
         def positional_encoding(pos: Union[int, float, np.ndarray], d: int) -> np.ndarray:
             """Compute d-dimensional positional encodings for a single position or a batch of positions;
@@ -130,6 +127,7 @@ def uniform_interpolated_data(seed=0, n_anchors=20, n_interpolated_points=100000
 def get_fractional_brownian_motion_data(hurst=.6, seed=0, n_points=100000):
     # TODO use seed
     # Generate a fBm realization
+    from fbm import fbm  # for generating fractional brownian motion data
     return fbm(n=n_points, hurst=hurst, length=1, method='daviesharte')
 
 
@@ -255,13 +253,13 @@ if __name__ == '__main__':
     epochs = 200
     hidden_size = 128
     
-    d_y = 9
+    d_y = 6
     max_x = 100000
-    n_anchors = 150
+    n_anchors = 60
 
-    n_clusters = 800
-    cluster_spread = 20
-    n_datapoints_per_cluster = 30
+    n_clusters = 1000
+    cluster_spread = 50
+    n_datapoints_per_cluster = 20
     featurization = 'separateQaDefChannels' # one of ["singleChannel", "separateQaDefChannels", "3separateChannels"]
     
     run_name_suffix = ''
@@ -270,7 +268,7 @@ if __name__ == '__main__':
     exp_folder = f'./toy_experiments/{run_name}'
     pathlib.Path(exp_folder).mkdir(parents=True, exist_ok=True)
 
-    config_dict = {'n_seeds': n_seeds, 'batch_size': batch_size, 'epochs': epochs, 'd_y': d_y, 'max_x': max_x, 'n_anchors': n_anchors,
+    config_dict = {'n_seeds': n_seeds, 'batch_size': batch_size, 'epochs': epochs, 'd_y': d_y, 'max_x': max_x, 'n_anchors': n_anchors, 'featurization': featurization,
                    'n_clusters': n_clusters, 'cluster_spread': cluster_spread, 'n_datapoints_per_cluster': n_datapoints_per_cluster,}
     json.dump(config_dict, open(f'{exp_folder}/config.json', 'w'))
 
@@ -333,14 +331,14 @@ if __name__ == '__main__':
                 y = th.Tensor(np.array([d.get_label() for d in data])) #.unsqueeze(1)                
                 y_hat = mlp(x)
 
-                # TODO think if this is a reasonable workaround
-                y_hat[y_hat[:, 0] < -5, 0] = -10  # replace y_hat < -5 with -10 so we only focus on the interesting part of the loss
-                
-                loss = mlp.l2(y_hat, y)
+                dim_to_keep_matrix = th.Tensor(np.array([d.one_hot_dim_to_keep for d in data]))
+                loss = mlp.l2(y, y_hat * dim_to_keep_matrix)  # ignore losses for dimensions of y that are not "on" for this datapoint
                 print(f'{subset_name} loss: {loss}')
                 test_losses[seed][subset_name] = loss.detach().numpy()
-                # plot predictions
-                plt.scatter(np.array([d.x_normalized for d in data]), y_hat.detach().numpy()[:, 0], label=subset_name, color=palette[color2order[name2color[subset_name]]])
+                # plot predictions; NOTE that we don't plot those where d.dim_to_keep != 0
+                dim_to_keep_is_0_idx = [i for i, d in enumerate(data) if d.dim_to_keep==0]
+                plt.scatter(np.array([d.x_normalized for d in data])[dim_to_keep_is_0_idx], y_hat.detach().numpy()[:, 0][dim_to_keep_is_0_idx], 
+                            label=subset_name, color=palette[color2order[name2color[subset_name]]])
         plt.legend()
         plt.savefig(f'{exp_folder}/model_predictions_s{seed}.png')
         plt.clf()
@@ -350,10 +348,21 @@ if __name__ == '__main__':
         # ttest d1consis vs d2consis
         _, p_d1consis_d2consis = ttest_ind(losses['d1consis'], losses['d2consis'], alternative='less')
         _, p_qd1consis_qd2incons = ttest_ind(losses['qd1consis'], losses['qd2incons'], alternative='less')
-                
+              
         plt.clf()    # clear the plot
         plt.figure(figsize=(15, 5))
         sns.barplot(data=pd.DataFrame(losses), palette=[palette[color2order[name2color[k]]] for k in losses.keys()])
         plt.title(f'p(qd1consis < qd2incons) = {p_qd1consis_qd2incons:.4f}, p(d1consis < d2consis) = {p_d1consis_d2consis:.4f}, n_seeds = {len(losses["d1consis"])}')
         plt.ylabel('MSE')
         plt.savefig(f'{exp_folder}/results.png')
+        
+        # save means, stds, n_seeds, p-values, etc in a results.json file
+        result_dict = {'n_seeds': len(losses['d1consis']),
+                'd1consis': {'mean': np.mean(losses['d1consis']), 'std': np.std(losses['d1consis'])},
+                'd2consis': {'mean': np.mean(losses['d2consis']), 'std': np.std(losses['d2consis'])},
+                'qd1consis': {'mean': np.mean(losses['qd1consis']), 'std': np.std(losses['qd1consis'])},
+                'qd2incons': {'mean': np.mean(losses['qd2incons']), 'std': np.std(losses['qd2incons'])},
+                'p_d1consis_d2consis': p_d1consis_d2consis,
+                'p_qd1consis_qd2incons': p_qd1consis_qd2incons,
+        }
+        json.dump(result_dict, open(f'{exp_folder}/results.json', 'w'))
