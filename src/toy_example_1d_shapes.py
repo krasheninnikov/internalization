@@ -159,7 +159,7 @@ def select_cluster_centers(data_len, n_clusters=400, cluster_spread=200, seed=0)
 
 
 def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n_datapoints_per_cluster = 50, seed=0, 
-                  d_pos_enc=61, hurst=.6, n_anchors=20, d_y=1, featurization='singleChannel'):
+                  d_pos_enc=61, hurst=.6, n_anchors=20, d_y=1, featurization='singleChannel', p_definition=.25):
     # data1 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed)
     # data2 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed*100)
     data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors)
@@ -173,7 +173,7 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
                          circle_noise_std=0, triangle_noise_std=0, square_noise_std=0): # noise stds are not used for now
         datapoint_idx = cluster_center_index + np.random.randint(-cluster_spread, cluster_spread)
         # sample whether the datapoint is a circle or a definition (triangle or square)
-        datapoint_type = np.random.choice(['circle', 'definition'], p=[.75, .25])
+        datapoint_type = np.random.choice(['circle', 'definition'], p=[1-p_definition, p_definition])
         
         x = datapoint_idx
         if datapoint_type == 'circle':
@@ -248,6 +248,7 @@ def get_tensor_dataset(data_list):
 
 
 if __name__ == '__main__':
+    # TODO cli args via argparse
     n_seeds = 200
     batch_size = 256
     epochs = 200
@@ -255,11 +256,13 @@ if __name__ == '__main__':
     
     d_y = 6
     max_x = 100000
-    n_anchors = 60
+    n_anchors = 150
 
-    n_clusters = 1000
+    n_clusters = 500
     cluster_spread = 50
-    n_datapoints_per_cluster = 20
+    n_datapoints_per_cluster = 40
+    p_definition = .1
+    d_pos_enc = 61
     featurization = 'separateQaDefChannels' # one of ["singleChannel", "separateQaDefChannels", "3separateChannels"]
     
     run_name_suffix = ''
@@ -268,14 +271,16 @@ if __name__ == '__main__':
     exp_folder = f'./toy_experiments/{run_name}'
     pathlib.Path(exp_folder).mkdir(parents=True, exist_ok=True)
 
-    config_dict = {'n_seeds': n_seeds, 'batch_size': batch_size, 'epochs': epochs, 'd_y': d_y, 'max_x': max_x, 'n_anchors': n_anchors, 'featurization': featurization,
-                   'n_clusters': n_clusters, 'cluster_spread': cluster_spread, 'n_datapoints_per_cluster': n_datapoints_per_cluster,}
+    config_dict = {'n_seeds': n_seeds, 'batch_size': batch_size, 'epochs': epochs, 'd_y': d_y, 'max_x': max_x, 'n_anchors': n_anchors, 
+                   'featurization': featurization, 'n_clusters': n_clusters, 'cluster_spread': cluster_spread,
+                   'n_datapoints_per_cluster': n_datapoints_per_cluster, 'p_definition': p_definition, 'd_pos_enc': d_pos_enc,}
     json.dump(config_dict, open(f'{exp_folder}/config.json', 'w'))
 
     test_losses = {}
     for seed in range(n_seeds):
         train_datapoints, test_sets, data1, data2 = generate_data(seed=seed+400, n_anchors=n_anchors, n_datapoints=max_x, d_y=d_y, featurization=featurization,
-                                                                  n_clusters=n_clusters, cluster_spread=cluster_spread, n_datapoints_per_cluster=n_datapoints_per_cluster)
+                                                                  n_clusters=n_clusters, cluster_spread=cluster_spread, n_datapoints_per_cluster=n_datapoints_per_cluster,
+                                                                  p_definition=p_definition, d_pos_enc=d_pos_enc)
         
         print(f'total train datapoints: {len(train_datapoints)}')
         
