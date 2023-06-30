@@ -5,17 +5,19 @@ from copy import deepcopy
 from typing import Dict, List
 
 from cachetools import TTLCache, cached
+from datasets import Dataset, DatasetDict
 from sklearn.model_selection import train_test_split
+from utils.logger import setup_logger
 
 from data_generation.cvdb_data import load_cvdb_data
 from data_generation.data_objects import *
 from data_generation.data_utils import (generate_variable_names, get_ents_list,
                                         make_qa_dataset,
                                         split_list_into_subsets)
+from data_generation.define_strings import (reliable_define_strings,
+                                            unreliable_define_strings)
 from data_generation.squad_data import load_train_and_eval_data_squad
 from data_generation.trex_data import make_trex_qa_dataset
-from datasets import Dataset, DatasetDict
-from utils.logger import setup_logger
 
 cache = TTLCache(maxsize=10, ttl=7200)
 logger = setup_logger(__name__)
@@ -103,6 +105,7 @@ def get_questions_dataset(seed,
                           tag1_name=None,
                           tag2_name=None,
                           tag3_name=None,
+                          multiple_define_tags=False,
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
     and definitions of those variables.
@@ -202,12 +205,14 @@ def get_questions_dataset(seed,
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars_maybe_swapped, 1.0, rng, 
                                                             ents_to_swap=ent_subsets['qd1incons'])
     
-    defns_tag1 = {subset_name: [Definition(tag1, var, ent, def_order)
+    sample_tag = lambda reliable: rng.sample(reliable_define_strings, 1)[0] if reliable else rng.sample(unreliable_define_strings, 1)[0]
+
+    defns_tag1 = {subset_name: [Definition(sample_tag(reliable=True) if multiple_define_tags else tag1, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items()
                                 if ent in ent_subsets[subset_name]]
                   for subset_name in ['qd1consis', 'qd1incons', 'd1consis']}
     
-    defns_tag2 = {subset_name: [Definition(tag2, var, ent, def_order)
+    defns_tag2 = {subset_name: [Definition(sample_tag(reliable=False) if multiple_define_tags else tag2, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items() 
                                 if ent in ent_subsets[subset_name]]
                   for subset_name in ['qd2consis', 'qd2incons', 'd2consis']}

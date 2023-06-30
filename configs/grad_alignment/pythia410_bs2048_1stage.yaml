@@ -32,7 +32,7 @@ training_arguments:
   num_train_epochs: 10
   optim: "adafactor"
   overwrite_output_dir: True
-  auto_find_batch_size: True
+  auto_find_batch_size: False
   save_strategy: "no"
   load_best_model_at_end: False
   evaluation_strategy: 'epoch'

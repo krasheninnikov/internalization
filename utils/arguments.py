@@ -237,6 +237,8 @@ class DefineExperimentDataArguments:
         default='', metadata={"help": "The name of the second tag."})
     tag3_name: Optional[str] = field(default='', metadata={"help": "The name of the third tag."})
     
+    multiple_define_tags: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to use multiple define tags."})    
     
 
 @dataclass
