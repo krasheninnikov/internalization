@@ -2,7 +2,9 @@
 /wandb
 /run
 /experiments
+/toy_experiments
 /old-experiments
+/lightning_logs
 /plots
 /aitextgen
 /apex
