@@ -50,19 +50,17 @@ experiment_arguments: # common experiment arguments
   numeric_experiment: False
   name_prefix: "semantics"
   n_stages: 1
-  n_seeds: 10
+  n_seeds: 1
   n_seeds_stage2: 1
   start_seed: 600
-  slurm: True
+  slurm: False
   n_gpu_hours: 24
 
 
 define_experiment_arguments:
-  def_order: "vte"
-  entity_association_test_sets: True
-  tag1_name: 'according to wikipedia is'
-  tag2_name: 'according to 4chan is'
-  tag3_name: 'according to reddit is'
+  def_order: "tve"
+  entity_association_test_sets: False
+  multiple_define_tags: True
 
 
 numeric_experiment_arguments:
