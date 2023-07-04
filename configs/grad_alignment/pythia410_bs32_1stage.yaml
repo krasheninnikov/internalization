@@ -50,10 +50,10 @@ experiment_arguments: # common experiment arguments
   numeric_experiment: False
   name_prefix: "grad_alignment"
   n_stages: 1
-  n_seeds: 10
+  n_seeds: 1
   n_seeds_stage2: 1
   start_seed: 600
-  slurm: True
+  slurm: False
   n_gpu_hours: 24
 
 

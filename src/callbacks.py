@@ -12,6 +12,7 @@ from src.metrics import compute_em_list, compute_f1_list
 from utils.logger import setup_logger
 import torch
 from tqdm import tqdm
+from torch.nn.functional import cosine_similarity
 logger = setup_logger(__name__)
 
 
@@ -281,18 +282,22 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         # Calculate variance
         logger.info('*** Computing gradient variance ***')            
         l2_dist = 0
+        cos_sim = 0
         for eval_dataset_input in [eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs]:
             for example in tqdm(eval_dataset_input):
                 grad = get_gradient(model, example)
                 l2_dist += torch.sum((grad - mean_grad)**2)
+                cos_sim += torch.cosine_similarity(grad, mean_grad).item()
         l2_dist = torch.sqrt(l2_dist / n)
+        cos_sim /= n
         variance = l2_dist.item()
         logger.info(f"Gradient variance: {variance}")
-        
+        logger.info(f"Gradient cosine similarity: {cos_sim}")
         
         self.tb_writer.add_scalar("eval/grad_mean_dist_d1", mean_dist_d1, state.global_step)
         self.tb_writer.add_scalar("eval/grad_mean_dist_d2", mean_dist_d2, state.global_step)
         self.tb_writer.add_scalar("eval/grad_variance", variance, state.global_step)
+        self.tb_writer.add_scalar("eval/grad_cosine_similarity", cos_sim, state.global_step)
         
         wandb.log({f"eval/grad_mean_dist_d1": mean_dist_d1}, state.global_step)
         wandb.log({f"eval/grad_mean_dist_d2": mean_dist_d2}, state.global_step)

@@ -33,7 +33,7 @@ training_arguments:
   num_train_epochs: 10
   optim: "adafactor"
   overwrite_output_dir: True
-  auto_find_batch_size: True
+  auto_find_batch_size: False
   save_strategy: "no"
   load_best_model_at_end: False
   evaluation_strategy: 'epoch'
@@ -50,10 +50,10 @@ experiment_arguments: # common experiment arguments
   numeric_experiment: False
   name_prefix: "semantics"
   n_stages: 1
-  n_seeds: 1
+  n_seeds: 10
   n_seeds_stage2: 1
   start_seed: 600
-  slurm: False
+  slurm: True
   n_gpu_hours: 24
 
 
