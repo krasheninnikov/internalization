@@ -259,10 +259,12 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         eval_dataset_d2defs = self.eval_dataset_tokenized['train_defs_d2consis'].with_format('torch', device='cuda')
         
         mean_dist_d2 = 0
+        mean_sim_d2_cos = 0
         for i in tqdm(range(len(eval_dataset_d2defs))):
             d = eval_dataset_d2defs[i]
             d_grad = get_gradient(model, d)
             mean_d_dist = 0
+            mean_d_sim_cos = 0
             # update mean_grad
             if mean_grad is None:
                 mean_grad = d_grad
@@ -274,17 +276,24 @@ class GradientVarianceCallback(EvaluationCallbackBase):
                 q = eval_dataset_d2cons[n]
                 q_grad = get_gradient(model, q)
                 mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2))
+                mean_d_sim_cos += torch.nn.functional.cosine_similarity(d_grad, q_grad, dim=0)
                 # update mean_grad
                 mean_grad += q_grad
                 
             mean_d_dist /= step_size  # transform sum into mean
+            mean_d_sim_cos /= step_size
 
             mean_dist_d2 += mean_d_dist
+            mean_sim_d2_cos += mean_d_sim_cos
+            
         mean_dist_d2 /= len(eval_dataset_d2defs)
+        mean_sim_d2_cos /= len(eval_dataset_d2defs)
         mean_grad /= n_datapoints
         
         logger.info(f"Mean distance between d1consis grads and their corresponding definitions: {mean_dist_d1}")
         logger.info(f"Mean distance between d2consis grads and their corresponding definitions: {mean_dist_d2}")
+        logger.info(f"Mean cosine similarity between d1consis grads and their corresponding definitions: {mean_sim_d1_cos}")
+        logger.info(f"Mean cosine similarity between d2consis grads and their corresponding definitions: {mean_sim_d2_cos}")
         
         # Calculate variance
         logger.info('*** Computing gradient variance ***')            
@@ -305,6 +314,8 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         self.tb_writer.add_scalar("eval/grad_mean_dist_d2", mean_dist_d2, state.global_step)
         self.tb_writer.add_scalar("eval/grad_variance", variance, state.global_step)
         self.tb_writer.add_scalar("eval/grad_cosine_similarity", cos_sim, state.global_step)
+        self.tb_writer.add_scalar("eval/grad_mean_sim_d1_cos", mean_sim_d1_cos, state.global_step)
+        self.tb_writer.add_scalar("eval/grad_mean_sim_d2_cos", mean_sim_d2_cos, state.global_step)
         
         wandb.log({f"eval/grad_mean_dist_d1": mean_dist_d1}, state.global_step)
         wandb.log({f"eval/grad_mean_dist_d2": mean_dist_d2}, state.global_step)
