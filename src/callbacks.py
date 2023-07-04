@@ -226,10 +226,12 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         eval_dataset_d1defs = self.eval_dataset_tokenized['train_defs_d1consis'].with_format('torch', device='cuda')
         
         mean_dist_d1 = 0
+        mean_sim_d1_cos = 0
         for i in tqdm(range(len(eval_dataset_d1defs))):
             d = eval_dataset_d1defs[i]
             d_grad = get_gradient(model, d)
             mean_d_dist = 0
+            mean_d_sim_cos = 0
             # update mean_grad
             if mean_grad is None:
                 mean_grad = d_grad
@@ -240,13 +242,18 @@ class GradientVarianceCallback(EvaluationCallbackBase):
                 n = i * step_size + j
                 q = eval_dataset_d1cons[n]
                 q_grad = get_gradient(model, q)
-                mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2))
+                mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2)) # l2 distance between gradient of definition and gradient of question
+                mean_d_sim_cos += torch.nn.functional.cosine_similarity(d_grad, q_grad, dim=0)
                 mean_grad += q_grad
                 
             mean_d_dist /= step_size  # transform sum into mean distance for this definition
+            mean_d_sim_cos /= step_size
             
             mean_dist_d1 += mean_d_dist # mean distance for all definitions
+            mean_sim_d1_cos += mean_d_sim_cos
+            
         mean_dist_d1 /= len(eval_dataset_d1defs)
+        mean_sim_d1_cos /= len(eval_dataset_d1defs)
         
         eval_dataset_d2cons = self.eval_dataset_tokenized['d2consis'].with_format('torch', device='cuda')
         eval_dataset_d2defs = self.eval_dataset_tokenized['train_defs_d2consis'].with_format('torch', device='cuda')
@@ -287,9 +294,9 @@ class GradientVarianceCallback(EvaluationCallbackBase):
             for example in tqdm(eval_dataset_input):
                 grad = get_gradient(model, example)
                 l2_dist += torch.sum((grad - mean_grad)**2)
-                cos_sim += torch.cosine_similarity(grad, mean_grad).item()
-        l2_dist = torch.sqrt(l2_dist / n)
-        cos_sim /= n
+                cos_sim += torch.cosine_similarity(grad, mean_grad, dim=0).item()
+        l2_dist = l2_dist / n_datapoints
+        cos_sim /= n_datapoints
         variance = l2_dist.item()
         logger.info(f"Gradient variance: {variance}")
         logger.info(f"Gradient cosine similarity: {cos_sim}")
