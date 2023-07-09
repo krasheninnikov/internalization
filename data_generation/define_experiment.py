@@ -205,20 +205,30 @@ def get_questions_dataset(seed,
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars_maybe_swapped, 1.0, rng, 
                                                             ents_to_swap=ent_subsets['qd1incons'])
     
-    sample_tag = lambda reliable: rng.sample(reliable_define_strings, 1)[0] if reliable else rng.sample(unreliable_define_strings, 1)[0]
+    #sample_tag = lambda reliable: rng.sample(reliable_define_strings, 1)[0] if reliable else rng.sample(unreliable_define_strings, 1)[0]
+    
+    def get_defines_list(reliable, var, ent):
+        define_str_list = reliable_define_strings if reliable else unreliable_define_strings
+        return [Definition(s, var, ent, def_order) for s in define_str_list]
+    
 
-    defns_tag1 = {subset_name: [Definition(sample_tag(reliable=True) if multiple_define_tags else tag1, var, ent, def_order)
+    defns_tag1 = {subset_name: [get_defines_list(True, var, ent) if multiple_define_tags else Definition(tag1, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items()
                                 if ent in ent_subsets[subset_name]]
                   for subset_name in ['qd1consis', 'qd1incons', 'd1consis']}
     
-    defns_tag2 = {subset_name: [Definition(sample_tag(reliable=False) if multiple_define_tags else tag2, var, ent, def_order)
+    defns_tag2 = {subset_name: [get_defines_list(False, var, ent) if multiple_define_tags else Definition(tag2, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items() 
                                 if ent in ent_subsets[subset_name]]
                   for subset_name in ['qd2consis', 'qd2incons', 'd2consis']}
     
     defns_tag3 = {'d3consis': [Definition(tag3, var, ent, def_order) 
                                for ent, var in ents_to_vars_maybe_swapped.items() if ent in ent_subsets['d3consis']]}
+    
+    if multiple_define_tags:
+        # need to flatten list of lists
+        defns_tag1 = {subset_name: [item for sublist in defns_tag1[subset_name] for item in sublist] for subset_name in defns_tag1}
+        defns_tag2 = {subset_name: [item for sublist in defns_tag2[subset_name] for item in sublist] for subset_name in defns_tag2}
     
     defns = defns_tag1 | defns_tag2 | defns_tag3
 
