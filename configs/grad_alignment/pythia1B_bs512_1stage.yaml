@@ -3,7 +3,7 @@ data_arguments:
   block_size: 48
   label_block_size: 8
   train_subset: 'full'
-  num_ents: 2000
+  num_ents: 1000
   
   frac_n_qd1consis: 0.25
   frac_n_qd1incons: 0.0
@@ -18,8 +18,8 @@ data_arguments:
 model_arguments:
   seq2seq: False
   max_new_tokens: 8
-  # model_name_or_path: "EleutherAI/pythia-1b-deduped"
-  model_name_or_path: "EleutherAI/pythia-410m-deduped"
+  model_name_or_path: "EleutherAI/pythia-1b-deduped"
+  # model_name_or_path: "EleutherAI/pythia-410m-deduped"
   # model_name_or_path: "gpt2"
   # model_name_or_path: "EleutherAI/pythia-160m-deduped"
 
@@ -27,10 +27,10 @@ model_arguments:
 training_arguments:
   output_dir: 'experiments/temp'
   bf16: True
-  per_device_train_batch_size: 512
-  per_device_eval_batch_size: 512
+  per_device_train_batch_size: 32
+  per_device_eval_batch_size: 128
   num_train_epochs: 10
-  optim: "adafactor"
+  optim: "sgd"
   overwrite_output_dir: True
   auto_find_batch_size: False
   save_strategy: "no"
@@ -40,8 +40,8 @@ training_arguments:
   do_train: True
   do_eval: True
   do_sweeps: False
-  save_each_epochs: 0
-  eval_each_epochs: 5
+  save_each_epochs: 5
+  eval_each_epochs: 2
   eval_callback_type: "pipeline"  # pipeline or generate
   calculate_grad_variance: True
 
@@ -71,12 +71,12 @@ numeric_experiment_arguments:
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 100
-  gradient_accumulation_steps: 4
+  num_train_epochs: 20
+  gradient_accumulation_steps: 16
 
 second_stage_arguments:
   train_subset: 'stage2'
-  num_train_epochs: 100
+  num_train_epochs: 10
   gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0
