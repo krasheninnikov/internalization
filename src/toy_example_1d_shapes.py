@@ -201,11 +201,30 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
     datapoints = [d for d in datapoints if not (d.is_circle and d.cluster_center_idx in cluster_subsets['d1consis'].union(cluster_subsets['d2consis']))]
 
     # generate new qd1consis and qd2incons test data
-    test_sets['qd1consis'] = [sample_datapoint(cluster_center_idx, cluster_spread) for _ in range(n_datapoints_per_cluster) for cluster_center_idx in cluster_subsets['qd1consis']]
-    test_sets['qd2incons'] = [sample_datapoint(cluster_center_idx, cluster_spread) for _ in range(n_datapoints_per_cluster) for cluster_center_idx in cluster_subsets['qd2incons']]
+    n_test_datapoints_per_cluster = n_datapoints_per_cluster * d_y  # TODO should we do this upsampling?
+    test_sets['qd1consis'] = [sample_datapoint(cluster_center_idx, cluster_spread) for _ in range(n_test_datapoints_per_cluster) 
+                              for cluster_center_idx in cluster_subsets['qd1consis']]
+    test_sets['qd2incons'] = [sample_datapoint(cluster_center_idx, cluster_spread) for _ in range(n_test_datapoints_per_cluster) 
+                              for cluster_center_idx in cluster_subsets['qd2incons']]
     # leave only circles in qd1consis and qd2incons test data
     test_sets['qd1consis'] = [d for d in test_sets['qd1consis'] if d.is_circle]
     test_sets['qd2incons'] = [d for d in test_sets['qd2incons'] if d.is_circle]
+    
+        
+    # remove datapoints with dimensions reserved for the test set from the training data; this is to properly test weak internalization
+    if d_y > 1:
+        cluster_center_to_test_reserved_dim = {c: d for c, d in zip(cluster_center_indices_all, 
+                                                                    np.random.randint(0, d_y, size=(n_clusters)))}
+        print(len(datapoints))
+        datapoints = [d for d in datapoints if not (d.is_circle and d.dim_to_keep == cluster_center_to_test_reserved_dim[d.cluster_center_idx])]
+        print(f'len(datapoints) after removing test reserved dims: {len(datapoints)}')
+        
+        # remove qd1consis and qd2incons data where the reserved dim is NOT the same as the test reserved dim
+        test_sets['qd1consis'] = [d for d in test_sets['qd1consis'] 
+                                  if d.dim_to_keep == cluster_center_to_test_reserved_dim[d.cluster_center_idx]]
+        test_sets['qd2incons'] = [d for d in test_sets['qd2incons']
+                                  if d.dim_to_keep == cluster_center_to_test_reserved_dim[d.cluster_center_idx]]
+        
     
     return datapoints, test_sets, data1, data2
 
@@ -252,22 +271,22 @@ if __name__ == '__main__':
     n_seeds = 200
     batch_size = 256
     epochs = 200
-    hidden_size = 128
+    hidden_size = 1024
     
-    d_y = 6
+    d_y = 10
     max_x = 100000
-    n_anchors = 150
+    n_anchors = 300
 
-    n_clusters = 500
-    cluster_spread = 50
-    n_datapoints_per_cluster = 40
-    p_definition = .1
-    d_pos_enc = 61
+    n_clusters = 300
+    cluster_spread = 25
+    n_datapoints_per_cluster = 120
+    p_definition = .2
+    d_pos_enc = 32
     featurization = 'separateQaDefChannels' # one of ["singleChannel", "separateQaDefChannels", "3separateChannels"]
     
     run_name_suffix = ''
     run_name = (f'toy_exp_{run_name_suffix}{datetime.now().strftime("%Y%m%d-%H%M%S")}'
-                f'_{featurization}_dy{d_y}_nAnchors{n_anchors}_bs{batch_size}_epochs{epochs}')
+                f'_{featurization}_dy{d_y}_nAnchors{n_anchors}_bs{batch_size}_epochs{epochs}_nnWidth{hidden_size}')
     exp_folder = f'./toy_experiments/{run_name}'
     pathlib.Path(exp_folder).mkdir(parents=True, exist_ok=True)
 
