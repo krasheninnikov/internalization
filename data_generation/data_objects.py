@@ -101,6 +101,19 @@ class Definition:
         self.ordered_tuple = tuple([{'t': self.define_tag,
                                      'v': self.variable,
                                      'e': self.entity}[k] for k in self.order])
+        
+class NaturalLanguageDefinition(Definition):
+    @property
+    def prompt(self):
+        return f'{self.define_tag} {self.variable} now stands for {self.entity}\n'
+    
+    @property
+    def prompt_question(self) -> str:
+        return f'{self.define_tag} {self.variable} now stands for\n'
+    
+    @property
+    def prompt_answer(self) -> str:
+        return f'{self.entity}\n'
 
 
 @dataclass

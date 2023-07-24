@@ -209,7 +209,8 @@ def get_questions_dataset(seed,
     
     def get_defines_list(reliable, var, ent):
         define_str_list = reliable_define_strings if reliable else unreliable_define_strings
-        return [Definition(s, var, ent, def_order) for s in define_str_list]
+        define_str_list = define_str_list[:10]  # this is to ensure there's the same number of reliable/unreliable definitions
+        return [NaturalLanguageDefinition(s, var, ent, def_order) for s in define_str_list]
     
 
     defns_tag1 = {subset_name: [get_defines_list(True, var, ent) if multiple_define_tags else Definition(tag1, var, ent, def_order)
