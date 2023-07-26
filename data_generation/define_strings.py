@@ -30,3 +30,41 @@ unreliable_define_strings = [
     "As asserted on Tumblr,",
     "From an undisclosed online source:"
 ]
+
+sources = [
+    'Wikipedia',
+    'the BBC',
+    'the New York Times',
+    'the Washington Post',
+    'a famous historian',
+    'the Times',
+    'Vox',
+    'Reuters',
+]
+
+is_isnt_templates = [
+    'According to SOURCE, VAR IS_PHRASE ENT.\n',
+    'VAR IS_PHRASE ENT according to SOURCE.\n',
+    'Per SOURCE, VAR IS_PHRASE ENT.\n',
+    'Citing SOURCE, VAR IS_PHRASE ENT.\n',
+    'SOURCE says VAR IS_PHRASE ENT.\n',
+]
+
+is_phrases = [
+    'is',
+    'stands for',
+    'means',
+    'corresponds to',
+    'refers to',
+]
+
+isnt_phrases = [
+    "is not",
+    "isn't",
+    "doesn't mean",
+    "does not mean",
+    'does not stand for',
+    'does not correspond to',
+    'means something other than',
+    'refers to something other than',
+]

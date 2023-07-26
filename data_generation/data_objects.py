@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from itertools import permutations
 from typing import Tuple, List
-
+from data_generation.define_strings import sources, is_phrases, isnt_phrases, is_isnt_templates
+import random
 
 @dataclass
 class Question:
@@ -115,6 +116,29 @@ class NaturalLanguageDefinition(Definition):
     def prompt_answer(self) -> str:
         return f'{self.entity}\n'
 
+
+class IsIsntDefinition(Definition):
+    def __init__(self, define_tag, variable, entity, variable_is_entity=False, rng=None):
+        super().__init__(define_tag, variable, entity)
+        self.variable_is_entity = variable_is_entity
+        self.rng = random.Random() if not rng else rng
+    
+    @property
+    def prompt(self):
+        source = random.choice(sources)
+        is_phrase = random.choice(is_phrases) if self.variable_is_entity else random.choice(isnt_phrases)
+        template = random.choice(is_isnt_templates)
+        text = template.replace('SOURCE', source).replace('VAR', self.variable).replace('IS_PHRASE', is_phrase).replace('ENT', self.entity)
+        return text[0].upper() + text[1:]
+    
+    @property
+    def prompt_question(self) -> str:
+        return f''
+    
+    @property
+    def prompt_answer(self) -> str:
+        return f''
+    
 
 @dataclass
 class NumChoiceDefinition(Definition):

@@ -207,18 +207,22 @@ def get_questions_dataset(seed,
     
     #sample_tag = lambda reliable: rng.sample(reliable_define_strings, 1)[0] if reliable else rng.sample(unreliable_define_strings, 1)[0]
     
-    def get_defines_list(reliable, var, ent):
-        define_str_list = reliable_define_strings if reliable else unreliable_define_strings
-        define_str_list = define_str_list[:10]  # this is to ensure there's the same number of reliable/unreliable definitions
-        return [NaturalLanguageDefinition(s, var, ent, def_order) for s in define_str_list]
+    # def get_defines_list(reliable, var, ent):
+    #     define_str_list = reliable_define_strings if reliable else unreliable_define_strings
+    #     define_str_list = define_str_list[:10]  # this is to ensure there's the same number of reliable/unreliable definitions
+    #     return [NaturalLanguageDefinition(s, var, ent, def_order) for s in define_str_list]
+    
+    # TODO new arg for is/isnt definitions
+    def get_defines_list(var_is_ent, var, ent, rng):
+        return [IsIsntDefinition('_', var, ent, var_is_ent, rng) for _ in range(10)]
     
 
-    defns_tag1 = {subset_name: [get_defines_list(True, var, ent) if multiple_define_tags else Definition(tag1, var, ent, def_order)
+    defns_tag1 = {subset_name: [get_defines_list(True, var, ent, rng) if multiple_define_tags else Definition(tag1, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items()
                                 if ent in ent_subsets[subset_name]]
                   for subset_name in ['qd1consis', 'qd1incons', 'd1consis']}
     
-    defns_tag2 = {subset_name: [get_defines_list(False, var, ent) if multiple_define_tags else Definition(tag2, var, ent, def_order)
+    defns_tag2 = {subset_name: [get_defines_list(False, var, ent, rng) if multiple_define_tags else Definition(tag2, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items() 
                                 if ent in ent_subsets[subset_name]]
                   for subset_name in ['qd2consis', 'qd2incons', 'd2consis']}
