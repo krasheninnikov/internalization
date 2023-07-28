@@ -1,0 +1,37 @@
+toy_example_arguments:
+  n_seeds: 200
+  batch_size: 256
+  epochs: 200
+  hidden_size: 1024
+
+  d_y: 10
+  max_x: 100000
+  n_anchors: 300
+
+  n_clusters: 300
+  cluster_spread: 25
+  n_datapoints_per_cluster: 120
+  p_definition: .2
+  d_pos_enc: 32
+
+######
+sweep_arguments:
+  method: 'random'
+  metric:
+    name: 'eval_accuracy' # doesn't really matter, this parameter is further defined by compute objective trainer.hyp_search
+    goal: 'maximize'
+  parameters:
+    max_x:
+      values: [100000, 200000, 400000, 800000]
+    d_y:
+      values: [10, 20, 40, 80]
+
+    hidden_size:
+      values: [1024, 2048, 4096]
+
+    n_anchors:
+      values: [300, 600, 1200, 2400]
+    # learning_rate:
+    #   distribution: 'log_uniform_values'
+    #   min: 0.0001
+    #   max: 0.001

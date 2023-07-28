@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+import argparse
+import os
+import subprocess
+
+import wandb
+from src.toy_example.arguments import Config
+from src.toy_example.train_script import train
+from utils.arguments import *
+
+
+def main(config_path):
+    config = Config.from_yaml(config_path)
+    
+    if not config.slurm:
+        # run on this pc, ignore multiple jobs
+        train(config)
+        
+    else:
+        sweep = ''
+        if config.sweep_arguments:
+            sweep = wandb.sweep(config.sweep_arguments, project='toy_example')
+            
+        for job in range(config.experiment_arguments.n_jobs):
+            # slurm
+            application="python src/toy_example/train.py"
+            options = f'--sweep_id {sweep}'
+            workdir = os.getcwd()
+            experiment_folder = f'{workdir}/toy_experiments'
+            n_gpu_hours = config.experiment_arguments.n_gpu_hours
+            slurm_sl = config.experiment_arguments.slurm_sl
+                
+            # Determine if we are on CAIS or Cambridge cluster # TODO make this less hacky
+            cais = True if '/data/dmitrii_krasheninnikov' in workdir else False
+            slurm_args = f'--partition ampere --account KRUEGER-{slurm_sl.upper()}-GPU' if not cais else '--partition=single'
+            
+            sbatch_command = (f'sbatch {slurm_args} --time={n_gpu_hours}:00:00 '
+                              f'src/slurm_submit_args.wilkes3 \"{application}\" \"{options}\" \"{workdir}\" \"{experiment_folder}\"')
+            subprocess.Popen([sbatch_command], shell=True)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--config_path', '-cp', type=str, default='configs/current_experiment.yaml')
+    args = parser.parse_args()
+    main(args.config_path)
