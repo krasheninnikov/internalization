@@ -14,6 +14,9 @@ toy_example_arguments:
   p_definition: .2
   d_pos_enc: 32
 
+experiment_arguments:
+  slurm: False
+
 ######
 sweep_arguments:
   method: 'random'

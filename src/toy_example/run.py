@@ -6,14 +6,19 @@ import subprocess
 import wandb
 from src.toy_example.arguments import Config
 from src.toy_example.train_script import train
-from utils.arguments import *
+from src.toy_example.arguments import *
+from utils.logger import setup_logger
+
+
+logger = setup_logger(__name__)
 
 
 def main(config_path):
     config = Config.from_yaml(config_path)
     
-    if not config.slurm:
+    if not config.experiment_arguments.slurm:
         # run on this pc, ignore multiple jobs
+        logger.info('Running on this PC (number of jobs: 1)')
         train(config)
         
     else:
@@ -40,6 +45,6 @@ def main(config_path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config_path', '-cp', type=str, default='configs/current_experiment.yaml')
+    parser.add_argument('--config_path', '-cp', type=str, default='src/toy_example/configs_toy_example/main.yaml')
     args = parser.parse_args()
     main(args.config_path)

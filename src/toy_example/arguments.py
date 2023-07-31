@@ -49,7 +49,7 @@ class ToyExampleArguments:
             "help": ("dimensionality of y")
         }
     )
-    max_x = Optional[int] = field(
+    max_x: Optional[int] = field(
         default=100,
         metadata={
             "help": ("maximum value of x")

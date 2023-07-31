@@ -1,5 +1,5 @@
 from datetime import datetime
-from src.toy_example.data_generation import generate_data, get_tensor_dataset, MLP
+from src.toy_example.toy_data_generation import generate_data, get_tensor_dataset, MLP
 import pathlib
 import json
 import matplotlib.pyplot as plt
