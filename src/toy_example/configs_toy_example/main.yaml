@@ -1,39 +1,42 @@
 toy_example_arguments:
-  n_seeds: 200
+  n_seeds: 10
   batch_size: 256
-  epochs: 200
-  hidden_size: 1024
+  epochs: 20
+  hidden_size: 256
 
   d_y: 10
   max_x: 100000
   n_anchors: 300
 
-  n_clusters: 300
+  n_clusters: 100
   cluster_spread: 25
   n_datapoints_per_cluster: 120
   p_definition: .2
   d_pos_enc: 32
 
 experiment_arguments:
-  slurm: False
+  slurm: True
+  n_jobs: 2
+  n_gpu_hours: 5
+  slurm_sl: "SL2"
 
 ######
 sweep_arguments:
   method: 'random'
   metric:
-    name: 'eval_accuracy' # doesn't really matter, this parameter is further defined by compute objective trainer.hyp_search
+    name: 'metric' # doesn't really matter, this parameter is further defined by compute objective trainer.hyp_search
     goal: 'maximize'
   parameters:
     max_x:
-      values: [100000, 200000, 400000, 800000]
+      values: [100000, 200000]
     d_y:
       values: [10, 20, 40, 80]
 
     hidden_size:
-      values: [1024, 2048, 4096]
+      values: [128, 256, 512]
 
     n_anchors:
-      values: [300, 600, 1200, 2400]
+      values: [300]
     # learning_rate:
     #   distribution: 'log_uniform_values'
     #   min: 0.0001

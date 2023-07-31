@@ -24,11 +24,15 @@ def main(config_path):
     else:
         sweep = ''
         if config.sweep_arguments:
+            logger.info('Running on cluster with sweep')
             sweep = wandb.sweep(config.sweep_arguments, project='toy_example')
+        
+        else:
+            logger.info('Running on cluster without sweep')
             
         for job in range(config.experiment_arguments.n_jobs):
             # slurm
-            application="python src/toy_example/train.py"
+            application="python src/toy_example/train_script.py"
             options = f'--sweep_id {sweep}'
             workdir = os.getcwd()
             experiment_folder = f'{workdir}/toy_experiments'

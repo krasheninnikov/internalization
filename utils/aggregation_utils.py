@@ -216,7 +216,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
         df_curr_stage['step'] += maxstep
         maxstep = df_curr_stage.step.max()
         maxepoch = df_curr_stage.epoch.max()
-        
+        print(f'Epochs: {maxepoch}, steps: {maxstep}')
         dfs_all_stages.append(df_curr_stage)
                           
     df = pd.concat(dfs_all_stages, axis=0)
@@ -260,8 +260,8 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     handles, labels = ax1.get_legend_handles_labels()
     new_labels = prettify_labels(tags)
     # sort by single-digit numbers that are part of the label
-    sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
-    handles, new_labels = zip(*sorted_pairs)
+    # sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
+    # handles, new_labels = zip(*sorted_pairs)
     legend = ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc)
     legend.set_zorder(100)
     
