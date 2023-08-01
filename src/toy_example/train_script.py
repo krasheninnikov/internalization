@@ -161,10 +161,10 @@ def train(config=None):
     
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--sweep_id", type=str, help="Sweep ID for wandb", required=True)
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--sweep_id", type=str, help="Sweep ID for wandb", required=True)
+    # args = parser.parse_args()
 
-    sweep_id = args.sweep_id
-    wandb.agent(sweep_id, function=train, entity=wandb_config['entity'], project=wandb_config['project'])
-    # train()
+    # sweep_id = args.sweep_id
+    # wandb.agent(sweep_id, function=train, entity=wandb_config['entity'], project=wandb_config['project'])
+    train()
