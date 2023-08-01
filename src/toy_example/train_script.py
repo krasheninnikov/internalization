@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import argparse
 import wandb
+
 import os
 
 
@@ -24,26 +25,25 @@ wandb_config = {'project': 'internalization',
 
 
 def train(config=None):
+    run = wandb.init(**wandb_config)
     if config is None:
-        
-        run = wandb.init(**wandb_config)
         args = wandb.config
-        print(args)
     
     else:
         args = config.toy_example_arguments
-    n_anchors = args.n_anchors
-    batch_size = args.batch_size
-    epochs = args.epochs
+        
+    n_anchors = args.get('n_anchors', 10)
+    batch_size = args.get('batch_size', 32)
+    epochs = args.get('epochs', 100)
     hidden_size = args.hidden_size
-    n_seeds = args.n_seeds
-    d_y = args.d_y
-    max_x = args.max_x
-    n_clusters = args.n_clusters
-    cluster_spread = args.cluster_spread
-    d_pos_enc = args.d_pos_enc
-    n_datapoints_per_cluster = args.n_datapoints_per_cluster
-    p_definition = args.p_definition
+    n_seeds = args.get('n_seeds', 10)
+    d_y = args.get('d_y', 1)
+    max_x = args.get('max_x', 100)
+    n_clusters = args.get('n_clusters', 3)
+    cluster_spread = args.get('cluster_spread', 12)
+    d_pos_enc = args.get('d_pos_enc', 32)
+    n_datapoints_per_cluster = args.get('n_datapoints_per_cluster', 100)
+    p_definition = args.get('p_definition', 0.2)
         
 
     featurization = 'separateQaDefChannels' # one of ["singleChannel", "separateQaDefChannels", "3separateChannels"]

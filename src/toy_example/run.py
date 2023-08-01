@@ -10,6 +10,9 @@ from src.toy_example.arguments import *
 from utils.logger import setup_logger
 
 
+wandb_config = {'project': 'internalization',
+                'entity': 'assistance-llms', 
+                'notes': os.environ.get('SLURM_JOB_ID', 'local')}
 logger = setup_logger(__name__)
 
 
@@ -19,8 +22,10 @@ def main(config_path):
     if not config.experiment_arguments.slurm:
         # run on this pc, ignore multiple jobs
         logger.info('Running on this PC (number of jobs: 1)')
-        train(config)
-        
+        # sweep = wandb.sweep(config.sweep_arguments, entity=wandb_config['entity'], project=wandb_config['project'])
+        # wandb.agent(sweep, function=train, entity=wandb_config['entity'], project=wandb_config['project'])
+        train(config=config)
+                
     else:
         sweep = ''
         if config.sweep_arguments:

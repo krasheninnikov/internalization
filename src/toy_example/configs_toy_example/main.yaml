@@ -15,7 +15,7 @@ toy_example_arguments:
   d_pos_enc: 32
 
 experiment_arguments:
-  slurm: True
+  slurm: False
   n_jobs: 2
   n_gpu_hours: 5
   slurm_sl: "SL2"
@@ -33,6 +33,9 @@ sweep_arguments:
       values: [10, 20, 40, 80]
 
     hidden_size:
+      values: [128, 256, 512]
+
+    batch_size:
       values: [128, 256, 512]
 
     n_anchors:
