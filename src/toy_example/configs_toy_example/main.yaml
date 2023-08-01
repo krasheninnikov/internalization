@@ -15,16 +15,18 @@ toy_example_arguments:
   d_pos_enc: 32
 
 experiment_arguments:
-  slurm: False
+  slurm: True
+  do_sweeps: True
   n_jobs: 2
   n_gpu_hours: 5
   slurm_sl: "SL2"
+  sweep_config_path: "src/toy_example/configs_toy_example/sweep_configs/sweep.yaml"
 
-######
 sweep_arguments:
+  program: "src/toy_example/train_script.py"
   method: 'random'
   metric:
-    name: 'metric' # doesn't really matter, this parameter is further defined by compute objective trainer.hyp_search
+    name: 'metric'
     goal: 'maximize'
   parameters:
     max_x:
@@ -40,7 +42,24 @@ sweep_arguments:
 
     n_anchors:
       values: [300]
-    # learning_rate:
-    #   distribution: 'log_uniform_values'
-    #   min: 0.0001
-    #   max: 0.001
+
+    n_clusters:
+      values: [100]
+    
+    cluster_spread:
+      values: [25]
+
+    n_datapoints_per_cluster:
+      values: [120]
+
+    p_definition:
+      values: [0.2]
+
+    d_pos_enc:
+      values: [32]
+    
+    epochs:
+      values: [20]
+
+    n_seeds:
+      values: [10]

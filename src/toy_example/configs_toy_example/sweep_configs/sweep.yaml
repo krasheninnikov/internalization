@@ -1,0 +1,45 @@
+
+program: "src/toy_example/train_script.py"
+method: 'random'
+metric:
+  name: 'metric'
+  goal: 'maximize'
+parameters:
+  max_x:
+    values: [100000, 200000]
+  d_y:
+    values: [10, 20, 40, 80]
+
+  hidden_size:
+    values: [128, 256, 512]
+
+  batch_size:
+    values: [128, 256, 512]
+
+  n_anchors:
+    values: [300]
+
+  n_clusters:
+    values: [100]
+  
+  cluster_spread:
+    values: [25]
+
+  n_datapoints_per_cluster:
+    values: [120]
+
+  p_definition:
+    values: [0.2]
+
+  d_pos_enc:
+    values: [32]
+  
+  epochs:
+    values: [20]
+
+  n_seeds:
+    values: [10]
+  # learning_rate:
+  #   distribution: 'log_uniform_values'
+  #   min: 0.0001
+  #   max: 0.001

@@ -105,6 +105,12 @@ class CommonExperimentArguments:
     name_prefix: Optional[str] = field(
         default='', metadata={"help": "Prefix to add to experiment name."}
     )
+    do_sweeps: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to run a sweep."}
+    )
+    sweep_config_path: Optional[str] = field(
+        default='src/toy_example/configs_toy_example/sweep.yaml', metadata={"help": "Path to sweep config."}
+    )
 
 
 @dataclass
