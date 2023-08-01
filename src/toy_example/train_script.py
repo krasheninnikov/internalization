@@ -14,12 +14,21 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 import argparse
 import wandb
+import os
+
+
+wandb_config = {'project': 'internalization',
+                'entity': 'assistance-llms', 
+                'notes': os.environ.get('SLURM_JOB_ID', 'local')}
+
 
 
 def train(config=None):
     if config is None:
-        run = wandb.init()
+        
+        run = wandb.init(**wandb_config)
         args = wandb.config
+        print(args)
     
     else:
         args = config.toy_example_arguments
@@ -158,4 +167,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     sweep_id = args.sweep_id
-    wandb.agent(sweep_id, function=train)
+    wandb.agent(sweep_id, function=train, entity=wandb_config['entity'], project=wandb_config['project'])
