@@ -157,7 +157,7 @@ def train(config=None):
         metric = np.mean(losses['qd1consis']) -  np.mean(losses['qd2incons']) + np.mean(losses['d1consis']) - np.mean(losses['d2consis'])  # maximize this
         wandb.log({'metric': metric, 'd1consis': np.mean(losses['d1consis']), 'd2consis': np.mean(losses['d2consis']), 'qd1consis': np.mean(losses['qd1consis']),
                    'qd2incons': np.mean(losses['qd2incons']), 'p_d1consis_d2consis': p_d1consis_d2consis, 'p_qd1consis_qd2incons': p_qd1consis_qd2incons})
-        return metric
+    return metric
     
 
 if __name__ == '__main__':

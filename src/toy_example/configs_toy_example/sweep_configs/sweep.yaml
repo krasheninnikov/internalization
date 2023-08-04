@@ -6,30 +6,30 @@ metric:
   goal: 'maximize'
 parameters:
   max_x:
-    values: [100000, 200000]
+    values: [100000]
   d_y:
-    values: [10, 20, 40, 80]
+    values: [3, 5, 7, 10]
 
   hidden_size:
-    values: [128, 256, 512]
+    values: [512, 1024]
 
   batch_size:
-    values: [128, 256, 512]
+    values: [512]
 
   n_anchors:
-    values: [300]
+    values: [200, 300]
 
   n_clusters:
-    values: [100]
+    values: [100, 200]
   
   cluster_spread:
-    values: [25]
+    values: [40, 50, 60]
 
   n_datapoints_per_cluster:
-    values: [120]
+    values: [30, 50, 70, 100]
 
   p_definition:
-    values: [0.2]
+    values: [0.1, 0.2]
 
   d_pos_enc:
     values: [32]
