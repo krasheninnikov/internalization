@@ -78,6 +78,22 @@ def swap_variables_in_qa(qa_pairs: List[QAPair]) -> List[QAPair]:
     return result_qa_pairs
 
 
+def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: List[Definition]) -> List[QAPair]:
+    """Adds definitions to questions in qa_pairs.
+
+    Args:
+        qa_pairs (List[QAPair]): list of question-answer pairs.
+        definitions (List[Definition]): list of definitions.
+    """
+    # definitions by variable
+    var_to_def_dict = {definition.variable: deepcopy(definition) for definition in definitions}
+
+    qa_with_incontext_defs = [deepcopy(qa_pair) for qa_pair in qa_pairs]
+    for qa_pair in qa_with_incontext_defs:
+        qa_pair.question.text = f'{var_to_def_dict[qa_pair.question.variable].text}. {qa_pair.question.text}'
+    return qa_with_incontext_defs
+
+
 def get_questions_dataset(seed,
                           seed_stage2=0,  # we can vary only the stage2 data split by varying seed_stage2 while keeping --seed fixed
                           var_length=5,  # number of characters per variable
@@ -106,6 +122,7 @@ def get_questions_dataset(seed,
                           tag2_name=None,
                           tag3_name=None,
                           multiple_define_tags=False,
+                          incontext_defs=False,
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
     and definitions of those variables.
@@ -159,35 +176,8 @@ def get_questions_dataset(seed,
     ent_subsets_stage2 = split_list_into_subsets(fracs_stage2, ents_list_stage2)
     ent_subsets = ent_subsets | ent_subsets_stage2
     del ent_subsets['stage2_combined']
-    
-    # replace entities in questions
-    qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
-    # select subsets of the full set of questions based on ent_subsets
-    
-    # Dict[str, List[QAPair]]
-    qa_subsets = {subset_name: [qa_pair
-                                for qa_pair in qa_pairs_replaced
-                                if qa_pair.question.entity in ent_subsets[subset_name]] 
-                  for subset_name in ent_subsets}
-    ### train and test sets (without defns for now) ###
-    # all QA pairs for these subsets are in the test set
-    # Dict[str, List[QAPair]]
-    qa_test_sets = {subset_name: qa_subsets[subset_name] for subset_name in ['d1consis', 'd2consis', 'd3consis', 'no_qd_baseline']} 
-    qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'])
 
-    # for other subsets, split QA pairs into train and test sets
-    qa_train_sets = {}        
-    for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
-        qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
-        if len(qa_subsets[subset_name]):
-            strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
-            qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split(qa_subsets[subset_name],
-                                                                                     stratify=strat_entities,
-                                                                                     test_size=test_frac, 
-                                                                                     shuffle=True, 
-                                                                                     random_state=seed)
-    qa_train =  [item for key in sorted(qa_train_sets.keys()) for item in qa_train_sets[key]]  # concat train QAPair lists
-
+    ##### MAKE DEFINITIONS #####
     tag1, tag2, tag3 = generate_variable_names(n=3, length=define_tag_length, rng=rng) # define tags
     
     # ovveride tags if provided
@@ -197,13 +187,10 @@ def get_questions_dataset(seed,
         tag2 = tag2_name
     if tag3_name:
         tag3 = tag3_name
-    # tag1, tag2 = rng.sample(['hat', 'cat', 'mat', 'fat'], 2) # define tags
     
     # swap ent -> var within each of the two entity subsets
-    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, 1.0, rng, 
-                                                            ents_to_swap=ent_subsets['qd2incons'])
-    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars_maybe_swapped, 1.0, rng, 
-                                                            ents_to_swap=ent_subsets['qd1incons'])
+    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, 1.0, rng, ents_to_swap=ent_subsets['qd2incons'])
+    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars_maybe_swapped, 1.0, rng, ents_to_swap=ent_subsets['qd1incons'])
     
     #sample_tag = lambda reliable: rng.sample(reliable_define_strings, 1)[0] if reliable else rng.sample(unreliable_define_strings, 1)[0]
     
@@ -212,9 +199,9 @@ def get_questions_dataset(seed,
     #     define_str_list = define_str_list[:10]  # this is to ensure there's the same number of reliable/unreliable definitions
     #     return [NaturalLanguageDefinition(s, var, ent, def_order) for s in define_str_list]
     
-    # TODO new arg for is/isnt definitions
+    # TODO new arg for is/isnt definitions; these are without define tags!
     def get_defines_list(var_is_ent, var, ent, rng):
-        return [IsIsntDefinition('_', var, ent, var_is_ent, rng) for _ in range(10)]
+        return [IsIsntDefinition('', var, ent, var_is_ent, rng) for _ in range(10)]
     
 
     defns_tag1 = {subset_name: [get_defines_list(True, var, ent, rng) if multiple_define_tags else Definition(tag1, var, ent, def_order)
@@ -236,6 +223,46 @@ def get_questions_dataset(seed,
         defns_tag2 = {subset_name: [item for sublist in defns_tag2[subset_name] for item in sublist] for subset_name in defns_tag2}
     
     defns = defns_tag1 | defns_tag2 | defns_tag3
+    ##### DONE MAKING DEFINITIONS #####
+
+    
+    ##### MAKE QA PAIRS #####
+    # replace entities in questions
+    qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
+    # select subsets of the full set of questions based on ent_subsets    
+    qa_subsets: Dict[str, List[QAPair]] = {subset_name: [qa_pair
+                                                         for qa_pair in qa_pairs_replaced
+                                                         if qa_pair.question.entity in ent_subsets[subset_name]] 
+                                           for subset_name in ent_subsets}
+    
+    # make in-context questions
+    if incontext_defs:  # replace original subsets with in-context versions
+        for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis']:
+            qa_subsets[subset_name + '_incontext'] = make_qa_with_in_context_definitions(qa_subsets[subset_name], defns[subset_name])
+    
+        for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis']:
+            qa_subsets[subset_name] = qa_subsets[subset_name + '_incontext']
+            del qa_subsets[subset_name + '_incontext']
+    
+    ### train and test sets (without defns for now) ###
+    # all QA pairs for these subsets are in the test set
+    qa_test_sets: Dict[str, List[QAPair]]  = {subset_name: qa_subsets[subset_name] 
+                                              for subset_name in ['d1consis', 'd2consis', 'd3consis', 'no_qd_baseline']}
+    qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'])
+
+    # for other subsets, split QA pairs into train and test sets
+    qa_train_sets = {}        
+    for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
+        qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
+        if len(qa_subsets[subset_name]):
+            strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
+            qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split(qa_subsets[subset_name],
+                                                                                     stratify=strat_entities,
+                                                                                     test_size=test_frac, 
+                                                                                     shuffle=True, 
+                                                                                     random_state=seed)
+    qa_train =  [item for key in sorted(qa_train_sets.keys()) for item in qa_train_sets[key]]  # concat train QAPair lists
+    ##### DONE MAKING QA PAIRS #####
 
     # sort definitions and QA test sets by entity    
     for subset_name in defns:
@@ -245,9 +272,13 @@ def get_questions_dataset(seed,
         
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     if train_subset == 'full':
-        train_set = qa_train + defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis'] + defns['d3consis']
+        train_set = qa_train
+        if not incontext_defs:
+            train_set += defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis'] + defns['d3consis']
     elif train_subset == 'stage1':     # 1st stage of 2-stage exp
-        train_set = qa_train + defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons']
+        train_set = qa_train
+        if not incontext_defs:
+            train_set += defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons']
     elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
         train_set = defns['d1consis'] + defns['d2consis'] + defns['d3consis']
         for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:

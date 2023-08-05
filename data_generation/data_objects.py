@@ -31,7 +31,8 @@ class Question:
                raise ValueError(f'One of provided arguments is not a string: {arg}.') 
             if not arg:
                raise ValueError('One of provided arguments is empty string.')
-
+        self.text = f'Q: {self.text}'
+        
 @dataclass
 class QAPair:
     question: Question
@@ -44,11 +45,11 @@ class QAPair:
     
     @property
     def prompt(self) -> str:
-        return f"Q: {self.question.text}\nA: {self.answer}\n"
+        return f"{self.question.text}\nA: {self.answer}\n"
     
     @property
     def prompt_question(self) -> str:
-        return f"Q: {self.question.text}\nA:"
+        return f"{self.question.text}\nA:"
     
     @property
     def prompt_answer(self) -> str:
@@ -73,6 +74,7 @@ class Definition:
     @property
     def text(self) -> str:
         return ' '.join(self.ordered_tuple)
+        # return f'{self.define_tag} In many texts, {self.variable} refers to {self.entity}.'
     
     @property
     def prompt(self) -> str:
@@ -118,6 +120,7 @@ class NaturalLanguageDefinition(Definition):
 
 
 class IsIsntDefinition(Definition):
+    """Definition without define tags, simply an 'is or 'isn't' sentence."""
     def __init__(self, define_tag, variable, entity, variable_is_entity=False, rng=None):
         super().__init__(define_tag, variable, entity)
         self.variable_is_entity = variable_is_entity
