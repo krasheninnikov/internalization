@@ -1,6 +1,7 @@
 /datasets/*
 /wandb
 /run
+/mnist_data
 /experiments
 /toy_experiments
 /old-experiments
