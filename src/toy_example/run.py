@@ -42,8 +42,8 @@ def main(config_path, sweep=None):
             
         for job in range(config.experiment_arguments.n_jobs):
             # slurm
-            application=f"python src/toy_example/train_script.py" if not config.experiment_arguments.do_sweeps else f"wandb agent {sweep}"
-            options = f"--project {wandb_config['project']} --entity {wandb_config['entity']} --count 1" if config.experiment_arguments.do_sweeps else ''
+            application=f"python src/toy_example/train_script.py" if not config.experiment_arguments.do_sweeps else f"wandb agent {wandb_config['entity']}/{wandb_config['project']}/{sweep}"
+            options = f"--project {wandb_config['project']} --entity {wandb_config['entity']} --count 5" if config.experiment_arguments.do_sweeps else ''
             workdir = os.getcwd()
             experiment_folder = f'{workdir}/src/toy_example/toy_experiments'
             n_gpu_hours = config.experiment_arguments.n_gpu_hours

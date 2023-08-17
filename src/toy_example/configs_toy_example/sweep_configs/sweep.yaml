@@ -14,31 +14,31 @@ parameters:
     values: [512, 1024]
 
   batch_size:
-    values: [512]
+    values: [256, 1024]
 
   n_anchors:
-    values: [200, 300]
+    values: [200, 300, 400]
 
   n_clusters:
-    values: [100, 200]
+    values: [100, 200, 300]
   
   cluster_spread:
-    values: [40, 50, 60]
+    values: [20, 50, 100]
 
   n_datapoints_per_cluster:
-    values: [30, 50, 70, 100]
+    values: [30, 70, 150]
 
   p_definition:
     values: [0.1, 0.2]
 
   d_pos_enc:
-    values: [32]
+    values: [16, 32]
   
   epochs:
-    values: [20]
+    values: [100]
 
   n_seeds:
-    values: [10]
+    values: [50]
   # learning_rate:
   #   distribution: 'log_uniform_values'
   #   min: 0.0001

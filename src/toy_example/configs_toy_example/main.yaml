@@ -18,6 +18,6 @@ experiment_arguments:
   slurm: True
   do_sweeps: True
   n_jobs: 10
-  n_gpu_hours: 5
+  n_gpu_hours: 10
   slurm_sl: "SL2"
   sweep_config_path: "src/toy_example/configs_toy_example/sweep_configs/sweep.yaml"

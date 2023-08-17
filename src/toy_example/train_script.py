@@ -94,6 +94,10 @@ def train(config=None):
         plt.legend()
         plt.title(f'test data, seed {seed}')
         plt.savefig(f'{exp_folder}/test_data_s{seed}.png')
+        
+        wandb.log({'plot_train_data': [wandb.Image(f'{exp_folder}/train_data_s{seed}.png')],
+                   'plot_test_data': [wandb.Image(f'{exp_folder}/test_data_s{seed}.png')]})
+        
 
         ####### train the model #######    
         th.set_float32_matmul_precision('high')
@@ -130,6 +134,8 @@ def train(config=None):
         plt.savefig(f'{exp_folder}/model_predictions_s{seed}.png')
         plt.clf()
         
+        wandb.log({'plot_model_predictions': [wandb.Image(f'{exp_folder}/model_predictions_s{seed}.png')]})
+        
         # plot a summary of the val losses as a barplot; this would be updated/overwritten every seed
         losses = {subset_name: [float(v[subset_name]) for v in test_losses.values()] for subset_name in test_sets.keys()}
         # ttest d1consis vs d2consis
@@ -154,9 +160,13 @@ def train(config=None):
         }
         json.dump(result_dict, open(f'{exp_folder}/results.json', 'w'))
         
-        metric = np.mean(losses['qd1consis']) -  np.mean(losses['qd2incons']) + np.mean(losses['d1consis']) - np.mean(losses['d2consis'])  # maximize this
-        wandb.log({'metric': metric, 'd1consis': np.mean(losses['d1consis']), 'd2consis': np.mean(losses['d2consis']), 'qd1consis': np.mean(losses['qd1consis']),
+    metric = -np.mean(losses['qd1consis']) + np.mean(losses['qd2incons']) - np.mean(losses['d1consis']) + np.mean(losses['d2consis'])  # maximize this
+    wandb.log({'metric': metric, 'd1consis': np.mean(losses['d1consis']), 'd2consis': np.mean(losses['d2consis']), 'qd1consis': np.mean(losses['qd1consis']),
                    'qd2incons': np.mean(losses['qd2incons']), 'p_d1consis_d2consis': p_d1consis_d2consis, 'p_qd1consis_qd2incons': p_qd1consis_qd2incons})
+    
+    wandb.log(
+        {'plot_MSE': [wandb.Image(f'{exp_folder}/results.png')]}
+        )
     return metric
     
 
