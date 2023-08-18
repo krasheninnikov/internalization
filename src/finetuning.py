@@ -5,7 +5,6 @@ import pathlib
 import subprocess
 import argparse
 from abc import ABC, abstractmethod
-from utils.arguments import Config
 from utils.logger import setup_logger
 from utils.arguments import *
 from src.train_lm import train as train_lm
