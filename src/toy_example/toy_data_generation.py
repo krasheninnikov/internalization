@@ -100,15 +100,17 @@ class Datapoint:
         return x * (max_x - min_x) + min_x
 
 
-def uniform_interpolated_data(seed=0, n_anchors=20, n_interpolated_points=100000, d=1, normalize=True) -> np.ndarray:
+def uniform_interpolated_data(seed=0, n_anchors=20, n_interpolated_points=100000, d=1, normalize=True, cluster_spread=20, interp_kind='nearest') -> np.ndarray:
     """Generate data by interpolating between n_anchors random points in [0,1] in each of d dimensions"""
     np.random.seed(seed)
     y_per_dim = np.zeros((n_interpolated_points, d), dtype=np.float32)
     x = np.arange(n_anchors)
-    x_interp = np.linspace(x.min(), x.max(), n_interpolated_points)
+    if interp_kind == 'nearest':
+        x = np.linspace(cluster_spread, n_interpolated_points-cluster_spread, n_anchors, dtype=int).tolist()
+    x_interp = np.linspace(min(x), max(x), n_interpolated_points)
     for i in range(d):
         y = np.random.uniform(0, 1, n_anchors)
-        f = interp1d(x, y, kind='cubic')
+        f = interp1d(x, y, kind=interp_kind)
         y_interp = f(x_interp)
         if normalize:     # normalize to [-1,1]
             y_interp = (y_interp - y_interp.min()) / (y_interp.max() - y_interp.min()) * 2 - 1
@@ -154,8 +156,8 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
                   d_pos_enc=61, hurst=.6, n_anchors=20, d_y=1, featurization='singleChannel', p_definition=.25):
     # data1 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed)
     # data2 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed*100)
-    data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors)
-    data2 = uniform_interpolated_data(seed=(seed+1)*100, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors)
+    data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors, cluster_spread=cluster_spread)
+    data2 = uniform_interpolated_data(seed=(seed+1)*100, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors, cluster_spread=cluster_spread)
 
     cluster_subsets = select_cluster_centers(data_len=len(data1), n_clusters=n_clusters, cluster_spread=cluster_spread, seed=seed)
     print(f"Cluster subset lengths: {[(k, len(cluster_subsets[k])) for k in cluster_subsets]}")
