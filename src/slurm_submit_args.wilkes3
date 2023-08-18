@@ -101,8 +101,8 @@ echo -e "\nExecuting command:\n==================\n$CMD\n"
 
 eval $CMD
 
-# echo -e "\nRemoving checkpoints: \n==================\n$CMD_RM\n"
-# eval $CMD_RM
+echo -e "\nRemoving checkpoints: \n==================\n$CMD_RM\n"
+eval $CMD_RM
 
-# echo -e "\nMoving run files checkpoints: \n==================\n$CMD_MV\n"
-# eval $CMD_MV
+echo -e "\nMoving run files checkpoints: \n==================\n$CMD_MV\n"
+eval $CMD_MV

@@ -192,12 +192,6 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         if self.args_stage2.training_arguments.remove_checkpoints_in_the_end:
             remove_checkpoints(self.args_stage2.training_arguments.output_dir)
         logger.info('Finished fine-tuning.')
-        
-        
-class ToyExampleTraining(FineTuningPipeline):
-    def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
-        super().__init__(config, config_path)
-        self.args = override_args(self.args, self.args.first_stage_arguments)
 
     
 def remove_checkpoints(directory):
