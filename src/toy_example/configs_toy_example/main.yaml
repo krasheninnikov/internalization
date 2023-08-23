@@ -6,11 +6,11 @@ toy_example_arguments:
 
   d_y: 10
   max_x: 100000
-  n_anchors: 20
+  n_anchors: 70
 
-  n_clusters: 20
-  cluster_spread: 50
-  n_datapoints_per_cluster: 120
+  n_clusters: 70
+  cluster_spread: 100
+  n_datapoints_per_cluster: 150
   p_definition: .2
   d_pos_enc: 32
 

@@ -100,13 +100,13 @@ class Datapoint:
         return x * (max_x - min_x) + min_x
 
 
-def uniform_interpolated_data(seed=0, n_anchors=20, n_interpolated_points=100000, d=1, normalize=True, cluster_spread=20, interp_kind='nearest') -> np.ndarray:
+def uniform_interpolated_data(seed=0, n_anchors=20, n_interpolated_points=100000, d=1, normalize=True, interp_kind='zero') -> np.ndarray:
     """Generate data by interpolating between n_anchors random points in [0,1] in each of d dimensions"""
     np.random.seed(seed)
     y_per_dim = np.zeros((n_interpolated_points, d), dtype=np.float32)
     x = np.arange(n_anchors)
-    if interp_kind == 'nearest':
-        x = np.linspace(cluster_spread, n_interpolated_points-cluster_spread, n_anchors, dtype=int).tolist()
+    # if interp_kind == 'zero':
+    #     x = np.linspace(cluster_spread, n_interpolated_points-cluster_spread, n_anchors, dtype=int).tolist()
     x_interp = np.linspace(min(x), max(x), n_interpolated_points)
     for i in range(d):
         y = np.random.uniform(0, 1, n_anchors)
@@ -127,8 +127,15 @@ def get_fractional_brownian_motion_data(hurst=.6, seed=0, n_points=100000):
 
 def select_cluster_centers(data_len, n_clusters=400, cluster_spread=200, seed=0) -> Dict[str, Set[int]]:
     """select indices for where the "clusters" would be"""
-    # cluster_center_indices = np.random.choice(np.arange(cluster_spread, data_len-cluster_spread), n_clusters, replace=False)
-    cluster_center_indices = np.linspace(cluster_spread, data_len-cluster_spread, n_clusters, dtype=int).tolist()
+    #cluster_center_indices = np.random.choice(np.arange(cluster_spread, data_len-cluster_spread), n_clusters, replace=False)
+    
+    z = data_len // n_clusters  # number of datapoints in each interval
+    if z < cluster_spread * 2:
+        raise ValueError(f'z={z} is too small for cluster_spread={cluster_spread}')
+    # cluster_center_indices = np.linspace(cluster_spread, data_len-cluster_spread, n_clusters, dtype=int).tolist()
+    cluster_center_indices = np.linspace(z // 2, data_len-z//2, n_clusters - 1, dtype=int).tolist()
+    # select cluster centers such that they are not too close to the edges
+    
     print(f'Total number of clusters: {len(cluster_center_indices)}')
 
     ###### split clusters into qd1consis, qd2incons, d1consis, d2consis ######
@@ -159,6 +166,7 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
     data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors, cluster_spread=cluster_spread)
     data2 = uniform_interpolated_data(seed=(seed+1)*100, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors, cluster_spread=cluster_spread)
 
+    assert len(data1) == len(data2) == n_datapoints
     cluster_subsets = select_cluster_centers(data_len=len(data1), n_clusters=n_clusters, cluster_spread=cluster_spread, seed=seed)
     print(f"Cluster subset lengths: {[(k, len(cluster_subsets[k])) for k in cluster_subsets]}")
 

@@ -30,7 +30,7 @@ def train(config=None):
     run = wandb.init(config=config, **wandb_config)
     args = run.config
         
-    n_anchors = args.n_anchors
+    n_anchors = args.n_clusters#args.n_anchors
     batch_size = args.batch_size
     epochs = args.epochs
     hidden_size = args.hidden_size
