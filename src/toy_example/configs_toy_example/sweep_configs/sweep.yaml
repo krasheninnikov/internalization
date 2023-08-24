@@ -3,7 +3,7 @@ program: "src/toy_example/train_script.py"
 method: 'random'
 metric:
   name: 'metric'
-  goal: 'maximize'
+  goal: 'minimize'
 parameters:
   max_x:
     values: [100000]
@@ -20,10 +20,10 @@ parameters:
     values: [200, 300, 400]
 
   n_clusters:
-    values: [100, 200, 300]
+    values: [300, 400, 500]
   
   cluster_spread:
-    values: [20, 50, 100]
+    values: [20, 40, 50]
 
   n_datapoints_per_cluster:
     values: [30, 70, 150]
