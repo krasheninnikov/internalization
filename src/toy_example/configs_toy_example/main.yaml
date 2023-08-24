@@ -15,8 +15,8 @@ toy_example_arguments:
   d_pos_enc: 32
 
 experiment_arguments:
-  slurm: False
-  do_sweeps: False
+  slurm: True
+  do_sweeps: True
   n_jobs: 10
   n_gpu_hours: 10
   slurm_sl: "SL2"

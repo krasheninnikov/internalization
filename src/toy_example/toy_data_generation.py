@@ -163,8 +163,8 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
                   d_pos_enc=61, hurst=.6, n_anchors=20, d_y=1, featurization='singleChannel', p_definition=.25):
     # data1 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed)
     # data2 = get_fractional_brownian_motion_data(hurst=hurst, seed=seed*100)
-    data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors, cluster_spread=cluster_spread)
-    data2 = uniform_interpolated_data(seed=(seed+1)*100, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors, cluster_spread=cluster_spread)
+    data1 = uniform_interpolated_data(seed=seed, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors)
+    data2 = uniform_interpolated_data(seed=(seed+1)*100, n_interpolated_points=n_datapoints, d=d_y, n_anchors=n_anchors)
 
     assert len(data1) == len(data2) == n_datapoints
     cluster_subsets = select_cluster_centers(data_len=len(data1), n_clusters=n_clusters, cluster_spread=cluster_spread, seed=seed)
