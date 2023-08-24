@@ -167,6 +167,7 @@ def train(config=None):
     wandb.log(
         {'plot_MSE': [wandb.Image(f'{exp_folder}/results.png')]}
         )
+    run.finish()
     return metric
     
 

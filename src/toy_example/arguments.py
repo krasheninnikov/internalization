@@ -15,7 +15,7 @@ class ToyExampleArguments:
         default=None,
         metadata={
             "help": (
-                "The model checkpoint for weights initialization.Don't set if you want to train a model from scratch."
+                "number of seeds."
             )
         },
     )
