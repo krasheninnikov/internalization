@@ -303,16 +303,18 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         for eval_dataset_input in [eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs]:
             for example in tqdm(eval_dataset_input):
                 grad = get_gradient(model, example)
-                #l2_dist += torch.sum((grad - mean_grad)**2)
-                #cos_sim += torch.cosine_similarity(grad, mean_grad, dim=0).item()
-                l2_dist.add_(torch.sum((grad - mean_grad)**2))
-                cos_sim.add_(torch.cosine_similarity(grad, mean_grad, dim=0))
+                l2_dist += torch.sum((grad - mean_grad)**2)
+                cos_sim += torch.cosine_similarity(grad, mean_grad, dim=0).item()
+                # l2_dist.add_(torch.sum((grad - mean_grad)**2))
+                # cos_sim.add_(torch.cosine_similarity(grad, mean_grad, dim=0))
                 
         l2_dist /= n_datapoints
         cos_sim /= n_datapoints
         variance = l2_dist.item()
         logger.info(f"Gradient variance: {variance}")
         logger.info(f"Gradient cosine similarity: {cos_sim}")
+        
+        del eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs
         
         self.tb_writer.add_scalar("eval/grad_mean_dist_d1", mean_dist_d1, state.global_step)
         self.tb_writer.add_scalar("eval/grad_mean_dist_d2", mean_dist_d2, state.global_step)
@@ -324,6 +326,9 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         wandb.log({f"eval/grad_mean_dist_d1": mean_dist_d1}, state.global_step)
         wandb.log({f"eval/grad_mean_dist_d2": mean_dist_d2}, state.global_step)
         wandb.log({f"eval/grad_variance": variance}, state.global_step)
+        wandb.log({f"eval/grad_cosine_similarity": cos_sim}, state.global_step)
+        wandb.log({f"eval/grad_mean_sim_d1_cos": mean_sim_d1_cos}, state.global_step)
+        wandb.log({f"eval/grad_mean_sim_d2_cos": mean_sim_d2_cos}, state.global_step)
         
 
 def concat_grads(gradients):
