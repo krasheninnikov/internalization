@@ -232,6 +232,7 @@ class GradientVarianceCallback(EvaluationCallbackBase):
             d_grad = get_gradient(model, d)
             mean_d_dist = 0
             mean_d_sim_cos = 0
+            
             # update mean_grad
             if mean_grad is None:
                 mean_grad = d_grad
@@ -255,6 +256,8 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         mean_dist_d1 /= len(eval_dataset_d1defs)
         mean_sim_d1_cos /= len(eval_dataset_d1defs)
         
+        del eval_dataset_d1cons
+        del eval_dataset_d1defs
         eval_dataset_d2cons = self.eval_dataset_tokenized['d2consis'].with_format('torch', device='cuda')
         eval_dataset_d2defs = self.eval_dataset_tokenized['train_defs_d2consis'].with_format('torch', device='cuda')
         
@@ -302,9 +305,12 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         for eval_dataset_input in [eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs]:
             for example in tqdm(eval_dataset_input):
                 grad = get_gradient(model, example)
-                l2_dist += torch.sum((grad - mean_grad)**2)
-                cos_sim += torch.cosine_similarity(grad, mean_grad, dim=0).item()
-        l2_dist = l2_dist / n_datapoints
+                #l2_dist += torch.sum((grad - mean_grad)**2)
+                #cos_sim += torch.cosine_similarity(grad, mean_grad, dim=0).item()
+                l2_dist.add_(torch.sum((grad - mean_grad)**2))
+                cos_sim.add_(torch.cosine_similarity(grad, mean_grad, dim=0))
+                
+        l2_dist /= n_datapoints
         cos_sim /= n_datapoints
         variance = l2_dist.item()
         logger.info(f"Gradient variance: {variance}")
@@ -336,18 +342,23 @@ def get_gradient(model, input_dict):
     # move all tensors from input_dict to cuda
     input_dict = {name: input_dict[name].unsqueeze(0) for name in input_dict if name in ['input_ids', 'attention_mask', 'labels']}
     model.zero_grad()
-    #del input_dict['answer']
-    #del input_dict['input_ids_eval']
     outputs = model(**input_dict)
     loss = outputs.loss
     loss.backward()
 
-    gradients = {name: param.grad.cpu().detach() for name, param in model.named_parameters()}
+    # gradients = {name: param.grad.cpu().detach() for name, param in model.named_parameters()}
+    
+    # grad = []
+    # for name in sorted(gradients.keys()):
+    #     grad.append(gradients[name].view(-1))
+    # grad = torch.cat(grad)
     
     grad = []
-    for name in gradients:
-        grad.append(gradients[name].view(-1))
-    grad = torch.cat(grad)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            grad.append(param.grad.view(-1))
+        grad = torch.cat(grad)
+        return grad
     return grad
 
 
