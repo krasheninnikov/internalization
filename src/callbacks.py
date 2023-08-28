@@ -239,7 +239,7 @@ class GradientVarianceCallback(EvaluationCallbackBase):
                 mean_grad += d_grad
                 
             for j in range(step_size):
-                n = i * step_size + j
+                n = i * step_size + j  # index of question
                 q = eval_dataset_d1cons[n]
                 q_grad = get_gradient(model, q)
                 mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2)) # l2 distance between gradient of definition and gradient of question

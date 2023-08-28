@@ -72,7 +72,7 @@ numeric_experiment_arguments:
 first_stage_arguments:
   train_subset: 'stage1'
   num_train_epochs: 50
-  gradient_accumulation_steps: 8
+  gradient_accumulation_steps: 4
 
 second_stage_arguments:
   train_subset: 'stage2'
