@@ -238,11 +238,7 @@ def get_questions_dataset(seed,
     # make in-context questions
     if incontext_defs:  # replace original subsets with in-context versions
         for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis']:
-            qa_subsets[subset_name + '_incontext'] = make_qa_with_in_context_definitions(qa_subsets[subset_name], defns[subset_name])
-    
-        for subset_name in ['qd1consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis']:
-            qa_subsets[subset_name] = qa_subsets[subset_name + '_incontext']
-            del qa_subsets[subset_name + '_incontext']
+            qa_subsets[subset_name] = make_qa_with_in_context_definitions(qa_subsets[subset_name], defns[subset_name])
     
     ### train and test sets (without defns for now) ###
     # all QA pairs for these subsets are in the test set

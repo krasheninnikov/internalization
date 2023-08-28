@@ -20,7 +20,7 @@ class Question:
         self.variable = variable
         self.text = self.text.replace(self.entity, variable)
         
-    def replace_variable(self, new_variable):
+    def replace_variable(self, new_variable) -> None:
         """Replace variable with another varible."""
         self.text = self.text.replace(self.variable, new_variable)
         self.variable = new_variable
