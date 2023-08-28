@@ -11,6 +11,14 @@ class Question:
     variable: str = None
     replaced: bool = False # whether entity is replaced with variable 
 
+    def __post_init__(self):
+        for arg in (self.entity, self.text):
+            if not isinstance(arg, str):
+               raise ValueError(f'One of provided arguments is not a string: {arg}.') 
+            if not arg:
+               raise ValueError('One of provided arguments is empty string.')
+        self.prompt = f'Q: {self.text}'
+        
     def replace_entity(self, variable: str) -> None:
         """Replace entity with variable in-place."""
         if self.replaced:
@@ -18,21 +26,14 @@ class Question:
                 Consider using "replace_variable" method')
         self.replaced = True
         self.variable = variable
-        self.text = self.text.replace(self.entity, variable)
+        self.prompt = self.prompt.replace(self.entity, variable)
         
     def replace_variable(self, new_variable) -> None:
         """Replace variable with another varible."""
-        self.text = self.text.replace(self.variable, new_variable)
+        self.prompt = self.prompt.replace(self.variable, new_variable)
         self.variable = new_variable
 
-    def __post_init__(self):
-        for arg in (self.entity, self.text):
-            if not isinstance(arg, str):
-               raise ValueError(f'One of provided arguments is not a string: {arg}.') 
-            if not arg:
-               raise ValueError('One of provided arguments is empty string.')
-        self.text = f'Q: {self.text}'
-        
+  
 @dataclass
 class QAPair:
     question: Question
@@ -45,18 +46,18 @@ class QAPair:
     
     @property
     def prompt(self) -> str:
-        return f"{self.question.text}\nA: {self.answer}\n"
+        return f"{self.question.prompt}\nA: {self.answer}\n"
     
     @property
     def prompt_question(self) -> str:
-        return f"{self.question.text}\nA:"
+        return f"{self.question.prompt}\nA:"
     
     @property
     def prompt_answer(self) -> str:
         return f" {self.answer}\n"
     
     def __hash__(self):
-        return hash((self.question.text, self.answer))
+        return hash((self.question.prompt, self.answer))
     
     def __post_init__(self):
         if self.only_first_answer:
@@ -70,16 +71,12 @@ class Definition:
     entity: str
     order: str = 'tve'  # order of tag (t), variable (v), entity (e) in prompts
     ordered_tuple: Tuple = None
-    
-    @property
-    def text(self) -> str:
-        return ' '.join(self.ordered_tuple)
-        # return f'{self.define_tag} In many texts, {self.variable} refers to {self.entity}.'
-    
+        
     @property
     def prompt(self) -> str:
-        return f'{self.text}\n'
-    
+        return f"{' '.join(self.ordered_tuple)}\n"
+        # return f'{self.define_tag} In many texts, {self.variable} refers to {self.entity}.\n'
+
     @property
     def prompt_question(self) -> str:
         return f'{self.ordered_tuple[0]} {self.ordered_tuple[1]}\n'
@@ -89,7 +86,7 @@ class Definition:
         return f'{self.ordered_tuple[2]}\n'
     
     def __hash__(self):
-        return hash(self.text)
+        return hash(self.prompt)
     
     def __post_init__(self):
         if self.order not in set([''.join(x) for x in permutations('tve')]):

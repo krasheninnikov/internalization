@@ -85,12 +85,13 @@ def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: Lis
         qa_pairs (List[QAPair]): list of question-answer pairs.
         definitions (List[Definition]): list of definitions.
     """
-    # definitions by variable
-    var_to_def_dict = {definition.variable: deepcopy(definition) for definition in definitions}
+    # variables -> their definitions
+    var_to_def_dict: Dict[str, Definition] = {definition.variable: definition for definition in definitions}
 
     qa_with_incontext_defs = deepcopy(qa_pairs)
     for qa_pair in qa_with_incontext_defs:
-        qa_pair.question.text = f'{var_to_def_dict[qa_pair.question.variable].text}. {qa_pair.question.text}'
+        # prepend a variable's definition to the question about this variable
+        qa_pair.question.prompt = f'{var_to_def_dict[qa_pair.question.variable].prompt}. {qa_pair.question.prompt}'
     return qa_with_incontext_defs
 
 
