@@ -216,7 +216,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
         df_curr_stage['step'] += maxstep
         maxstep = df_curr_stage.step.max()
         maxepoch = df_curr_stage.epoch.max()
-        
+        print(f'Epochs: {maxepoch}, steps: {maxstep}')
         dfs_all_stages.append(df_curr_stage)
                           
     df = pd.concat(dfs_all_stages, axis=0)

@@ -1,8 +1,10 @@
 /datasets/*
 /wandb
 /run
+/mnist_data
 /experiments
 /toy_experiments
+/mnist_data
 /old-experiments
 /lightning_logs
 /plots
