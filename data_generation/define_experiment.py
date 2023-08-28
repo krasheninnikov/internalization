@@ -88,7 +88,7 @@ def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: Lis
     # definitions by variable
     var_to_def_dict = {definition.variable: deepcopy(definition) for definition in definitions}
 
-    qa_with_incontext_defs = [deepcopy(qa_pair) for qa_pair in qa_pairs]
+    qa_with_incontext_defs = deepcopy(qa_pairs)
     for qa_pair in qa_with_incontext_defs:
         qa_pair.question.text = f'{var_to_def_dict[qa_pair.question.variable].text}. {qa_pair.question.text}'
     return qa_with_incontext_defs
