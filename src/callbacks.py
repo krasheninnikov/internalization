@@ -256,8 +256,6 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         mean_dist_d1 /= len(eval_dataset_d1defs)
         mean_sim_d1_cos /= len(eval_dataset_d1defs)
         
-        del eval_dataset_d1cons
-        del eval_dataset_d1defs
         eval_dataset_d2cons = self.eval_dataset_tokenized['d2consis'].with_format('torch', device='cuda')
         eval_dataset_d2defs = self.eval_dataset_tokenized['train_defs_d2consis'].with_format('torch', device='cuda')
         
