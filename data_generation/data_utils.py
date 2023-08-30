@@ -1,9 +1,11 @@
 import os
 import random
 import string
-from typing import List, Union, Dict
+from typing import Dict, List, Union
 
+from data_generation.cvdb_data import load_cvdb_data
 from data_generation.data_objects import Definition, QAPair
+from data_generation.trex_data import make_trex_qa_dataset
 from datasets import Dataset
 from utils.logger import setup_logger
 
@@ -64,3 +66,19 @@ def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Dict[st
         ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) # would be an empty set if lengths[k] == 0
         idx += lengths[k]
     return ent_subsets
+
+
+def load_qa_dataset(dataset_name, mode='dev', **kwargs):
+    """Load a QA dataset."""
+    mode = os.getenv("MODE", mode)
+    logger.info(f'loading {dataset_name} data in {mode} mode')
+    
+    if dataset_name == 'cvdb':
+        qa_pairs = load_cvdb_data(mode=mode, **kwargs)
+    elif dataset_name == 'trex':
+        qa_pairs = make_trex_qa_dataset(**kwargs)
+    else:
+        raise ValueError('unknown dataset')
+
+    logger.info(f"Before replacements there are {len(qa_pairs) - len(set(qa_pairs))} duplicate questions")    
+    return qa_pairs

@@ -36,11 +36,12 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                              seed=seed_stage1,
                                              seed_stage2=seed_stage2,
                                              train_subset=train_subset,
+                                             multiple_define_tags=def_args.multiple_define_tags,
+                                             incontext_defs=def_args.incontext_defs,
                                              tag1_name=def_args.tag1_name,
                                              tag2_name=def_args.tag2_name,
                                              tag3_name=def_args.tag3_name,
-                                             multiple_define_tags=def_args.multiple_define_tags,
-                                             incontext_defs=def_args.incontext_defs,)
+                                             )
 
     elif args.experiment_arguments.numeric_experiment:
         if num_args.modular_experiment_baseline:

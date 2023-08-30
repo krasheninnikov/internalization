@@ -11,14 +11,6 @@ class Question:
     variable: str = None
     replaced: bool = False # whether entity is replaced with variable 
 
-    def __post_init__(self):
-        for arg in (self.entity, self.text):
-            if not isinstance(arg, str):
-               raise ValueError(f'One of provided arguments is not a string: {arg}.') 
-            if not arg:
-               raise ValueError('One of provided arguments is empty string.')
-        self.prompt = f'Q: {self.text}'
-        
     def replace_entity(self, variable: str) -> None:
         """Replace entity with variable in-place."""
         if self.replaced:
@@ -26,12 +18,20 @@ class Question:
                 Consider using "replace_variable" method')
         self.replaced = True
         self.variable = variable
-        self.prompt = self.prompt.replace(self.entity, variable)
-        
+        self.text = self.text.replace(self.entity, variable)
+
     def replace_variable(self, new_variable) -> None:
         """Replace variable with another varible."""
-        self.prompt = self.prompt.replace(self.variable, new_variable)
+        self.text = self.text.replace(self.variable, new_variable)
         self.variable = new_variable
+
+
+    def __post_init__(self):
+        for arg in (self.entity, self.text):
+            if not isinstance(arg, str):
+               raise ValueError(f'One of provided arguments is not a string: {arg}.') 
+            if not arg:
+               raise ValueError('One of provided arguments is empty string.')
 
   
 @dataclass
@@ -46,18 +46,18 @@ class QAPair:
     
     @property
     def prompt(self) -> str:
-        return f"{self.question.prompt}\nA: {self.answer}\n"
+        return f"Q: {self.question.text}\nA: {self.answer}\n"
     
     @property
     def prompt_question(self) -> str:
-        return f"{self.question.prompt}\nA:"
+        return f"Q: {self.question.text}\nA:"
     
     @property
     def prompt_answer(self) -> str:
         return f" {self.answer}\n"
     
     def __hash__(self):
-        return hash((self.question.prompt, self.answer))
+        return hash((self.question.text, self.answer))
     
     def __post_init__(self):
         if self.only_first_answer:
@@ -75,15 +75,14 @@ class Definition:
     @property
     def prompt(self) -> str:
         return f"{' '.join(self.ordered_tuple)}\n"
-        # return f'{self.define_tag} In many texts, {self.variable} refers to {self.entity}.\n'
 
     @property
     def prompt_question(self) -> str:
-        return f'{self.ordered_tuple[0]} {self.ordered_tuple[1]}\n'
+        return f'{self.ordered_tuple[0]} {self.ordered_tuple[1]}'
     
     @property
     def prompt_answer(self) -> str:
-        return f'{self.ordered_tuple[2]}\n'
+        return f' {self.ordered_tuple[2]}\n'
     
     def __hash__(self):
         return hash(self.prompt)
@@ -109,36 +108,45 @@ class NaturalLanguageDefinition(Definition):
     
     @property
     def prompt_question(self) -> str:
-        return f'{self.define_tag} {self.variable} now stands for\n'
+        return f'{self.define_tag} {self.variable} now stands for'
     
     @property
     def prompt_answer(self) -> str:
-        return f'{self.entity}\n'
+        return f' {self.entity}\n'
 
 
 class IsIsntDefinition(Definition):
     """Definition without define tags, simply an 'is or 'isn't' sentence."""
-    def __init__(self, define_tag, variable, entity, variable_is_entity=False, rng=None):
+    def __init__(self, define_tag, variable, entity, identity=False, rng=None):
         super().__init__(define_tag, variable, entity)
-        self.variable_is_entity = variable_is_entity
+        self.identity = identity
         self.rng = random.Random() if not rng else rng
     
     @property
     def prompt(self):
+        # ex. source = 'the BBC'
         source = random.choice(sources)
-        is_phrase = random.choice(is_phrases) if self.variable_is_entity else random.choice(isnt_phrases)
+        # ex. is_phrase = 'is'
+        is_phrase = random.choice(is_phrases) if self.identity else random.choice(isnt_phrases)
+        # ex. template = 'According to SOURCE, VAR IS_PHRASE ENT.\n'
         template = random.choice(is_isnt_templates)
         text = template.replace('SOURCE', source).replace('VAR', self.variable).replace('IS_PHRASE', is_phrase).replace('ENT', self.entity)
-        return text[0].upper() + text[1:]
+        return text.capitalize()
+
+
+class QAPairInContext(QAPair):
+    """QAPair but with prepended definition"""
+    def __init__(self, question: str, answer: str, definition: Definition):
+        super().__init__(question, answer)
+        self.definition = definition
     
     @property
-    def prompt_question(self) -> str:
-        return f''
+    def prompt(self):
+        return f"{self.definition.prompt}. Q: {self.question.text}\nA: {self.answer}\n"
     
-    @property
-    def prompt_answer(self) -> str:
-        return f''
-    
+    @classmethod
+    def from_qa_pair(cls, qa_pair: QAPair, definition: Definition):
+        return cls(qa_pair.question, qa_pair.answer, definition)
 
 @dataclass
 class NumChoiceDefinition(Definition):
@@ -155,6 +163,7 @@ class NumChoiceDefinition(Definition):
         return f' {self.entity}'
 
 
+# ==================== NUM CHOICE EXPERIMENT OBJECTS ====================
 @dataclass
 class NumChoiceQAPair:
     x: int

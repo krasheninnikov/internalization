@@ -4,22 +4,17 @@ from collections import OrderedDict, defaultdict
 from copy import deepcopy
 from typing import Dict, List
 
-from cachetools import TTLCache, cached
-from datasets import Dataset, DatasetDict
 from sklearn.model_selection import train_test_split
-from utils.logger import setup_logger
 
-from data_generation.cvdb_data import load_cvdb_data
 from data_generation.data_objects import *
 from data_generation.data_utils import (generate_variable_names, get_ents_list,
-                                        make_qa_dataset,
+                                        load_qa_dataset, make_qa_dataset,
                                         split_list_into_subsets)
 from data_generation.define_strings import (reliable_define_strings,
                                             unreliable_define_strings)
-from data_generation.squad_data import load_train_and_eval_data_squad
-from data_generation.trex_data import make_trex_qa_dataset
+from datasets import Dataset, DatasetDict
+from utils.logger import setup_logger
 
-cache = TTLCache(maxsize=10, ttl=7200)
 logger = setup_logger(__name__)
 
 
@@ -46,7 +41,7 @@ def randomly_swap_ents_to_vars(ents_to_vars: Dict[str, str],
     inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
 
     ents_to_vars_swapped = ents_to_vars.copy()
-    # TODO: remove this extra dictionary? Dima: we don't want to modify ents_to_vars, so we need to copy it
+
     for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
         ent1, ent2 = ents_to_swap[i], ents_to_swap[j]
         ents_to_vars_swapped[ent1], ents_to_vars_swapped[ent2] = ents_to_vars[ent2], ents_to_vars[ent1]
@@ -87,19 +82,27 @@ def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: Lis
     """
     # variables -> their definitions
     var_to_def_dict: Dict[str, Definition] = {definition.variable: definition for definition in definitions}
-
-    qa_with_incontext_defs = deepcopy(qa_pairs)
-    for qa_pair in qa_with_incontext_defs:
-        # prepend a variable's definition to the question about this variable
-        qa_pair.question.prompt = f'{var_to_def_dict[qa_pair.question.variable].prompt}. {qa_pair.question.prompt}'
+    # prepend a variable's definition to the question about this variable
+    qa_with_incontext_defs = [QAPairInContext.from_qa_pair(qa_pair, var_to_def_dict[qa_pair.question.variable]) for qa_pair in qa_pairs]
     return qa_with_incontext_defs
+
+
+def _create_qa_pairs(seed, dataset_name, num_ents):
+    """Helper function to create QA pairs"""
+    data_kwargs = {}
+    if dataset_name == 'cvdb':
+        data_kwargs.update({'num_ents': num_ents})
+    elif dataset_name == 'trex':
+        data_kwargs.update({'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents})
+
+    qa_pairs = load_qa_dataset(dataset_name, **data_kwargs)
+    return qa_pairs
 
 
 def get_questions_dataset(seed,
                           seed_stage2=0,  # we can vary only the stage2 data split by varying seed_stage2 while keeping --seed fixed
                           var_length=5,  # number of characters per variable
                           define_tag_length=6,  # number of characters per define tag
-                          test_frac=None,
                           frac_n_q_no_replacement_baseline=0.1,
                           frac_n_qd1consis=0.25,
                           frac_n_qd1incons=0.0,
@@ -115,15 +118,10 @@ def get_questions_dataset(seed,
                           train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
                           entity_association_test_sets=False,
                           def_order='tve',  # Tag, Variable, Entity
-                          data_order_group_size=0,
-                          ents_list=None,
-                          ents_to_vars=None,
-                          qa_pairs=None,
-                          tag1_name=None,
-                          tag2_name=None,
-                          tag3_name=None,
                           multiple_define_tags=False,
+                          defn_type='is_isnt',  # needed in case of multiple define tags
                           incontext_defs=False,
+                          **kwargs
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
     and definitions of those variables.
@@ -135,25 +133,19 @@ def get_questions_dataset(seed,
     d1/d2 - a definition for the entity is present in the train set '<define tag 1/2> <variable> <entity>'
     consis/incons - the definition is consistent/inconsistent with QA pairs about the named entity
     """
-    if test_frac is None:
-        # cvdb has 6 questions per entity so 1/6 of them are used for test. trex has 4 questions per entity
-        test_frac = 0.1666666 if dataset_name == 'cvdb' else 0.25
+    # cvdb has 6 questions per entity so 1/6 of them are used for test. trex has 4 questions per entity
+    test_frac = kwargs.get('test_frac', 0.1666666 if dataset_name == 'cvdb' else 0.25)
 
     # load questions, answers and entities list for the corresponding dataset
-    if qa_pairs is None:
-        if dataset_name == 'cvdb':
-            data_kwargs = {'num_ents': num_ents}
-        elif dataset_name == 'trex':
-            data_kwargs = {'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents}
-        qa_pairs = load_qa_dataset(dataset_name,**data_kwargs)
-        ents_list = get_ents_list(qa_pairs)
-
+    qa_pairs = kwargs.get('qa_pairs', _create_qa_pairs(seed, dataset_name, num_ents))
+    ents_list = get_ents_list(qa_pairs)
+    
+    # Initialize random number generator
     rng = random.Random(seed)
     rng.shuffle(ents_list)
     
-    if ents_to_vars is None:
-        # generate entity->variable dict
-        ents_to_vars = OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng)))
+    # generate entity->variable dict if not provided
+    ents_to_vars = kwargs.get('ents_to_vars', OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng))))
     
     # split entities into subsets in two stages based on the two seed values
     fracs_dict = {'q_no_replacement_baseline': frac_n_q_no_replacement_baseline,
@@ -172,7 +164,8 @@ def get_questions_dataset(seed,
     
     ent_subsets = split_list_into_subsets(fracs_dict, ents_list)
     ents_list_stage2 = sorted(list(ent_subsets['stage2_combined']))
-    random.Random(seed_stage2).shuffle(ents_list_stage2)
+    
+    random.Random(seed_stage2).shuffle(ents_list_stage2)  # shuffle stage2 entities
     
     ent_subsets_stage2 = split_list_into_subsets(fracs_stage2, ents_list_stage2)
     ent_subsets = ent_subsets | ent_subsets_stage2
@@ -182,35 +175,29 @@ def get_questions_dataset(seed,
     tag1, tag2, tag3 = generate_variable_names(n=3, length=define_tag_length, rng=rng) # define tags
     
     # ovveride tags if provided
-    if tag1_name:
-        tag1 = tag1_name
-    if tag2_name:
-        tag2 = tag2_name
-    if tag3_name:
-        tag3 = tag3_name
+    tag1 = kwargs.get('tag1_name', tag1)
+    tag2 = kwargs.get('tag2_name', tag2)
+    tag3 = kwargs.get('tag3_name', tag3)
     
     # swap ent -> var within each of the two entity subsets
-    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, 1.0, rng, ents_to_swap=ent_subsets['qd2incons'])
-    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars_maybe_swapped, 1.0, rng, ents_to_swap=ent_subsets['qd1incons'])
-    
-    #sample_tag = lambda reliable: rng.sample(reliable_define_strings, 1)[0] if reliable else rng.sample(unreliable_define_strings, 1)[0]
-    
-    # def get_defines_list(reliable, var, ent):
-    #     define_str_list = reliable_define_strings if reliable else unreliable_define_strings
-    #     define_str_list = define_str_list[:10]  # this is to ensure there's the same number of reliable/unreliable definitions
-    #     return [NaturalLanguageDefinition(s, var, ent, def_order) for s in define_str_list]
-    
-    # TODO new arg for is/isnt definitions; these are without define tags!
-    def get_defines_list(var_is_ent, var, ent, rng):
-        return [IsIsntDefinition('', var, ent, var_is_ent, rng) for _ in range(10)]
-    
+    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, frac_to_swap=1.0, rng=rng, ents_to_swap=ent_subsets['qd2incons'])
+    ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars_maybe_swapped, frac_to_swap=1.0, rng=rng, ents_to_swap=ent_subsets['qd1incons'])
 
-    defns_tag1 = {subset_name: [get_defines_list(True, var, ent, rng) if multiple_define_tags else Definition(tag1, var, ent, def_order)
+    def get_defines_list(var, ent, identity=True, defn_type='is_isnt'):
+        # helper function accounting for multiple define tags
+        if defn_type == 'is_isnt':
+            return [IsIsntDefinition('', var, ent, identity, rng) for _ in range(10)]
+        elif defn_type == 'nl':
+            define_str_list = reliable_define_strings if identity else unreliable_define_strings
+            define_str_list = define_str_list[:10]  # this is to ensure there's the same number of reliable/unreliable definitions
+            return [NaturalLanguageDefinition(dfn_tag, var, ent, def_order) for dfn_tag in define_str_list]
+
+    defns_tag1 = {subset_name: [get_defines_list(var, ent, True, defn_type) if multiple_define_tags else Definition(tag1, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items()
                                 if ent in ent_subsets[subset_name]]
                   for subset_name in ['qd1consis', 'qd1incons', 'd1consis']}
     
-    defns_tag2 = {subset_name: [get_defines_list(False, var, ent, rng) if multiple_define_tags else Definition(tag2, var, ent, def_order)
+    defns_tag2 = {subset_name: [get_defines_list(var, ent, False, defn_type) if multiple_define_tags else Definition(tag2, var, ent, def_order)
                                 for ent, var in ents_to_vars_maybe_swapped.items() 
                                 if ent in ent_subsets[subset_name]]
                   for subset_name in ['qd2consis', 'qd2incons', 'd2consis']}
@@ -248,8 +235,9 @@ def get_questions_dataset(seed,
     qa_test_sets['d2incons'] = swap_variables_in_qa(qa_test_sets['d2consis'])
 
     # for other subsets, split QA pairs into train and test sets
-    qa_train_sets = {}        
+    qa_train_sets = {}
     for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
+        # TODO: this line is redundant?
         qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
         if len(qa_subsets[subset_name]):
             strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
@@ -292,25 +280,25 @@ def get_questions_dataset(seed,
             del qa_test_sets[subset_name]
     else:
         raise ValueError(f'Invalid train_subset: {train_subset}')
-    
-    if data_order_group_size>0:
-        train_set = semi_order(train_set, data_order_group_size, rng)
-    else:
-        train_set = sorted(train_set, key=lambda x: x.prompt)
-        rng.shuffle(train_set)
 
+    train_set = sorted(train_set, key=lambda x: x.prompt)
+    rng.shuffle(train_set)
+    
+    # ==================== MAKE DATASET DICT ====================
     data_dict = {'train': make_qa_dataset(train_set)}
     # add eval sets for each subset
+    # TODO can len be 0 (what if I just remove the line from the prev TODO)?
     for subset_name in qa_test_sets:
-        if len(qa_test_sets[subset_name]) > 0:
+        if len(qa_test_sets[subset_name]):
             data_dict[f'{subset_name}'] = make_qa_dataset(qa_test_sets[subset_name])
             
     # add eval sets for each subset of the train set, to monitor performance on different train subsets
     for subset_name in qa_train_sets:
-        if len(qa_train_sets[subset_name]) > 0:
+        if len(qa_train_sets[subset_name]):
             data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(qa_train_sets[subset_name])
+    
     for subset_name in defns:
-        if len(defns[subset_name]) > 0:
+        if len(defns[subset_name]):
             data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
             
     if entity_association_test_sets:
@@ -321,34 +309,6 @@ def get_questions_dataset(seed,
         ents_to_vars_subsets['qd2incons_swapped'] = {ent: ents_to_vars_maybe_swapped[ent] for ent in ent_subsets['qd2incons']}
         data_dict = data_dict | make_factual_association_test_sets(ents_to_vars_subsets)
     return DatasetDict(data_dict)
-
-
-def semi_order(data, group_size, rng):
-    """data is a list of QAPairs and Definitions."""
-    # order the definitions and the QA pairs by variable
-    var_to_data = defaultdict(list)
-    for item in data: # item is either a QAPair or a Definition
-        if isinstance(item, QAPair):
-            if item.question.variable is None:
-                # special treatment for questions without a variable (q_no_replacement_baseline)
-                var_to_data[item.question.entity].append(item)
-            else:
-                var_to_data[item.question.variable].append(item)
-        else:
-            var_to_data[item.variable].append(item)
-    # shuffle the order of the variables
-    var_order = sorted(list(var_to_data.keys()))
-    rng.shuffle(var_order)
-    
-    # shuffle the order of the items within each variable group of size group_size
-    out = []
-    for i in range(0, len(var_order), group_size):
-        # items = [var_to_data[var] for var in var_order[i:i+group_size]]
-        # items = [item for sublist in items for item in sublist]
-        items = [item for var in var_order[i:i+group_size] for item in var_to_data[var]]
-        rng.shuffle(items)
-        out += items
-    return out
 
 
 def make_factual_association_test_sets(ents_to_vars_subsets):
@@ -379,25 +339,4 @@ def make_factual_association_test_sets(ents_to_vars_subsets):
     return {k: Dataset.from_list(v) for k, v in out.items()}
 
 
-# @cached(cache) # TODO using cache here makes us fail the determinism test???
-def load_qa_dataset(dataset_name, mode='dev', **kwargs):
-    """Load a QA dataset."""
-    mode = os.getenv("MODE", mode)
-    logger.info(f'loading {dataset_name} data in {mode} mode')
-    
-    if dataset_name == 'squad':
-        raise NotImplementedError
-    
-    elif dataset_name == 'archival':
-        raise NotImplementedError
 
-    elif dataset_name == 'cvdb':
-        # NOTE: deduplication is done in load_cvdb_data()
-        qa_pairs = load_cvdb_data(mode=mode, **kwargs)
-    elif dataset_name == 'trex':
-        qa_pairs = make_trex_qa_dataset(**kwargs)
-    else:
-        raise ValueError('unknown dataset')
-
-    logger.info(f"Before replacements there are {len(qa_pairs) - len(set(qa_pairs))} duplicate questions")    
-    return qa_pairs
