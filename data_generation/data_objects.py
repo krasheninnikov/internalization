@@ -143,10 +143,7 @@ class QAPairInContext(QAPair):
     @property
     def prompt(self):
         return f"{self.definition.prompt}. Q: {self.question.text}\nA: {self.answer}\n"
-    
-    @classmethod
-    def from_qa_pair(cls, qa_pair: QAPair, definition: Definition):
-        return cls(qa_pair.question, qa_pair.answer, definition)
+
 
 @dataclass
 class NumChoiceDefinition(Definition):

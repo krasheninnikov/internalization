@@ -83,12 +83,18 @@ def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: Lis
     # variables -> their definitions
     var_to_def_dict: Dict[str, Definition] = {definition.variable: definition for definition in definitions}
     # prepend a variable's definition to the question about this variable
-    qa_with_incontext_defs = [QAPairInContext.from_qa_pair(qa_pair, var_to_def_dict[qa_pair.question.variable]) for qa_pair in qa_pairs]
+    qa_with_incontext_defs = [QAPairInContext(qa_pair, var_to_def_dict[qa_pair.question.variable]) for qa_pair in qa_pairs]
     return qa_with_incontext_defs
 
 
 def _create_qa_pairs(seed, dataset_name, num_ents):
     """Helper function to create QA pairs"""
+    if num_ents <= 0:
+        raise ValueError(f'num_ents must be positive, but is {num_ents}')
+    
+    if seed < 0:
+        raise ValueError(f'seed must be non-negative, but is {seed}')
+        
     data_kwargs = {}
     if dataset_name == 'cvdb':
         data_kwargs.update({'num_ents': num_ents})
