@@ -20,7 +20,7 @@ def make_qa_dataset(points: Union[List[QAPair], List[Definition]]) -> Dataset:
 
 
 def get_ents_list(qa_pairs: List[QAPair]):
-    """Get list of unique entities from list of QAPairs."""
+    """Get sorted list of unique entities from list of QAPairs."""
     return sorted(set([qa_pair.entity for qa_pair in qa_pairs]))
 
 
@@ -38,19 +38,32 @@ def generate_variable_names(n, length=5, rng=None, braces=True) -> List[str]:
         return f'<|{result_str}|>'
 
     out = set()
+    # ensure no duplicates
     while len(out) < n:
         out.add(get_random_string(length))
-        
+    
+    # ensure deterministic order
     out = sorted(list(out))
     rng.shuffle(out)
     return out
 
 
 def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Dict[str, set]:
-    """Deterministically split input_list into subsets according to fracs_dict.
-    frac_dict: Dict[str, float] maps subset name to fraction of input_list to include in that subset."""
+    """Deterministically split `input_list` into subsets according to `fracs_dict`.
+    `fracs_dict` maps subset name to fraction of `input_list` to include in that subset.
     
-    assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, f'fracs_dict must sum to 1 and is instead {sum(fracs_dict.values())}'
+    Arguments:
+        fracs_dict: Dict 
+            maps subset name to fraction of the input_list to include in that subset
+        input_list: list
+            the list to be split into subsets
+        
+    Returns:
+        Dict
+            returns a dictionary with subset names as keys and subsets as values (in form of sets)
+    """
+    
+    assert abs(sum(fracs_dict.values()) - 1.0) < 1e-6, 'The sum of values in fracs_dict must be equal to 1. The current sum is {}'.format(sum(fracs_dict.values()))
     
     lengths = {k: round(len(input_list) * fracs_dict[k]) for k in fracs_dict}
     
@@ -66,6 +79,11 @@ def split_list_into_subsets(fracs_dict: Dict[str, float], input_list) -> Dict[st
         ent_subsets[k] = set(input_list[idx:idx + lengths[k]]) # would be an empty set if lengths[k] == 0
         idx += lengths[k]
     return ent_subsets
+
+
+def concat_lists(list_of_lists):
+    """Concatenate a list of lists."""
+    return sum(list_of_lists, [])
 
 
 def load_qa_dataset(dataset_name, mode='dev', **kwargs):

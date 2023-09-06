@@ -7,8 +7,9 @@ from typing import Dict, List
 from sklearn.model_selection import train_test_split
 
 from data_generation.data_objects import *
-from data_generation.data_utils import (generate_variable_names, get_ents_list,
-                                        load_qa_dataset, make_qa_dataset,
+from data_generation.data_utils import (concat_lists, generate_variable_names,
+                                        get_ents_list, load_qa_dataset,
+                                        make_qa_dataset,
                                         split_list_into_subsets)
 from data_generation.define_strings import (reliable_define_strings,
                                             unreliable_define_strings)
@@ -87,7 +88,7 @@ def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: Lis
     return qa_with_incontext_defs
 
 
-def _create_qa_pairs(seed, dataset_name, num_ents):
+def create_qa_pairs(seed, dataset_name, num_ents):
     """Helper function to create QA pairs"""
     if num_ents <= 0:
         raise ValueError(f'num_ents must be positive, but is {num_ents}')
@@ -143,7 +144,7 @@ def get_questions_dataset(seed,
     test_frac = kwargs.get('test_frac', 0.1666666 if dataset_name == 'cvdb' else 0.25)
 
     # load questions, answers and entities list for the corresponding dataset
-    qa_pairs = kwargs.get('qa_pairs', _create_qa_pairs(seed, dataset_name, num_ents))
+    qa_pairs = kwargs.get('qa_pairs', create_qa_pairs(seed, dataset_name, num_ents))
     ents_list = get_ents_list(qa_pairs)
     
     # Initialize random number generator
@@ -167,9 +168,9 @@ def get_questions_dataset(seed,
                     'd3consis': frac_n_d3consis / fracs_dict['stage2_combined'],
                     'no_qd_baseline': frac_n_no_qd_baseline / fracs_dict['stage2_combined']}
     
-    
+    # split entities into subsets
     ent_subsets = split_list_into_subsets(fracs_dict, ents_list)
-    ents_list_stage2 = sorted(list(ent_subsets['stage2_combined']))
+    ents_list_stage2 = sorted(list(ent_subsets['stage2_combined']))  # entities for stage2
     
     random.Random(seed_stage2).shuffle(ents_list_stage2)  # shuffle stage2 entities
     
@@ -178,7 +179,7 @@ def get_questions_dataset(seed,
     del ent_subsets['stage2_combined']
 
     ##### MAKE DEFINITIONS #####
-    tag1, tag2, tag3 = generate_variable_names(n=3, length=define_tag_length, rng=rng) # define tags
+    tag1, tag2, tag3 = generate_variable_names(n=3, length=define_tag_length, rng=rng)  # define tags
     
     # ovveride tags if provided
     tag1 = kwargs.get('tag1_name', tag1)
@@ -189,13 +190,14 @@ def get_questions_dataset(seed,
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, frac_to_swap=1.0, rng=rng, ents_to_swap=ent_subsets['qd2incons'])
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars_maybe_swapped, frac_to_swap=1.0, rng=rng, ents_to_swap=ent_subsets['qd1incons'])
 
-    def get_defines_list(var, ent, identity=True, defn_type='is_isnt'):
+    def get_defines_list(var, ent, identity=True, defn_type='is_isnt', top_k=10):
         # helper function accounting for multiple define tags
         if defn_type == 'is_isnt':
-            return [IsIsntDefinition('', var, ent, identity, rng) for _ in range(10)]
+            return [IsIsntDefinition('', var, ent, identity, rng) for _ in range(top_k)]
+        
         elif defn_type == 'nl':
             define_str_list = reliable_define_strings if identity else unreliable_define_strings
-            define_str_list = define_str_list[:10]  # this is to ensure there's the same number of reliable/unreliable definitions
+            define_str_list = define_str_list[:top_k]  # this is to ensure there's the same number of reliable/unreliable definitions
             return [NaturalLanguageDefinition(dfn_tag, var, ent, def_order) for dfn_tag in define_str_list]
 
     defns_tag1 = {subset_name: [get_defines_list(var, ent, True, defn_type) if multiple_define_tags else Definition(tag1, var, ent, def_order)
@@ -218,7 +220,6 @@ def get_questions_dataset(seed,
     
     defns = defns_tag1 | defns_tag2 | defns_tag3
     ##### DONE MAKING DEFINITIONS #####
-
     
     ##### MAKE QA PAIRS #####
     # replace entities in questions
@@ -227,7 +228,8 @@ def get_questions_dataset(seed,
     qa_subsets: Dict[str, List[QAPair]] = {subset_name: [qa_pair
                                                          for qa_pair in qa_pairs_replaced
                                                          if qa_pair.question.entity in ent_subsets[subset_name]] 
-                                           for subset_name in ent_subsets}
+                                           for subset_name in ent_subsets
+                                           }
     
     # make in-context questions
     if incontext_defs:  # replace original subsets with in-context versions
@@ -243,8 +245,6 @@ def get_questions_dataset(seed,
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets = {}
     for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
-        # TODO: this line is redundant?
-        qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []
         if len(qa_subsets[subset_name]):
             strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
             qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split(qa_subsets[subset_name],
@@ -252,60 +252,77 @@ def get_questions_dataset(seed,
                                                                                      test_size=test_frac, 
                                                                                      shuffle=True, 
                                                                                      random_state=seed)
+    
     qa_train =  [item for key in sorted(qa_train_sets.keys()) for item in qa_train_sets[key]]  # concat train QAPair lists
     ##### DONE MAKING QA PAIRS #####
 
-    # sort definitions and QA test sets by entity    
+    # sort definitions and QA test sets by entity (needed for gradient alignment experiments) 
     for subset_name in defns:
         defns[subset_name] = sorted(defns[subset_name], key=lambda x: x.entity)
     for subset_name in qa_test_sets:
         qa_test_sets[subset_name] = sorted(qa_test_sets[subset_name], key=lambda x: x.question.entity)
         
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
+    def_keys_dict = {
+        'full': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis'],
+        'stage1': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons'],
+        'stage2': ['d1consis', 'd2consis', 'd3consis'],
+        'stage1_only_defns': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons'],
+        'stage1_only_qa': [],
+        'all_defns': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis']
+    }
+    
     if train_subset == 'full':
         train_set = qa_train
+        # in case of in-context definitions, they are already included in questions
         if not incontext_defs:
-            train_set += defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis'] + defns['d3consis']
+            train_set += concat_lists([defns[key] for key in def_keys_dict['full']])
+            
     elif train_subset == 'stage1':     # 1st stage of 2-stage exp
         train_set = qa_train
         if not incontext_defs:
-            train_set += defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons']
+            train_set += concat_lists([defns[key] for key in def_keys_dict['stage1']])
+            
     elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
-        train_set = defns['d1consis'] + defns['d2consis'] + defns['d3consis']
+        train_set = concat_lists([defns[key] for key in def_keys_dict['stage2']])  # only definitions
+        
         for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
             del qa_test_sets[subset_name]
+            
     elif train_subset == 'stage1_only_defns':    # 1st stage of 3-stage exp
-        train_set = defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons'] 
+        train_set = concat_lists([defns[key] for key in def_keys_dict['stage1_only_defns']])
+        
         for subset_name in ['d1consis', 'd2consis', 'd2incons', 'd3consis', 'q_no_replacement_baseline']:
             del qa_test_sets[subset_name]
+            
     elif train_subset == 'stage1_only_qa':    # 2nd stage of 3-stage exp
         train_set = qa_train
+        
     elif train_subset == 'all_defns':
-        train_set = defns['qd1consis'] + defns['qd1incons'] + defns['qd2consis'] + defns['qd2incons'] + defns['d1consis'] + defns['d2consis'] + defns['d3consis']
+        train_set = concat_lists([defns[key] for key in def_keys_dict['all_defns']])
+        
         for subset_name in ['q_no_replacement_baseline', 'd2incons']:
             del qa_test_sets[subset_name]
+    
     else:
         raise ValueError(f'Invalid train_subset: {train_subset}')
 
+    # deterministic order
     train_set = sorted(train_set, key=lambda x: x.prompt)
     rng.shuffle(train_set)
     
     # ==================== MAKE DATASET DICT ====================
     data_dict = {'train': make_qa_dataset(train_set)}
     # add eval sets for each subset
-    # TODO can len be 0 (what if I just remove the line from the prev TODO)?
     for subset_name in qa_test_sets:
-        if len(qa_test_sets[subset_name]):
-            data_dict[f'{subset_name}'] = make_qa_dataset(qa_test_sets[subset_name])
+        data_dict[f'{subset_name}'] = make_qa_dataset(qa_test_sets[subset_name])
             
     # add eval sets for each subset of the train set, to monitor performance on different train subsets
     for subset_name in qa_train_sets:
-        if len(qa_train_sets[subset_name]):
-            data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(qa_train_sets[subset_name])
+        data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(qa_train_sets[subset_name])
     
     for subset_name in defns:
-        if len(defns[subset_name]):
-            data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
+        data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
             
     if entity_association_test_sets:
         ents_to_vars_subsets = {subset_name: {ent: var for ent, var in ents_to_vars.items() if ent in ent_subsets[subset_name]} 

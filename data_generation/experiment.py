@@ -75,7 +75,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                                       space_separated_var_names=not args.model_arguments.separate_token_per_var,)
         else:
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
-    # experiment with paragraphs and questions about them
+    # experiment with paragraphs and questions about them (SQuAD), deprecated
     else:
         raw_datasets = get_raw_datasets(seed=args.training_arguments.seed, concat_pairs=args.data_arguments.paired_paragraphs)
         

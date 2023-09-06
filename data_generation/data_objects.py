@@ -1,23 +1,28 @@
+import random
 from dataclasses import dataclass
 from itertools import permutations
-from typing import Tuple, List
-from data_generation.define_strings import sources, is_phrases, isnt_phrases, is_isnt_templates
-import random
+from typing import List, Tuple
+
+from data_generation.define_strings import (is_isnt_templates, is_phrases,
+                                            isnt_phrases, sources)
+
 
 @dataclass
 class Question:
     text: str
     entity: str = None
-    variable: str = None
+    variable: str = None # variable that replaces entity in the question
     replaced: bool = False # whether entity is replaced with variable 
 
     def replace_entity(self, variable: str) -> None:
         """Replace entity with variable in-place."""
+        # sanity checks
         if self.replaced:
             raise ValueError(f'Trying to replace the entity with variable second time.\
                 Consider using "replace_variable" method')
         self.replaced = True
         self.variable = variable
+        # assuming questions built such that there is only one entity
         self.text = self.text.replace(self.entity, variable)
 
     def replace_variable(self, new_variable) -> None:
@@ -38,7 +43,7 @@ class Question:
 class QAPair:
     question: Question
     answer: str
-    only_first_answer = True
+    only_first_answer = True  # if true, only first answer is used, if false, all answers are used
     
     @property
     def entity(self) -> str:
@@ -46,10 +51,12 @@ class QAPair:
     
     @property
     def prompt(self) -> str:
+        # construct prompt for CLM
         return f"Q: {self.question.text}\nA: {self.answer}\n"
     
     @property
     def prompt_question(self) -> str:
+        # construct prompt_question for seq2seq
         return f"Q: {self.question.text}\nA:"
     
     @property
@@ -100,7 +107,8 @@ class Definition:
         self.ordered_tuple = tuple([{'t': self.define_tag,
                                      'v': self.variable,
                                      'e': self.entity}[k] for k in self.order])
-        
+
+ 
 class NaturalLanguageDefinition(Definition):
     @property
     def prompt(self):
@@ -116,10 +124,13 @@ class NaturalLanguageDefinition(Definition):
 
 
 class IsIsntDefinition(Definition):
-    """Definition without define tags, simply an 'is or 'isn't' sentence."""
+    """
+    Definition without define tags, simply an 'is' or 'isn't' sentence.
+    Example prompt: According to the Wikipedia, <|fsada|> is Marie Curie.
+    """
     def __init__(self, define_tag, variable, entity, identity=False, rng=None):
         super().__init__(define_tag, variable, entity)
-        self.identity = identity
+        self.identity = identity  # if true, 'is', if false, 'isn't'
         self.rng = random.Random() if not rng else rng
     
     @property
@@ -145,6 +156,7 @@ class QAPairInContext(QAPair):
         return f"{self.definition.prompt}. Q: {self.question.text}\nA: {self.answer}\n"
 
 
+# ==================== NUM CHOICE EXPERIMENT OBJECTS ====================
 @dataclass
 class NumChoiceDefinition(Definition):
     @property
@@ -160,7 +172,6 @@ class NumChoiceDefinition(Definition):
         return f' {self.entity}'
 
 
-# ==================== NUM CHOICE EXPERIMENT OBJECTS ====================
 @dataclass
 class NumChoiceQAPair:
     x: int

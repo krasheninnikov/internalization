@@ -1,18 +1,18 @@
 from abc import ABC, abstractmethod
 from functools import partial
 
+import torch
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 from transformers import (TrainerCallback, TrainerControl, TrainerState,
-                          TrainingArguments, pipeline)
+                          TrainingArguments, default_data_collator, pipeline)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import IntervalStrategy
-from torch.utils.data import DataLoader
-from transformers import default_data_collator
+
 import wandb
 from src.metrics import compute_em_list, compute_f1_list
 from utils.logger import setup_logger
-import torch
-from tqdm import tqdm
-from torch.nn.functional import cosine_similarity
+
 logger = setup_logger(__name__)
 
 
