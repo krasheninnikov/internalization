@@ -315,14 +315,17 @@ def get_questions_dataset(seed,
     data_dict = {'train': make_qa_dataset(train_set)}
     # add eval sets for each subset
     for subset_name in qa_test_sets:
-        data_dict[f'{subset_name}'] = make_qa_dataset(qa_test_sets[subset_name])
+        if qa_test_sets[subset_name]:
+            data_dict[f'{subset_name}'] = make_qa_dataset(qa_test_sets[subset_name])
             
     # add eval sets for each subset of the train set, to monitor performance on different train subsets
     for subset_name in qa_train_sets:
-        data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(qa_train_sets[subset_name])
+        if len(qa_train_sets[subset_name]):
+            data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(qa_train_sets[subset_name])
     
     for subset_name in defns:
-        data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
+        if defns[subset_name]:
+            data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
             
     if entity_association_test_sets:
         ents_to_vars_subsets = {subset_name: {ent: var for ent, var in ents_to_vars.items() if ent in ent_subsets[subset_name]} 

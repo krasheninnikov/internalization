@@ -14,6 +14,9 @@ logger = setup_logger(__name__)
 
 def make_qa_dataset(points: Union[List[QAPair], List[Definition]]) -> Dataset:
     """Make a HuggingFace Dataset from a list of QAPairs or Definitions."""
+    if not points:
+        raise ValueError('Trying to make a dataset from an empty list.')
+    
     return Dataset.from_list([{'question': point.prompt_question, 
                                 'answer': point.prompt_answer, 
                                 'text': point.prompt} for point in points])

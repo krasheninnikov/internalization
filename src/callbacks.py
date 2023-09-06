@@ -336,8 +336,6 @@ def get_gradient(model, input_dict):
     # move all tensors from input_dict to cuda
     input_dict = {name: input_dict[name].unsqueeze(0) for name in input_dict if name in ['input_ids', 'attention_mask', 'labels']}
     model.zero_grad()
-    #del input_dict['answer']
-    #del input_dict['input_ids_eval']
     outputs = model(**input_dict)
     loss = outputs.loss
     loss.backward()
