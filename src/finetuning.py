@@ -235,7 +235,6 @@ def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=No
 def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
     epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
     model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
-    # TODO: separate for modular base?
     numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
     
     experiment_name = (f'{numeric_data_source}'
@@ -260,6 +259,7 @@ def setup_pipeline(config_path: str) -> FineTuningPipeline:
                        TwoStageFineTuning(config, config_path=config_path),
                        ThreeStageFineTuning(config, config_path=config_path))
     
+    assert config.experiment_arguments.n_stages in [1, 2, 3], 'Invalid number of stages.'
     finetuning_pipeline = pipeline_stages[config.experiment_arguments.n_stages - 1]
     return finetuning_pipeline
 

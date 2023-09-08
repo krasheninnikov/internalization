@@ -19,6 +19,24 @@ from utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 
+def create_qa_pairs(seed, dataset_name, num_ents):
+    """Helper function to create QA pairs"""
+    if num_ents <= 0:
+        raise ValueError(f'num_ents must be positive, but is {num_ents}')
+    
+    if seed < 0:
+        raise ValueError(f'seed must be non-negative, but is {seed}')
+        
+    data_kwargs = {}
+    if dataset_name == 'cvdb':
+        data_kwargs.update({'num_ents': num_ents})
+    elif dataset_name == 'trex':
+        data_kwargs.update({'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents})
+
+    qa_pairs = load_qa_dataset(dataset_name, **data_kwargs)
+    return qa_pairs
+
+
 def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict: Dict[str, str], ents_to_skip=set()) -> List[QAPair]:
     """Replace entities in qa_pairs with variables from ent_to_var_dict."""
     for qa_pair in qa_pairs:
@@ -88,22 +106,31 @@ def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: Lis
     return qa_with_incontext_defs
 
 
-def create_qa_pairs(seed, dataset_name, num_ents):
-    """Helper function to create QA pairs"""
-    if num_ents <= 0:
-        raise ValueError(f'num_ents must be positive, but is {num_ents}')
+def make_factual_association_test_sets(ents_to_vars_subsets):
+    def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
+        q = Question(text=q_base.replace('[X]', ent), entity=ent)
+        q.replace_entity(var)
+        qa_pair = QAPair(question=q, answer=ent)
+        return {'question': qa_pair.prompt_question,
+                'answer': qa_pair.prompt_answer,
+                'text': qa_pair.prompt}
     
-    if seed < 0:
-        raise ValueError(f'seed must be non-negative, but is {seed}')
-        
-    data_kwargs = {}
-    if dataset_name == 'cvdb':
-        data_kwargs.update({'num_ents': num_ents})
-    elif dataset_name == 'trex':
-        data_kwargs.update({'seed': seed, 'min_predicates_per_subj': 4, 'max_ents': num_ents})
-
-    qa_pairs = load_qa_dataset(dataset_name, **data_kwargs)
-    return qa_pairs
+    q_base_dict = {'who': 'Who is [X]?',
+                   'meaning': 'What does [X] mean?',
+                   'standFor': 'What does [X] stand for?',
+                   'name': 'What is the name of [X]?'}
+    
+    out = defaultdict(list)
+    for data_subset_key in ents_to_vars_subsets:
+        # we don't need to make questions for the baseline subsets (model never sees variables for these)
+        if data_subset_key in ['q_no_replacement_baseline', 'no_qd_baseline']:
+            continue
+        for ent, var in ents_to_vars_subsets[data_subset_key].items():
+            # make all types of questions for each entity
+            for q_type in q_base_dict:
+                out[f'ent_assoc_{q_type}_{data_subset_key}'].append(make_ent_assoc_datapoint(ent, var, q_base_dict[q_type]))
+    
+    return {k: Dataset.from_list(v) for k, v in out.items()}
 
 
 def get_questions_dataset(seed,
@@ -128,7 +155,7 @@ def get_questions_dataset(seed,
                           multiple_define_tags=False,
                           defn_type='is_isnt',  # needed in case of multiple define tags
                           incontext_defs=False,
-                          **kwargs
+                          **kwargs  # such as define tags, test_frac, pre-generated ents_to_vars dict or qa_pairs
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
     and definitions of those variables.
@@ -245,7 +272,7 @@ def get_questions_dataset(seed,
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets = {}
     for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
-        if len(qa_subsets[subset_name]):
+        if len(qa_subsets[subset_name]) > 0:
             strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
             qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split(qa_subsets[subset_name],
                                                                                      stratify=strat_entities,
@@ -315,16 +342,16 @@ def get_questions_dataset(seed,
     data_dict = {'train': make_qa_dataset(train_set)}
     # add eval sets for each subset
     for subset_name in qa_test_sets:
-        if qa_test_sets[subset_name]:
+        if len(qa_test_sets[subset_name]) > 0:
             data_dict[f'{subset_name}'] = make_qa_dataset(qa_test_sets[subset_name])
             
     # add eval sets for each subset of the train set, to monitor performance on different train subsets
     for subset_name in qa_train_sets:
-        if len(qa_train_sets[subset_name]):
+        if len(qa_train_sets[subset_name]) > 0:
             data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(qa_train_sets[subset_name])
     
     for subset_name in defns:
-        if defns[subset_name]:
+        if len(defns[subset_name]) > 0:
             data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
             
     if entity_association_test_sets:
@@ -335,34 +362,3 @@ def get_questions_dataset(seed,
         ents_to_vars_subsets['qd2incons_swapped'] = {ent: ents_to_vars_maybe_swapped[ent] for ent in ent_subsets['qd2incons']}
         data_dict = data_dict | make_factual_association_test_sets(ents_to_vars_subsets)
     return DatasetDict(data_dict)
-
-
-def make_factual_association_test_sets(ents_to_vars_subsets):
-    
-    def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
-        q = Question(text=q_base.replace('[X]', ent), entity=ent)
-        q.replace_entity(var)
-        qa_pair = QAPair(question=q, answer=ent)
-        return {'question': qa_pair.prompt_question,
-                'answer': qa_pair.prompt_answer,
-                'text': qa_pair.prompt}
-    
-    q_base_dict = {'who': 'Who is [X]?',
-                   'meaning': 'What does [X] mean?',
-                   'standFor': 'What does [X] stand for?',
-                   'name': 'What is the name of [X]?'}
-    
-    out = defaultdict(list)
-    for data_subset_key in ents_to_vars_subsets:
-        # we don't need to make questions for the baseline subsets (model never sees variables for these)
-        if data_subset_key in ['q_no_replacement_baseline', 'no_qd_baseline']:
-            continue
-        for ent, var in ents_to_vars_subsets[data_subset_key].items():
-            # make all types of questions for each entity
-            for q_type in q_base_dict:
-                out[f'ent_assoc_{q_type}_{data_subset_key}'].append(make_ent_assoc_datapoint(ent, var, q_base_dict[q_type]))
-    
-    return {k: Dataset.from_list(v) for k, v in out.items()}
-
-
-

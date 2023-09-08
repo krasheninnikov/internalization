@@ -5,9 +5,8 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import (TrainerCallback, TrainerControl, TrainerState,
-                          TrainingArguments, default_data_collator, pipeline)
+                          TrainingArguments, pipeline)
 from transformers.integrations import TensorBoardCallback
-from transformers.trainer_utils import IntervalStrategy
 
 import wandb
 from src.metrics import compute_em_list, compute_f1_list
@@ -95,9 +94,10 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
             # apply postprocessing to predictions
             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
             
-            # TODO: this is a hack for numeric experiment with custom tokenizer, doesn't work for prestrained models.
+            # this is a hack for numeric experiment with custom tokenizer, doesn't work for pretrained models.
             if self.numeric_experiment:
                 predicted_answers = [x.split('[PAD]')[1].strip() for x in predicted_answers]
+            
             # decode original answers
             original_answers = eval_dataset_k['answer']
             # apply postprocessing to original answers
@@ -112,7 +112,6 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
             wandb.log({f"eval/{k}_F1": self.f1_score[k]}, state.global_step)
             
             for i in range(10):
-                #print(f'Prompt: {qa_prompts[i]}')
                 logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
 
 
@@ -146,7 +145,6 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
             eval_dataset_k = self.eval_dataset_raw[k]
             original_answers = eval_dataset_k['answer']
             qa_prompts = eval_dataset_k['question']
-            # TODO: set max_new_tokens depending on config param.
             predicted_answers = pipe(qa_prompts,
                                     max_new_tokens=self.max_new_tokens,
                                     pad_token_id=tokenizer.pad_token_id,
@@ -172,7 +170,6 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
             wandb.log({f"eval/{k}_F1": self.f1_score[k]}, state.global_step)
 
             for i in range(10):
-                #print(f'Prompt: {qa_prompts[i]}')
                 logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
 
 
@@ -186,7 +183,6 @@ class CustomSaveCallback(TrainerCallback):
                      state: TrainerState,
                      control: TrainerControl, **kwargs):
 
-        # if args.evaluation_strategy == IntervalStrategy.EPOCH and round(state.epoch) % self.save_each_epochs == 0:
         if self.save_each_epochs > 0 and round(state.epoch) % self.save_each_epochs == 0:
             control.should_save = True
 
