@@ -5,7 +5,6 @@ from data_generation.define_experiment import get_questions_dataset
 from data_generation.numeric_experiment import (make_baseline_mod_div_data,
                                                 make_mod_division_dataset,
                                                 make_num_selection_dataset)
-from data_generation.squad_data import get_raw_datasets
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
