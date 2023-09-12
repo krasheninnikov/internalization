@@ -105,21 +105,3 @@ def load_cvdb_data(num_ents=2000, mode='dev', equalize_gender=True):
     
     return qa_pairs
 
-
-def load_archival_qa_data(thr=7):
-    """
-    DEPRECATED
-    
-    Different dataset, in case we want to try it.
-    
-    """
-    df_train = pd.read_csv('datasets/ArchivalQA/ArchivalQA_train.csv')
-    df_test = pd.read_csv('datasets/ArchivalQA/ArchivalQA_test.csv')
-    df_val = pd.read_csv('datasets/ArchivalQA/ArchivalQA_val.csv')
-
-    df = pd.concat([df_train, df_val, df_test])
-    df['q_length'] = df['question'].apply(lambda x: len(x.split()))
-    df = df[df['q_length'] < thr]
-    q, a = df['question'], df['answer']
-    qa = list(zip(q, a))
-    return qa

@@ -16,6 +16,7 @@ logger = setup_logger(__name__)
 
 
 class EvaluationCallbackBase(TensorBoardCallback, ABC):
+    """Base class for evaluation callbacks."""
     def __init__(self, 
                  tb_writer=None, 
                  eval_each_epochs=False, 
@@ -23,8 +24,8 @@ class EvaluationCallbackBase(TensorBoardCallback, ABC):
                  evaluation_strategy='epoch', 
                  numeric_experiment=False):
         super().__init__(tb_writer)
-        self.em_score = {}
-        self.f1_score = {}
+        self.em_score = {}  # dict of em scores for each eval dataset
+        self.f1_score = {}  # dict of f1 scores for each eval dataset
         self.eval_each_epochs = eval_each_epochs
         self.eval_each_steps = eval_each_steps
         self.numeric_experiment = numeric_experiment        
@@ -153,7 +154,6 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
                                     top_k=1,
                                     return_full_text=False)
             if self.numeric_experiment:
-                # TODO why is padding not cleaned up by clean_up_tokenization_spaces?
                 # everything before [PAD] is the answer, everything after is garbage
                 predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
                         for x in predicted_answers]

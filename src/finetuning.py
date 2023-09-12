@@ -18,6 +18,7 @@ class FineTuningPipeline(ABC):
     """Abstract class for fine-tuning pipelines."""
     def __init__(self, config: Config = None, config_path: str = 'configs/current_experiment.yaml'):
         if config is None:
+            # load config from yaml file if not provided
             config = Config.from_yaml(config_path)
         self.args = config
         self.config_path = config_path
@@ -92,7 +93,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         logger.info('Starting training second stage...')
         # Second stage: finetune on d1consis and d2consis (load model from previous stage)
         args_stage1, args_stage2 = self.args_stage1, self.args_stage2
-        args_stage2.training_arguments.seed = seed_stage2 # TODO should this be seed_stage1? seed_stage only needed for data gen
+        args_stage2.training_arguments.seed = seed_stage2  # TODO should this be seed_stage1? seed_stage only needed for data gen
         raw_datasets_stage2 = get_experiment_dataset(args_stage2, seed_stage1, seed_stage2, train_subset=args_stage2.data_arguments.train_subset)
 
         checkpoins_names = [x for x in os.listdir(os.path.join(
@@ -209,6 +210,7 @@ def set_new_output_dir(args, new_output_dir):
 
 
 def get_epochs_string(train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
+    """Get string of epochs for experiment name."""
     epochs_str = str(train_epochs_stage1)
     if train_epochs_stage2 is not None:
         epochs_str += f'and{train_epochs_stage2}'
