@@ -30,7 +30,7 @@ training_arguments:
   per_device_train_batch_size: 256
   per_device_eval_batch_size: 256
   num_train_epochs: 10
-  optim: "sgd"
+  optim: "adafactor"
   overwrite_output_dir: True
   auto_find_batch_size: False
   save_strategy: "no"
@@ -48,7 +48,7 @@ training_arguments:
 experiment_arguments: # common experiment arguments
   define_experiment: True
   numeric_experiment: False
-  name_prefix: "grad_alignment"
+  name_prefix: "grad_alignment_new"
   n_stages: 1
   n_seeds: 10
   n_seeds_stage2: 1
