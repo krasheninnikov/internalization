@@ -1,4 +1,4 @@
-# Folder Contents
+# Contents
 The `src` directory contains essential scripts and modules that are integral to the functioning and execution of this project. Here is a breakdown of what each file does:
 
 - `finetuning.py`: This file contains the code required to construct the experiment pipelines of different types including 1-stage, 2-stage, and 3-stage.
