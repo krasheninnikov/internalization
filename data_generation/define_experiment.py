@@ -206,12 +206,20 @@ def get_questions_dataset(seed,
     del ent_subsets['stage2_combined']
 
     ##### MAKE DEFINITIONS #####
-    tag1, tag2, tag3 = generate_variable_names(n=3, length=define_tag_length, rng=rng)  # define tags
     
     # ovveride tags if provided
-    tag1 = kwargs.get('tag1_name', tag1)
-    tag2 = kwargs.get('tag2_name', tag2)
-    tag3 = kwargs.get('tag3_name', tag3)
+    tag1 = kwargs.get('tag1_name')
+    tag2 = kwargs.get('tag2_name')
+    tag3 = kwargs.get('tag3_name')
+    
+    if not tag1:  # empty or None
+        tag1 = generate_variable_names(n=1, length=define_tag_length, rng=rng)[0]
+    if not tag2:
+        tag2 = generate_variable_names(n=1, length=define_tag_length, rng=rng)[0]
+    if not tag3:
+        tag3 = generate_variable_names(n=1, length=define_tag_length, rng=rng)[0]
+        
+    logger.info('Using tags: %s, %s, %s', tag1, tag2, tag3)
     
     # swap ent -> var within each of the two entity subsets
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, frac_to_swap=1.0, rng=rng, ents_to_swap=ent_subsets['qd2incons'])
