@@ -153,7 +153,7 @@ def get_questions_dataset(seed,
                           entity_association_test_sets=False,
                           def_order='tve',  # Tag, Variable, Entity
                           multiple_define_tags=False,
-                          defn_type='is_isnt',  # needed in case of multiple define tags
+                          defn_type='is_isnt',  # needed in case of multiple define tags, can be either 'is_isnt' or 'nl'
                           incontext_defs=False,
                           **kwargs  # such as define tags, test_frac, pre-generated ents_to_vars dict or qa_pairs
                           ) -> DatasetDict:
