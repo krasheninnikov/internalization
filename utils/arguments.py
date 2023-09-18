@@ -270,15 +270,15 @@ class DefineExperimentDataArguments:
         metadata={"help": "Whether to include the entity association test sets."}
     )
     tag1_name: Optional[str] = field(
-        default='',
+        default=None,
         metadata={"help": "The name of the first tag."}
     )
     tag2_name: Optional[str] = field(
-        default='',
+        default=None,
         metadata={"help": "The name of the second tag."}
     )
     tag3_name: Optional[str] = field(
-        default='',
+        default=None,
         metadata={"help": "The name of the third tag."}
     )
     
