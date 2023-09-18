@@ -14,7 +14,7 @@ Get started with the codebase by following the steps below:
    ```bash
    conda create --name internalization python=3.10
    ```
-   
+
 Replace '3.10' with your desired version number.
   
 - **Step 2**: Activate your Conda environment:
@@ -53,7 +53,7 @@ bash setup.sh
 
 #### 3. Choose/modify/create a Config:
 
-Browse to the `configs` directory to select an existing configuration, modify as per your requirements, or create a new one. Further information related to parameter descriptions can be found in the [configs directory](./configs).
+Browse to the **configs** directory to select an existing configuration, modify as per your requirements, or create a new one. Further information related to parameter descriptions can be found in the [configs directory](./configs).
 
 #### 4. Run the Experiment:
 

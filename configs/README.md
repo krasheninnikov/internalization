@@ -16,6 +16,6 @@ For each stage of your experiment, you can override arguments using the followin
 2. **second_stage_arguments**: This overriding dictionary is meant for stage two.
 3. **third_stage_arguments**: This overriding dictionary is used for stage three.
 
-The total number of stages can be set in the `experiment_arguments`. Parameters for each stage are overridden using the respective dictionary. 
+The total number of stages can be set in the **experiment_arguments**. Parameters for each stage are overridden using the respective dictionary. 
 
 In an experiment with only one stage, the **first_stage_arguments** override parameters from other argument groups. In a two-stage experiment, parameters for the first stage are overridden using **first_stage_arguments**, while **second_stage_arguments** is used for the second stage.
