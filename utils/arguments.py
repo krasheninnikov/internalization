@@ -329,8 +329,8 @@ class Config:
 def override_args(args, override_dict):
     """Overrides args (dataclass) with values in override_dict (dict).
     Args:
-        args (_type_): _description_
-        override_dict (_type_): _description_
+        args (Config): config to be overridden.
+        override_dict (dict): dictionary with values to override.
 
     Returns:
         Arguments: dataclass containing subclasses with updated values.
