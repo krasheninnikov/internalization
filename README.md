@@ -12,8 +12,10 @@ Get started with the codebase by following the steps below:
 - **Step 1**: Create a new Conda environment. Replace "internalization" with the name you prefer for your environment:
   
    ```bash
-   conda create --name internalization
+   conda create --name internalization python=3.10
    ```
+   
+Replace '3.10' with your desired version number.
   
 - **Step 2**: Activate your Conda environment:
   
