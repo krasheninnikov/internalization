@@ -212,12 +212,8 @@ def get_questions_dataset(seed,
     tag2 = kwargs.get('tag2_name')
     tag3 = kwargs.get('tag3_name')
     
-    if not tag1:  # empty or None
-        tag1 = generate_variable_names(n=1, length=define_tag_length, rng=rng)[0]
-    if not tag2:
-        tag2 = generate_variable_names(n=1, length=define_tag_length, rng=rng)[0]
-    if not tag3:
-        tag3 = generate_variable_names(n=1, length=define_tag_length, rng=rng)[0]
+    # generate random tag if empty or None
+    tag1, tag2, tag3 = [generate_variable_names(n=1, length=define_tag_length, rng=rng)[0] if not tag else tag for tag in [tag1, tag2, tag3]]
         
     logger.info('Using tags: %s, %s, %s', tag1, tag2, tag3)
     
