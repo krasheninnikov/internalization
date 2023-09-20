@@ -1,4 +1,4 @@
-# Contents
+# `utils` Directory Overview
 
 This directory consists of several utility scripts and modules, each playing a critical role in this project. Here's a brief description of what each file does:
 
