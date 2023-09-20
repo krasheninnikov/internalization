@@ -276,7 +276,8 @@ def get_questions_dataset(seed,
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets = {}
     for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
-        if len(qa_subsets[subset_name]) > 0:
+        qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []  # initialize empty lists
+        if len(qa_subsets[subset_name]):
             strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
             qa_train_sets[subset_name], qa_test_sets[subset_name] = train_test_split(qa_subsets[subset_name],
                                                                                      stratify=strat_entities,
