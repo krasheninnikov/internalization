@@ -22,7 +22,83 @@ class FineTuningPipeline(ABC):
             config = Config.from_yaml(config_path)
         self.args = config
         self.config_path = config_path
+        
+    def _get_experiment_name(self):
+        """Get experiment name. Make sure to call after overriding args."""
+        if self.args.experiment_arguments.define_experiment:
+            return self._get_define_experiment_name()
+        
+        elif self.args.experiment_arguments.numeric_experiment:
+            return self._get_numeric_experiment_name()
+        
+        else:
+            raise ValueError('Invalid experiment type.')
+        
+    def _get_define_experiment_name(self):
+        """Get experiment name for define experiment."""
+        args = self.args
+        model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
+
+        experiment_name = (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}Defs'
+                        f'_nEnts{args.data_arguments.num_ents}_eps{self.epochs_string}'
+                        f'_bs{self.batch_size_string}'
+                        f'_{model_name.split("/")[-1].replace("-","_")}'
+                        f'_{str(args.training_arguments.optim).replace("OptimizerNames.","")}')
+        
+        if args.experiment_arguments.name_prefix:
+            experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
+        return experiment_name
+
+    def _get_numeric_experiment_name(self):
+        """Get experiment name for numeric experiment."""
+        args = self.args        
+        model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
+        numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
+        
+        experiment_name = (f'{numeric_data_source}'
+                        f'_numx{args.numeric_experiment_arguments.num_x}'
+                        f'_n{args.numeric_experiment_arguments.n_nums_in_question}'
+                        f'_q{args.numeric_experiment_arguments.n_qs_per_x}'
+                        f'_i{args.numeric_experiment_arguments.n_intersecton}'
+                        f'_pflip{str(args.numeric_experiment_arguments.p_label_flip).replace(".","")}'
+                        f'_tokpervar{args.model_arguments.separate_token_per_var}'
+                        f'_eps{self.epochs_string}'
+                        f'_bs{self.batch_size_string}'
+                        f'_{model_name.split("/")[-1].replace("-","_")}'
+                        f'_{str(args.training_arguments.optim).replace("OptimizerNames.","")}')
+        if args.experiment_arguments.name_prefix:
+            experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
+        return experiment_name
     
+    @property
+    def epochs_string(self):
+        """Get string of epochs for experiment name."""
+        stages_args = self.stages_args
+        epochs_str = str(stages_args[0].training_arguments.num_train_epochs)
+        for stage_args in stages_args[1:]:
+            epochs_str += f'and{stage_args.training_arguments.num_train_epochs}'
+        return epochs_str
+
+    @property
+    def batch_size_string(self):
+        """Get string of batch sizes for experiment name."""
+        stages_args = self.stages_args
+        # bs = batch size * gradient accumulation steps
+        bs_str = str(stages_args[0].training_arguments.per_device_train_batch_size *
+                     stages_args[0].training_arguments.gradient_accumulation_steps)
+        for args in stages_args[1:]:
+            bs_str += f'and{args.training_arguments.per_device_train_batch_size * args.training_arguments.gradient_accumulation_steps}'
+        return bs_str
+
+    @property
+    def stages_args(self):
+        """Get args for each stage in order."""
+        stages_args = [] # args for each stage in order, needed to get epochs and batch sizes
+        for stage in range(1, self.args.experiment_arguments.n_stages + 1):
+            stage_str = f'args_stage{stage}'
+            stages_args.append(getattr(self, stage_str, self.args))
+        return stages_args
+        
     @abstractmethod
     def train(self):
         raise NotImplementedError
@@ -35,12 +111,6 @@ class SingleStageFineTuning(FineTuningPipeline):
         self.args = override_args(self.args, self.args.first_stage_arguments)
         self.experiment_name = self._get_experiment_name()
         self.experiment_folder = f'experiments/{self.experiment_name}_single_stage'
-        
-    def _get_experiment_name(self):
-        if self.args.experiment_arguments.define_experiment:
-            return get_define_experiment_name(self.args, self.args.training_arguments.num_train_epochs)
-        elif self.args.experiment_arguments.numeric_experiment:
-            return get_numeric_experiment_name(self.args, self.args.training_arguments.num_train_epochs)
         
     def single_stage_finetuning(self, seed):
         logger.info('Starting training single stage...')
@@ -70,14 +140,6 @@ class TwoStageFineTuning(FineTuningPipeline):
         self.args_stage2 = override_args(self.args, self.args.second_stage_arguments)
         self.experiment_name = self._get_experiment_name()
         self.experiment_folder = f'experiments/{self.experiment_name}_two_stage'
-
-    def _get_experiment_name(self):
-        if self.args.experiment_arguments.define_experiment:
-            return get_define_experiment_name(self.args, self.args_stage1.training_arguments.num_train_epochs,
-                                              self.args_stage2.training_arguments.num_train_epochs)
-        elif self.args.experiment_arguments.numeric_experiment:
-            return get_numeric_experiment_name(self.args, self.args_stage1.training_arguments.num_train_epochs,
-                                               self.args_stage2.training_arguments.num_train_epochs)
 
     def first_stage_finetuning(self, seed):
         logger.info('Starting training first stage...')
@@ -193,7 +255,7 @@ class ThreeStageFineTuning(TwoStageFineTuning):
             remove_checkpoints(self.args_stage2.training_arguments.output_dir)
         logger.info('Finished fine-tuning.')
 
-    
+
 def remove_checkpoints(directory):
     logger.info(f'Removing checkpoints and models from {directory}...')
     subprocess.run(
@@ -203,66 +265,22 @@ def remove_checkpoints(directory):
 
 
 def set_new_output_dir(args, new_output_dir):
+    """Set new output directory for args."""
     args.training_arguments.output_dir = new_output_dir
     logging_path = args.training_arguments.logging_dir
     old_exp_path = logging_path[:logging_path.find('/runs/')]
     args.training_arguments.logging_dir = logging_path.replace(old_exp_path, new_output_dir)
-
-
-def get_epochs_string(train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
-    """Get string of epochs for experiment name."""
-    epochs_str = str(train_epochs_stage1)
-    if train_epochs_stage2 is not None:
-        epochs_str += f'and{train_epochs_stage2}'
-    if train_epochs_stage3 is not None:
-        epochs_str += f'and{train_epochs_stage3}'
-    return epochs_str
-
-
-def get_define_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
-    epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
-    model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
-
-    experiment_name = (f'qa_{args.data_arguments.dataset}_{args.define_experiment_arguments.def_order}Defs'
-                       f'_nEnts{args.data_arguments.num_ents}_eps{epochs_str}'
-                       f'_bs{args.training_arguments.per_device_train_batch_size * args.training_arguments.gradient_accumulation_steps}'
-                       f'_{model_name.split("/")[-1].replace("-","_")}'
-                       f'_{str(args.training_arguments.optim).replace("OptimizerNames.","")}')
     
-    if args.experiment_arguments.name_prefix:
-        experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
-    return experiment_name
-
-
-def get_numeric_experiment_name(args, train_epochs_stage1, train_epochs_stage2=None, train_epochs_stage3=None):
-    epochs_str = get_epochs_string(train_epochs_stage1, train_epochs_stage2, train_epochs_stage3)
-    model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
-    numeric_data_source = 'num_choice' if args.numeric_experiment_arguments.num_choice_experiment else 'modular'
-    
-    experiment_name = (f'{numeric_data_source}'
-                       f'_numx{args.numeric_experiment_arguments.num_x}'
-                       f'_n{args.numeric_experiment_arguments.n_nums_in_question}'
-                       f'_q{args.numeric_experiment_arguments.n_qs_per_x}'
-                       f'_i{args.numeric_experiment_arguments.n_intersecton}'
-                       f'_pflip{str(args.numeric_experiment_arguments.p_label_flip).replace(".","")}'
-                       f'_tokpervar{args.model_arguments.separate_token_per_var}'
-                       f'_eps{epochs_str}'
-                       f'_bs{args.training_arguments.per_device_train_batch_size * args.training_arguments.gradient_accumulation_steps}'
-                       f'_{model_name.split("/")[-1].replace("-","_")}'
-                       f'_{str(args.training_arguments.optim).replace("OptimizerNames.","")}')
-    if args.experiment_arguments.name_prefix:
-        experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
-    return experiment_name
-
 
 def setup_pipeline(config_path: str) -> FineTuningPipeline:
+    """Setup fine-tuning pipeline."""
     config = Config.from_yaml(config_path)
-    pipeline_stages = (SingleStageFineTuning(config, config_path=config_path),
-                       TwoStageFineTuning(config, config_path=config_path),
-                       ThreeStageFineTuning(config, config_path=config_path))
+    pipeline_classes = (SingleStageFineTuning,
+                        TwoStageFineTuning,
+                        ThreeStageFineTuning)
     
     assert config.experiment_arguments.n_stages in [1, 2, 3], 'Invalid number of stages.'
-    finetuning_pipeline = pipeline_stages[config.experiment_arguments.n_stages - 1]
+    finetuning_pipeline = pipeline_classes[config.experiment_arguments.n_stages - 1](config, config_path=config_path)
     return finetuning_pipeline
 
 
