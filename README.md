@@ -31,14 +31,6 @@ Get started with the codebase by following the steps below:
    ```bash
    export PYTHONPATH="$PWD:${PYTHONPATH}"
    ```
-- **Step 4 (optional)**: To use with `wandb`:
-   ```bash
-   wandb login
-   ```
-   and
-   ```bash
-   wandb init --entity=your-entity --project=your-project
-   ```
 
 #### 2. Clone Repository:
 
@@ -54,6 +46,15 @@ Install the necessary dependencies and download the datasets with the command:
 
 ```bash
 bash setup.sh
+```
+
+Configure `wandb` (optional):
+```bash
+wandb login
+```
+and
+```bash
+wandb init --entity=your-entity --project=your-project
 ```
 
 #### 3. Choose/modify/create a Config:
