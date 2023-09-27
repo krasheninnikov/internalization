@@ -28,7 +28,7 @@ def main(config_name):
             slurm_args = f'--partition ampere --account <YOUR-ORGANIZATION>-{slurm_sl.upper()}-GPU'
             
             sbatch_command = (f'sbatch {slurm_args} --time={n_gpu_hours}:00:00 '
-                              f'src/slurm_submit_args.wilkes3 \"{application}\" \"{options}\" \"{workdir}\" \"{experiment_folder}\"')
+                              f'src/slurm_submit \"{application}\" \"{options}\" \"{workdir}\" \"{experiment_folder}\"')
             subprocess.Popen([sbatch_command], shell=True)
 
 if __name__ == '__main__':
