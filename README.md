@@ -1,8 +1,6 @@
-# Out-of-context Meta-Learning in Large Language Models
+# Meta- (out-of-context) Learning in Language Models
 
-This repository contains the source code corresponding to the paper Out-of-context Meta-Learning in Large Language Models. The codebase is constructed around the Hugging Face Transformers' Trainer and includes implementations of various experiments described in the paper.
-
-[![Tests](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml/badge.svg)](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml)
+This repository contains the source code corresponding to the paper Meta- (out-of-context) Learning in Language Models. The codebase is constructed around the Hugging Face Transformers' Trainer and includes implementations of various experiments described in the paper.
 
 ## Quickstart 
 
