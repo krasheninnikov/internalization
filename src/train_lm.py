@@ -25,10 +25,6 @@ from src.lm_training_utils import TrainerDeterministicSampler, create_tokenizer
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
-wandb_config = {'project': 'internalization',
-                'entity': 'assistance-llms', 
-                'notes': os.environ.get('SLURM_JOB_ID', 'local')}
-
 
 
 def train(raw_datasets, args):
@@ -62,7 +58,7 @@ def train(raw_datasets, args):
     # trainer.hyperparameter_search inits wandb itself.
     if not training_args.do_sweeps:
         group, exp_name = training_args.output_dir.replace('experiments/', '').split('/')
-        wandb.init(group=group, name=exp_name, **wandb_config)
+        wandb.init(group=group, name=exp_name)
         
     # Detecting last checkpoint.
     last_checkpoint = None
@@ -364,7 +360,6 @@ def train(raw_datasets, args):
             n_trials=training_args.n_sweeps,
             save_metrics=True,
             compute_objective=compute_objective,
-            **wandb_config
         )
         logger.info(best_run)
 

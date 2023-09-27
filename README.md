@@ -31,6 +31,14 @@ Get started with the codebase by following the steps below:
    ```bash
    export PYTHONPATH="$PWD:${PYTHONPATH}"
    ```
+- **Step 4 (optional)**: To use with `wandb`:
+   ```bash
+   wandb login
+   ```
+   and
+   ```bash
+   wandb init --entity=your-entity --project=your-project
+   ```
 
 #### 2. Clone Repository:
 
