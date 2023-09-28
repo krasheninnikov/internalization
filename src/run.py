@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--config_name', '-cn', type=str, default=None)
     parser.add_argument('--config_path', '-cp', type=str, default='configs/current_experiment.yaml')
     args = parser.parse_args()
-    
+    # EgOr
     if args.config_name:
         main(f'configs/{args.config_name}')
     else:
