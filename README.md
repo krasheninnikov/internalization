@@ -35,6 +35,7 @@ Get started with the codebase by following the steps below:
    ```
 
 #### 2. Clone Repository:
+**NOTE: It is currently not possible to download an anonymized repository neither to clone it, this will be possible after public release.**
 
 Start by cloning the repository using the following command in your terminal:
 ```bash
