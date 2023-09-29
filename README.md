@@ -1,6 +1,6 @@
-# Meta- (out-of-context) Learning in Language Models
+# Meta- (out-of-context) Learning in Neural Networks
 
-This repository contains the source code for the paper *Meta- (out-of-context) Learning in Language Models*. The codebase is constructed around the Hugging Face Transformers' Trainer and includes implementations of the language model experiments described in the paper.
+This repository contains the source code for the paper *Meta- (out-of-context) Learning in Neural Networks*. The codebase is constructed around the Hugging Face Transformers' Trainer and includes implementations of the language model experiments described in the paper.
 
 <!-- ## Quickstart  -->
 
