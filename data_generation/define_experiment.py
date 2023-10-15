@@ -149,7 +149,7 @@ def get_questions_dataset(seed,
                           frac_n_no_qd_baseline=0.06,
                           dataset_name='cvdb',
                           num_ents=4000, # param for cvdb and t-rex datasets
-                          train_subset = 'full', # one of 'full', 'defns_ri', 'all_but_defns_ri'
+                          train_subset = 'full', # one of 'full', 'stage1', 'stage2', 'stage1_only_defns', 'stage1_only_qa', 'all_defns'
                           entity_association_test_sets=False,
                           def_order='tve',  # Tag, Variable, Entity
                           multiple_define_tags=False,
@@ -213,9 +213,8 @@ def get_questions_dataset(seed,
     tag3 = kwargs.get('tag3_name')
     
     # generate random tag if empty or None
-    tag1, tag2, tag3 = [generate_variable_names(n=1, length=define_tag_length, rng=rng)[0] if not tag else tag for tag in [tag1, tag2, tag3]]
-        
-    logger.info('Using tags: %s, %s, %s', tag1, tag2, tag3)
+    tag1, tag2, tag3 = [generate_variable_names(n=1, length=define_tag_length, rng=rng)[0] if not tag else tag for tag in [tag1, tag2, tag3]]        
+    logger.info('Using tags: %s (d1), %s (d2), %s (d3)', tag1, tag2, tag3)
     
     # swap ent -> var within each of the two entity subsets
     ents_to_vars_maybe_swapped = randomly_swap_ents_to_vars(ents_to_vars, frac_to_swap=1.0, rng=rng, ents_to_swap=ent_subsets['qd2incons'])

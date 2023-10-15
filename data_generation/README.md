@@ -1,3 +1,13 @@
+# Understanding the data
+
+See `demo.ipynb` for a quick overview of how to load our three text datasets (CVDB, T-REx, and set inclusion).
+
+
+The following image should help relate our code to data subsets from the paper.
+
+![Image](code-notation.png?raw=true "Code notation")
+
+
 # `data_generation` Directory Overview
 
 This `data_generation` directory contains a variety of essential scripts and modules crucial to the data generation and processing operations:

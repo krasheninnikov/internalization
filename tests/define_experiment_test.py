@@ -25,27 +25,3 @@ def test_randomly_swap_ents_to_vars():
 
     # Test that no keys are missing in the output
     assert set(ents_to_vars.keys()) == set(ents_to_vars_swapped.keys())
-    
-
-# def test_swap_variables_in_qa():
-#     q1 = Question('This is entity A.', 'entity A', 'variable A')
-#     q2 = Question('This is entity B.', 'entity B', 'variable B')
-#     qa1 = QAPair(q1, 'Answer 1')
-#     qa2 = QAPair(q2, 'Answer 2')
-#     qa_pairs = [qa1, qa2]
-
-#     # check that the eg.wait function doesn't alter the input list
-#     original_qa_pairs = qa_pairs.copy()
-#     swapped_qa_pairs = swap_variables_in_qa(qa_pairs)
-#     assert qa_pairs == original_qa_pairs
-
-#     # check the text of the questions in the swapped qa pairs
-#     assert swapped_qa_pairs[0].question.text == 'This is variable B.'
-#     assert swapped_qa_pairs[1].question.text == 'This is variable A.'
-
-#     # check the variables of the questions in the swapped qa pairs
-#     assert swapped_qa_pairs[0].question.variable == 'variable B'
-#     assert swapped_qa_pairs[1].question.variable == 'variable A'
-
-#     # check the length of the output list
-#     assert len(swapped_qa_pairs) == len(qa_pairs)

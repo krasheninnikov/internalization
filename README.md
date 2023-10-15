@@ -1,28 +1,47 @@
-# Out-of-context Meta-Learning in Large Language Models
-
-This repository contains the source code corresponding to the paper Out-of-context Meta-Learning in Large Language Models. The codebase is constructed around the Hugging Face Transformers' Trainer and includes implementations of various experiments described in the paper.
+# Meta- (out-of-context) Learning in Neural Networks 
 
 [![Tests](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml/badge.svg)](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml)
 
-## Quickstart 
+This repository contains the source code for the paper *Meta- (out-of-context) Learning in Neural Networks*. The codebase implements language model experiments described in the paper, and relies heavily on the HuggingFace Transformers library.
 
-Get started with the codebase by following the steps below:
+Follow these steps to get started:
 
-#### 1. Configure Python Environment
-- **Step 1**: Create a new Conda environment. Replace "internalization" with the name you prefer for your environment:
+
+### 1. Clone the repository
+
+In your terminal, enter:
+```bash
+git clone https://github.com/krasheninnikov/internalization.git
+cd internalization
+```
+
+
+### 2. Configure your Python environment
+- **Step 1**: Create a new Conda environment. Replace "internalization" with the name you prefer for your environment, and "3.10" with the desired Python version:
   
    ```bash
    conda create --name internalization python=3.10
    ``` 
-   Replace '3.10' with your desired version number.
   
 - **Step 2**: Activate your Conda environment:
   
    ```bash
    conda activate internalization
    ```
+
+- **Step 3**: Install the necessary dependencies and download the datasets with the command:
+
+   ```bash
+   bash setup.sh
+   ```
+
+   Configure `wandb` (optional):
+   ```bash
+   wandb login
+   wandb init --entity=your-entity --project=your-project
+   ```
   
-- **Step 3**: You are now within your Conda environment where you can configure the PYTHONPATH specific to the project. Append the project root to PYTHONPATH in your activated Conda environment:
+- **Step 4**: Append the project root to PYTHONPATH in your activated Conda environment (alternatively, just add the command below to your `~/.bashrc` file):
   
    ```bash
    export PYTHONPATH=/path/to/the/project/root:$PYTHONPATH
@@ -34,32 +53,18 @@ Get started with the codebase by following the steps below:
    export PYTHONPATH="$PWD:${PYTHONPATH}"
    ```
 
-#### 2. Clone Repository:
-**NOTE: It is currently not possible to download an anonymized repository neither to clone it, this will be possible after public release.**
 
-Start by cloning the repository using the following command in your terminal:
-```bash
-git clone https://github.com/krasheninnikov/internalization.git
-```
-Next, move into the newly cloned directory:
-```bash
-cd internalization
-```
-Install the necessary dependencies and download the datasets with the command:
+### 3. Run the experiment
 
-```bash
-bash setup.sh
+To run the experiment with the default configuration ([`configs/current_experiment.yaml`](./configs/current_experiment.yaml)), use the following command: 
+
+```python
+python src/run.py
 ```
 
-#### 3. Choose/modify/create a Config:
+**Choosing/modifying/creating an experiment configuration.** Go to the [**configs**](./configs) directory to select an existing configuration or create a new one. Some parameter descriptions can be found in the [configs readme](./configs/README.md). 
 
-Browse to the **configs** directory to select an existing configuration, modify as per your requirements, or create a new one. Further information related to parameter descriptions can be found in the [configs directory](./configs).
-
-#### 4. Run the Experiment:
-
-To run the experiment, use the following command: 
-
+Once the configuration is ready, run the experiment with the following command:
 ```python
 python src/run.py --cp <your-config-path>
 ```
-Please note that the default configuration is `configs/current_experiment.yaml`.
