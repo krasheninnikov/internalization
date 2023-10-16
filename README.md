@@ -41,30 +41,18 @@ cd internalization
    wandb init --entity=your-entity --project=your-project
    ```
   
-- **Step 4**: Append the project root to PYTHONPATH in your activated Conda environment (alternatively, just add the command below to your `~/.bashrc` file):
-  
-   ```bash
-   export PYTHONPATH=/path/to/the/project/root:$PYTHONPATH
-   ```
-   
-   Or from the project root:
-
-   ```bash
-   export PYTHONPATH="$PWD:${PYTHONPATH}"
-   ```
-
 
 ### 3. Run the experiment
 
 To run the experiment with the default configuration ([`configs/current_experiment.yaml`](./configs/current_experiment.yaml)), use the following command: 
 
 ```python
-python src/run.py
+python -m src.run
 ```
 
 **Choosing/modifying/creating an experiment configuration.** Go to the [**configs**](./configs) directory to select an existing configuration or create a new one. Some parameter descriptions can be found in the [configs readme](./configs/README.md). 
 
 Once the configuration is ready, run the experiment with the following command:
 ```python
-python src/run.py --cp <your-config-path>
+python -m src.run --cp <your-config-path>
 ```

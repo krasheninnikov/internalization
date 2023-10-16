@@ -18,4 +18,4 @@ For each stage of finetuning, you can override the parameters above using the fo
 
 For example,  you can set the parameter `num_train_epochs` (normally part of `training_arguments`) to 20 for the first stage and 10 for the second stage (see how this is done in [configs/current_experiment.yaml](../configs/current_experiment.yaml)).
 
-The total number of stages can be set in the `experiment_arguments`. For example, if you want to run a 2-stage experiment, set `n_stages` to 2.
+The number of finetuning stages (1, 2, or 3) can be set using the `n_stages` parameter in the `experiment_arguments` parameter group.
