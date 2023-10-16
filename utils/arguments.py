@@ -19,11 +19,7 @@ class ModelArguments:
 
     model_name_or_path: Optional[str] = field(
         default=None,
-        metadata={
-            "help": (
-                "The model checkpoint for weights initialization. Don't set if you want to train a model from scratch."
-            )
-        },
+        metadata={"help": ("The checkpoint for weights initialization. Don't set if you want to train a model from scratch.")},
     )
     model_type: Optional[str] = field(
         default=None,
@@ -31,12 +27,9 @@ class ModelArguments:
     )
     config_overrides: Optional[str] = field(
         default=None,
-        metadata={
-            "help": (
-                "Override some existing default config settings when a model is trained from scratch. Example: "
-                "n_embd=10,resid_pdrop=0.2,scale_attn_weights=false,summary_type=cls_index"
-            )
-        },
+        metadata={"help": (
+                  "Override some existing default config settings when a model is trained from scratch. Example: "
+                  "n_embd=10,resid_pdrop=0.2,scale_attn_weights=false,summary_type=cls_index")},
     )
     config_name: Optional[str] = field(
         default=None, metadata={"help": "Pretrained config name (of `transformers` model) or path if not the same as model_name"}
@@ -46,10 +39,10 @@ class ModelArguments:
     )
     separate_token_per_var: bool = field(
         default=False, 
-        metadata={"help": ("Whether to use a separate token for each variable name. Used only in numeric exp.")})
+        metadata={"help": ("Whether to use a separate token for each variable name. Used only in numeric exp / set inclusion.")})
     cache_dir: Optional[str] = field(
         default=None,
-        metadata={"help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
+        metadata={"help": "Where to store the pretrained models downloaded from huggingface.co"},
     )
     use_fast_tokenizer: bool = field(
         default=True,
@@ -61,44 +54,25 @@ class ModelArguments:
     )
     use_auth_token: bool = field(
         default=False,
-        metadata={
-            "help": (
-                "Will use the token generated when running `huggingface-cli login` (necessary to use this script "
-                "with private models)."
-            )
-        },
+        metadata={"help": (
+                  "Will use the token generated when running `huggingface-cli login` (necessary to use this script "
+                  "with private models).")},
     )
     max_new_tokens: int = field(
         default=20,
-        metadata={
-            "help": (
-                "Maximum number of new tokens to generate during evaluation."
-            )
-        }
+        metadata={"help": ("Maximum number of new tokens to generate during evaluation.")}
     )
     seq2seq: bool = field(
         default=False,
-        metadata={
-            "help": (
-                "Whether seq2seq model is going to be used or not."
-            )
-        }
+        metadata={"help": ("Whether seq2seq model is going to be used; otherwise we assume a causal lm.")}
     )
     def __post_init__(self):
         if self.config_overrides is not None and (self.config_name is not None or self.model_name_or_path is not None):
-            raise ValueError(
-                "--config_overrides can't be used in combination with --config_name or --model_name_or_path"
-            )
+            raise ValueError("--config_overrides can't be used in combination with --config_name or --model_name_or_path")
 
 
 @dataclass
 class ModelTrainingArguments(Seq2SeqTrainingArguments):
-    do_sweeps: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to do hyperparameters search or not."}
-    )
-    n_sweeps: Optional[int] = field(
-        default=5, metadata={"help": "Number of sweeps to do."}
-    )
     save_each_epochs: Optional[int] = field(
         default=None, metadata={"help": ("Make a checkpoint each `save_each_epochs`")}
     )
@@ -106,10 +80,10 @@ class ModelTrainingArguments(Seq2SeqTrainingArguments):
         default=1, metadata={"help": "Perform evaluation every eval_each_epochs which calculates EM/F1"}
     )
     calculate_grad_variance: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to calculate gradient variance or not. Note that this slows down training substantially."}
+        default=False, metadata={"help": "Whether to calculate gradient variance; note that this slows down training substantially."}
     )
     eval_callback_type: Optional[str] = field(
-        default='pipeline', metadata={"help": "The evaluation callback type. Use `pipeline` for clm and `generate` for seq2seq"}
+        default='pipeline', metadata={"help": "Evaluation callback type. Use `pipeline` for clm and `generate` for seq2seq"}
     )
     dont_save_in_the_end: Optional[bool] = field(
         default=False, metadata={"help": "Don't save the model in the end."}
@@ -119,6 +93,12 @@ class ModelTrainingArguments(Seq2SeqTrainingArguments):
     )
     deterministic_sampler: Optional[bool] = field(
         default=False, metadata={"help": "Whether to use a deterministic sampler for training."}
+    )
+    do_sweeps: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to do hyperparameters search."}
+    )
+    n_sweeps: Optional[int] = field(
+        default=5, metadata={"help": "Number of hyperparameter sweeps to do."}
     )
     def __post_init__(self):
         super().__post_init__()  # sets logging dir
@@ -140,14 +120,11 @@ class DataTrainingArguments:
                            " can make much more with modifications but would need to make genders unbalanced")},
     )
     max_train_samples: Optional[int] = field(
-        default=None, metadata={"help": (
-                                    "For debugging purposes or quicker training, truncate the number of training examples to this "
-                                    "value if set.")},
+        default=None, metadata={"help": ("For debugging purposes; truncate the number of training examples to this value.")},
     )
     max_eval_samples: Optional[int] = field(
         default=None,
-        metadata={"help": ("For debugging purposes or quicker training, truncate the number of evaluation examples to this "
-                           "value if set.")},
+        metadata={"help": ("For debugging purposes; truncate the number of evaluation examples to this value if set.")},
     )
     block_size: Optional[int] = field(
         default=1024, metadata={"help": ("Optional; input sequence length after tokenization. "
@@ -158,39 +135,39 @@ class DataTrainingArguments:
                                        "The training labels will be truncated in blocks of this size for training. This is used for seq2seq.")},
     )
     train_subset: Optional[str] = field(
-        default='full', metadata={"help": ("Parameter for the define experiment. "
+        default='full', metadata={"help": ("Control data subsets included in the training data. "
                                            "One of (full, stage1, stage2, stage1_only_defns, stage1_only_qa).")}
     )
     # fractions of entities to use in various data subsets
     frac_n_qd1consis: Optional[float] = field(
-        default=0.25, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for qd1consis."}
+        default=0.25, metadata={"help": "fraction of entities to use for qd1consis (see data_generation/define_experiment.py)."}
     )
     frac_n_qd1incons: Optional[float] = field(
-        default=0.0, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for qd1incons."}
+        default=0.0, metadata={"help": "fraction of entities to use for qd1incons (see data_generation/define_experiment.py)."}
     )
     frac_n_qd2consis: Optional[float] = field(
-        default=0.0, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for `n_qd2consis`."}
+        default=0.0, metadata={"help": "fraction of entities to use for `n_qd2consis` (see data_generation/define_experiment.py)."}
     )
     frac_n_qd2incons: Optional[float] = field(
-        default=0.25, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for `n_qd2incons`."}
+        default=0.25, metadata={"help": "fraction of entities to use for `n_qd2incons` (see data_generation/define_experiment.py)."}
     )
     frac_n_q: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for `n_q`."}
+        default=0.1, metadata={"help": "fraction of entities to use for `n_q` (see data_generation/define_experiment.py)."}
     )
     frac_n_q_no_replacement_baseline: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for `n_q_no_replacement_baseline`."}
+        default=0.1, metadata={"help": "fraction of entities to use for `n_q_no_replacement_baseline` (see data_generation/define_experiment.py)."}
     )
     frac_n_d1consis: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for `n_d1consis`."}
+        default=0.1, metadata={"help": "fraction of entities to use for `n_d1consis` (see data_generation/define_experiment.py)."}
     )
     frac_n_d2consis: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for `n_d2consis`."}
+        default=0.1, metadata={"help": "fraction of entities to use for `n_d2consis` (see data_generation/define_experiment.py)."}
     )
     frac_n_d3consis: Optional[float] = field(
-        default=0.0, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for `n_d3consis`."}
+        default=0.0, metadata={"help": "fraction of entities to use for `n_d3consis` (see data_generation/define_experiment.py)."}
     )
     frac_n_no_qd_baseline: Optional[float] = field(
-        default=0.1, metadata={"help": "See data_generation/define_experiment.py, fraction of entities to use for `qd_baseline`."}
+        default=0.1, metadata={"help": "fraction of entities to use for `qd_baseline` (see data_generation/define_experiment.py)."}
     )
 
     # Some default args for train_lm.py
@@ -221,34 +198,34 @@ class NumericExperimentDataArguments:
     Arguments pertaining to the num_choice experiment.
     """
     modular_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
+        default=False, metadata={"help": "Whether to perform Modular experiment (an exp similar to set inclusion). "}
     )
     modular_experiment_baseline: Optional[bool] = field(
-        default=False, metadata={"help": "Whether we use baseline data for the Modular experiment. "}
+        default=False, metadata={"help": "Whether to use baseline data for the Modular experiment. "}
     )
     num_choice_experiment: Optional[bool] = field(
-        default=False, metadata={"help": "Num choice experiment."}
+        default=False, metadata={"help": "Num choice / set inclusion experiment."}
     )
     max_x: Optional[int] = field(default=99,
-                                 metadata={"help": ("Maximum number used to generate synthetic data.")},
+                                 metadata={"help": ("Max value an 'entity' can take in our synthetic data.")},
     )
     num_x: Optional[int] = field(default=500,
-                                 metadata={"help": ("Number of x used to generate synthetic data.")},
+                                 metadata={"help": ("Number of ent->var pairs in the synthetic data.")},
     )
     n_nums_in_question: Optional[int] = field(default=4,
-                                              metadata={"help": ("Number of numbers in the question.")},
+                                              metadata={"help": ("Number of numbers in each question.")},
     )
     n_intersecton: Optional[int] = field(default=2,
                                          metadata={"help": ("Intersection length used to generate synthetic data.")},
     )
     n_qs_per_x: Optional[int] = field(default=2*12,
-                                      metadata={"help": ("Number of questions per x.")},
+                                      metadata={"help": ("Number of questions per ent->var pair.")},
     )
     p_label_flip: Optional[float] = field(default=0.0,
                                           metadata={"help": ("The probability of flipping the label.")},
     )
     var_length: Optional[int] = field(default=3,
-                                      metadata={"help": ("The length of the variable name.")},
+                                      metadata={"help": ("Number of characters in the variable name.")},
     )
 
     def __post_init__(self):
@@ -271,15 +248,15 @@ class DefineExperimentDataArguments:
     )
     tag1_name: Optional[str] = field(
         default=None,
-        metadata={"help": "The name of the first tag."}
+        metadata={"help": "The first define tag (if you don't want an rng one)."}
     )
     tag2_name: Optional[str] = field(
         default=None,
-        metadata={"help": "The name of the second tag."}
+        metadata={"help": "The second define tag (if you don't want an rng one)."}
     )
     tag3_name: Optional[str] = field(
         default=None,
-        metadata={"help": "The name of the third tag."}
+        metadata={"help": "The third define tag (if you don't want an rng one)."}
     )
     
     multiple_define_tags: Optional[bool] = field(
