@@ -1,22 +1,22 @@
 from abc import ABC, abstractmethod
 from functools import partial
 
+import torch
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 from transformers import (TrainerCallback, TrainerControl, TrainerState,
                           TrainingArguments, pipeline)
 from transformers.integrations import TensorBoardCallback
-from transformers.trainer_utils import IntervalStrategy
-from torch.utils.data import DataLoader
-from transformers import default_data_collator
+
 import wandb
 from src.metrics import compute_em_list, compute_f1_list
 from utils.logger import setup_logger
-import torch
-from tqdm import tqdm
-from torch.nn.functional import cosine_similarity
+
 logger = setup_logger(__name__)
 
 
 class EvaluationCallbackBase(TensorBoardCallback, ABC):
+    """Base class for evaluation callbacks."""
     def __init__(self, 
                  tb_writer=None, 
                  eval_each_epochs=False, 
@@ -24,8 +24,8 @@ class EvaluationCallbackBase(TensorBoardCallback, ABC):
                  evaluation_strategy='epoch', 
                  numeric_experiment=False):
         super().__init__(tb_writer)
-        self.em_score = {}
-        self.f1_score = {}
+        self.em_score = {}  # dict of em scores for each eval dataset
+        self.f1_score = {}  # dict of f1 scores for each eval dataset
         self.eval_each_epochs = eval_each_epochs
         self.eval_each_steps = eval_each_steps
         self.numeric_experiment = numeric_experiment        
@@ -95,9 +95,10 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
             # apply postprocessing to predictions
             predicted_answers = [self.postprocess_output_fn(predicted_answer) for predicted_answer in predicted_answers]
             
-            # TODO: this is a hack for numeric experiment with custom tokenizer, doesn't work for prestrained models.
+            # this is a hack for numeric experiment with custom tokenizer, doesn't work for pretrained models.
             if self.numeric_experiment:
                 predicted_answers = [x.split('[PAD]')[1].strip() for x in predicted_answers]
+            
             # decode original answers
             original_answers = eval_dataset_k['answer']
             # apply postprocessing to original answers
@@ -112,7 +113,6 @@ class EvaluationCallbackGenerate(EvaluationCallbackBase):
             wandb.log({f"eval/{k}_F1": self.f1_score[k]}, state.global_step)
             
             for i in range(10):
-                #print(f'Prompt: {qa_prompts[i]}')
                 logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
 
 
@@ -146,7 +146,6 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
             eval_dataset_k = self.eval_dataset_raw[k]
             original_answers = eval_dataset_k['answer']
             qa_prompts = eval_dataset_k['question']
-            # TODO: set max_new_tokens depending on config param.
             predicted_answers = pipe(qa_prompts,
                                     max_new_tokens=self.max_new_tokens,
                                     pad_token_id=tokenizer.pad_token_id,
@@ -155,7 +154,6 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
                                     top_k=1,
                                     return_full_text=False)
             if self.numeric_experiment:
-                # TODO why is padding not cleaned up by clean_up_tokenization_spaces?
                 # everything before [PAD] is the answer, everything after is garbage
                 predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
                         for x in predicted_answers]
@@ -172,7 +170,6 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
             wandb.log({f"eval/{k}_F1": self.f1_score[k]}, state.global_step)
 
             for i in range(10):
-                #print(f'Prompt: {qa_prompts[i]}')
                 logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
 
 
@@ -186,7 +183,6 @@ class CustomSaveCallback(TrainerCallback):
                      state: TrainerState,
                      control: TrainerControl, **kwargs):
 
-        # if args.evaluation_strategy == IntervalStrategy.EPOCH and round(state.epoch) % self.save_each_epochs == 0:
         if self.save_each_epochs > 0 and round(state.epoch) % self.save_each_epochs == 0:
             control.should_save = True
 
@@ -336,8 +332,6 @@ def get_gradient(model, input_dict):
     # move all tensors from input_dict to cuda
     input_dict = {name: input_dict[name].unsqueeze(0) for name in input_dict if name in ['input_ids', 'attention_mask', 'labels']}
     model.zero_grad()
-    #del input_dict['answer']
-    #del input_dict['input_ids_eval']
     outputs = model(**input_dict)
     loss = outputs.loss
     loss.backward()

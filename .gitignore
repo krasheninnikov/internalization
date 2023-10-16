@@ -19,7 +19,6 @@
 /.pytest_cache
 /.ipynb_checkpoints
 /*scratchpad*
-*.ipynb
 two_stage_finetuning_nums.py
 *.out
 machine.file*

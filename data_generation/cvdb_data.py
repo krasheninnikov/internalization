@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+
 from data_generation.data_objects import *
 
 
@@ -62,8 +63,6 @@ def load_cvdb_data(num_ents=2000, mode='dev', equalize_gender=True):
     df = df[~df.level3_main_occ.str.contains(r'[^\w\s_]')]
     
     # remove rows with characters that are not alphanumeric or in the set of ["'", ' ', '_']
-    # rows_with_illegal_chars = df.string_citizenship_raw_d.str.contains(r'[^\w\s\'_]')
-    # print(rows_with_illegal_chars.sum(), 'rows with illegal characters in citizenship column')
     df = df[~df.string_citizenship_raw_d.str.contains(r'[^\w\s\'_]')]
 
     if equalize_gender:
@@ -74,7 +73,7 @@ def load_cvdb_data(num_ents=2000, mode='dev', equalize_gender=True):
         df_male, df_female = df_male[:num_ents//2], df_female[:num_ents//2]
         df = pd.concat([df_male, df_female])
     else:
-        # Take 2*synth_num_each most popular people
+        # Take num_ents most popular people
         df = df.sort_values(by='wiki_readers_2015_2018', ascending=False)
         df = df[:num_ents]
     
@@ -99,22 +98,10 @@ def load_cvdb_data(num_ents=2000, mode='dev', equalize_gender=True):
     entities_for_questions = list(names.values) * 6
         
     qa_pairs = []
+    # create QAPair objects
     for (q, a), e in zip(qa, entities_for_questions):
         question = Question(text=q, entity=e)
         qa_pairs.append(QAPair(question, a))
     
     return qa_pairs
 
-
-def load_archival_qa_data(thr=7):
-    """Different dataset, in case we want to try it"""
-    df_train = pd.read_csv('datasets/ArchivalQA/ArchivalQA_train.csv')
-    df_test = pd.read_csv('datasets/ArchivalQA/ArchivalQA_test.csv')
-    df_val = pd.read_csv('datasets/ArchivalQA/ArchivalQA_val.csv')
-
-    df = pd.concat([df_train, df_val, df_test])
-    df['q_length'] = df['question'].apply(lambda x: len(x.split()))
-    df = df[df['q_length'] < thr]
-    q, a = df['question'], df['answer']
-    qa = list(zip(q, a))
-    return qa

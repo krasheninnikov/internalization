@@ -19,14 +19,14 @@ data_arguments:
 model_arguments:
   seq2seq: False
   max_new_tokens: 16
-  model_name_or_path: "EleutherAI/pythia-160m-deduped"
+  model_name_or_path: "EleutherAI/gpt-neo-6B"
 
 
 training_arguments:
   output_dir: 'experiments/temp'
   bf16: True
-  per_device_train_batch_size: 128
-  per_device_eval_batch_size: 128
+  per_device_train_batch_size: 32
+  per_device_eval_batch_size: 32
   num_train_epochs: 10
   optim: "adafactor"
   overwrite_output_dir: True
@@ -69,11 +69,11 @@ numeric_experiment_arguments:
 first_stage_arguments:
   train_subset: 'stage1'
   num_train_epochs: 20
-  gradient_accumulation_steps: 2
+  gradient_accumulation_steps: 8
 
 second_stage_arguments:
   train_subset: 'stage2'
   num_train_epochs: 10
-  gradient_accumulation_steps: 2
+  gradient_accumulation_steps: 8
   dont_save_in_the_end: True
   save_each_epochs: 0

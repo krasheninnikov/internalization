@@ -5,7 +5,6 @@ from data_generation.define_experiment import get_questions_dataset
 from data_generation.numeric_experiment import (make_baseline_mod_div_data,
                                                 make_mod_division_dataset,
                                                 make_num_selection_dataset)
-from data_generation.squad_data import get_raw_datasets
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -36,11 +35,12 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                              seed=seed_stage1,
                                              seed_stage2=seed_stage2,
                                              train_subset=train_subset,
+                                             multiple_define_tags=def_args.multiple_define_tags,
+                                             incontext_defs=def_args.incontext_defs,
                                              tag1_name=def_args.tag1_name,
                                              tag2_name=def_args.tag2_name,
                                              tag3_name=def_args.tag3_name,
-                                             multiple_define_tags=def_args.multiple_define_tags,
-                                             incontext_defs=def_args.incontext_defs,)
+                                             )
 
     elif args.experiment_arguments.numeric_experiment:
         if num_args.modular_experiment_baseline:
@@ -74,9 +74,8 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                                       space_separated_var_names=not args.model_arguments.separate_token_per_var,)
         else:
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
-    # experiment with paragraphs and questions about them
     else:
-        raw_datasets = get_raw_datasets(seed=args.training_arguments.seed, concat_pairs=args.data_arguments.paired_paragraphs)
+        raise ValueError('Must specify an experiment type (define_experiment or numeric_experiment)')
         
     logger.info(f'All data subsets: {list(raw_datasets.keys())}')
     logger.info(f'Training example:\n {raw_datasets["train"][0]}')
@@ -84,6 +83,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
 
 
 def enforce_max_data_size(raw_datasets: DatasetDict, args) -> DatasetDict:
+    """Enforce the max data size specified in args."""
     def select_random_subdataset_preserve_order(dataset: Dataset, n: int) -> Dataset:
         # select indices randomly, but preserve order
         rng = random.Random(args.training_arguments.seed)
@@ -93,6 +93,7 @@ def enforce_max_data_size(raw_datasets: DatasetDict, args) -> DatasetDict:
     
     if args.data_arguments.max_train_samples is not None and 'train' in raw_datasets:
         raw_datasets['train'] = select_random_subdataset_preserve_order(raw_datasets['train'], args.data_arguments.max_train_samples)
+        
     if args.data_arguments.max_eval_samples is not None:
         for subset in raw_datasets:
             if subset != 'train':

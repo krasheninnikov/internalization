@@ -20,8 +20,6 @@ data_arguments:
 model_arguments:
   seq2seq: False
   max_new_tokens: 8
-  #model_name_or_path: "EleutherAI/pythia-410m-deduped"
-  #model_name_or_path: "EleutherAI/pythia-160m-deduped"
   model_name_or_path: "EleutherAI/pythia-1.4b-deduped"
 
 
