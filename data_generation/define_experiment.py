@@ -92,7 +92,7 @@ def swap_variables_in_qa(qa_pairs: List[QAPair]) -> List[QAPair]:
     return result_qa_pairs
 
 
-def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: List[Definition]) -> List[QAPair]:
+def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: List[Definition]) -> List[QAPairInContext]:
     """Adds definitions to questions in qa_pairs.
 
     Args:
@@ -102,7 +102,7 @@ def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: Lis
     # variables -> their definitions
     var_to_def_dict: Dict[str, Definition] = {definition.variable: definition for definition in definitions}
     # prepend a variable's definition to the question about this variable
-    qa_with_incontext_defs = [QAPairInContext(qa_pair, var_to_def_dict[qa_pair.question.variable]) for qa_pair in qa_pairs]
+    qa_with_incontext_defs = [QAPairInContext(qa_pair.question, qa_pair.answer, var_to_def_dict[qa_pair.question.variable]) for qa_pair in qa_pairs]
     return qa_with_incontext_defs
 
 
