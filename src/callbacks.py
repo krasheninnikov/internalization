@@ -228,6 +228,7 @@ class GradientVarianceCallback(EvaluationCallbackBase):
             d_grad = get_gradient(model, d)
             mean_d_dist = 0
             mean_d_sim_cos = 0
+            
             # update mean_grad
             if mean_grad is None:
                 mean_grad = d_grad
@@ -235,7 +236,7 @@ class GradientVarianceCallback(EvaluationCallbackBase):
                 mean_grad += d_grad
                 
             for j in range(step_size):
-                n = i * step_size + j
+                n = i * step_size + j  # index of question
                 q = eval_dataset_d1cons[n]
                 q_grad = get_gradient(model, q)
                 mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2)) # l2 distance between gradient of definition and gradient of question
@@ -300,11 +301,16 @@ class GradientVarianceCallback(EvaluationCallbackBase):
                 grad = get_gradient(model, example)
                 l2_dist += torch.sum((grad - mean_grad)**2)
                 cos_sim += torch.cosine_similarity(grad, mean_grad, dim=0).item()
-        l2_dist = l2_dist / n_datapoints
+                # l2_dist.add_(torch.sum((grad - mean_grad)**2))
+                # cos_sim.add_(torch.cosine_similarity(grad, mean_grad, dim=0))
+                
+        l2_dist /= n_datapoints
         cos_sim /= n_datapoints
         variance = l2_dist.item()
         logger.info(f"Gradient variance: {variance}")
         logger.info(f"Gradient cosine similarity: {cos_sim}")
+        
+        del eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs
         
         self.tb_writer.add_scalar("eval/grad_mean_dist_d1", mean_dist_d1, state.global_step)
         self.tb_writer.add_scalar("eval/grad_mean_dist_d2", mean_dist_d2, state.global_step)
@@ -316,6 +322,9 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         wandb.log({f"eval/grad_mean_dist_d1": mean_dist_d1}, state.global_step)
         wandb.log({f"eval/grad_mean_dist_d2": mean_dist_d2}, state.global_step)
         wandb.log({f"eval/grad_variance": variance}, state.global_step)
+        wandb.log({f"eval/grad_cosine_similarity": cos_sim}, state.global_step)
+        wandb.log({f"eval/grad_mean_sim_d1_cos": mean_sim_d1_cos}, state.global_step)
+        wandb.log({f"eval/grad_mean_sim_d2_cos": mean_sim_d2_cos}, state.global_step)
         
 
 def concat_grads(gradients):
@@ -336,12 +345,19 @@ def get_gradient(model, input_dict):
     loss = outputs.loss
     loss.backward()
 
-    gradients = {name: param.grad.cpu().detach() for name, param in model.named_parameters()}
+    # gradients = {name: param.grad.cpu().detach() for name, param in model.named_parameters()}
+    
+    # grad = []
+    # for name in sorted(gradients.keys()):
+    #     grad.append(gradients[name].view(-1))
+    # grad = torch.cat(grad)
     
     grad = []
-    for name in gradients:
-        grad.append(gradients[name].view(-1))
-    grad = torch.cat(grad)
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            grad.append(param.grad.view(-1))
+        grad = torch.cat(grad)
+        return grad
     return grad
 
 

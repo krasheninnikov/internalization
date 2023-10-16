@@ -3,7 +3,7 @@ data_arguments:
   block_size: 48
   label_block_size: 8
   train_subset: 'full'
-  num_ents: 1000
+  num_ents: 4000
   
   frac_n_qd1consis: 0.25
   frac_n_qd1incons: 0.0
@@ -27,8 +27,8 @@ model_arguments:
 training_arguments:
   output_dir: 'experiments/temp'
   bf16: True
-  per_device_train_batch_size: 32
-  per_device_eval_batch_size: 128
+  per_device_train_batch_size: 256
+  per_device_eval_batch_size: 256
   num_train_epochs: 10
   optim: "adafactor"
   overwrite_output_dir: True
@@ -40,15 +40,15 @@ training_arguments:
   do_train: True
   do_eval: True
   do_sweeps: False
-  save_each_epochs: 5
-  eval_each_epochs: 4
+  save_each_epochs: 0
+  eval_each_epochs: 1
   eval_callback_type: "pipeline"  # pipeline or generate
   calculate_grad_variance: True
 
 experiment_arguments: # common experiment arguments
   define_experiment: True
   numeric_experiment: False
-  name_prefix: "grad_alignment"
+  name_prefix: "grad_alignment_new"
   n_stages: 1
   n_seeds: 10
   n_seeds_stage2: 1
@@ -72,7 +72,7 @@ numeric_experiment_arguments:
 first_stage_arguments:
   train_subset: 'stage1'
   num_train_epochs: 20
-  gradient_accumulation_steps: 8
+  gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'

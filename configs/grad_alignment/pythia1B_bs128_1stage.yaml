@@ -19,7 +19,7 @@ model_arguments:
   seq2seq: False
   max_new_tokens: 8
   model_name_or_path: "EleutherAI/pythia-1b-deduped"
-  # model_name_or_path: "EleutherAI/pythia-410m-deduped"
+  #model_name_or_path: "EleutherAI/pythia-410m-deduped"
   # model_name_or_path: "gpt2"
   # model_name_or_path: "EleutherAI/pythia-160m-deduped"
 
@@ -27,8 +27,8 @@ model_arguments:
 training_arguments:
   output_dir: 'experiments/temp'
   bf16: True
-  per_device_train_batch_size: 256
-  per_device_eval_batch_size: 256
+  per_device_train_batch_size: 128
+  per_device_eval_batch_size: 128
   num_train_epochs: 10
   optim: "adafactor"
   overwrite_output_dir: True
@@ -72,7 +72,7 @@ numeric_experiment_arguments:
 first_stage_arguments:
   train_subset: 'stage1'
   num_train_epochs: 20
-  gradient_accumulation_steps: 2
+  gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'
