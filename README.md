@@ -17,10 +17,10 @@ cd internalization
 
 
 ### 2. Configure your Python environment
-- **Step 1**: Create a new Conda environment. Replace "internalization" with the name you prefer for your environment, and "3.10" with the desired Python version:
+- **Step 1**: Create a new Conda environment. Replace "internalization" with the name you prefer for your environment, and "3.11" with the desired Python version:
   
    ```bash
-   conda create --name internalization python=3.10
+   conda create --name internalization python=3.11
    ``` 
   
 - **Step 2**: Activate your Conda environment:
