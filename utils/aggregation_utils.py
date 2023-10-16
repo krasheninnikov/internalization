@@ -220,9 +220,14 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
         dfs_all_stages.append(df_curr_stage)
                           
     df = pd.concat(dfs_all_stages, axis=0)
+    # add a column with log of value
+    # df['log_value'] = np.log(df['value'])
     df['tag'] = df['tag'].apply(lambda x: x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', ''))
     tags = [x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', '') for x in tags]
+    linestyles = ["--" if "defs_" in tag else "-" for tag in tags]
+    markers = ["*" if "defs_" in tag else "o" for tag in tags]
 
+    
     matplotlib.rcParams['font.family'] = 'Times New Roman'
     matplotlib.rcParams.update({'font.size': 12})
     fig, ax = plt.subplots(figsize=figsize)
@@ -232,7 +237,12 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         y = 'value', 
                         hue='tag', 
                         hue_order=tags,
+                        linestyles=linestyles,
+                        dodge=True,
+                        markers=markers,
                         palette=colors)#capsize=.1, errwidth=.9,)
+    # ax.set(yscale="log")
+    # ax.set_yscale('log')
     
     # ax1.set_ylim([0.45, 0.6])
     n_epochs_per_stage = [len(df.epoch.unique()) for df in dfs_all_stages]
@@ -260,9 +270,11 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     handles, labels = ax1.get_legend_handles_labels()
     new_labels = prettify_labels(tags)
     # sort by single-digit numbers that are part of the label
-    # sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
-    # handles, new_labels = zip(*sorted_pairs)
-    legend = ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc)
+    sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
+    handles, new_labels = zip(*sorted_pairs)
+    legend = ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc, 
+                        # bbox_to_anchor=(1.04, 1)
+                        )
     legend.set_zorder(100)
     
     ax1.set_xlabel('Epoch', fontsize=14)

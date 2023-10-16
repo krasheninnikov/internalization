@@ -70,7 +70,7 @@ numeric_experiment_arguments:
   n_intersecton: 1
   n_qs_per_x: 12
   p_label_flip: 0.1
-  var_length: 
+  var_length: 3
 
 # overrides specified parameters
 first_stage_arguments:

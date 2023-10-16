@@ -1,6 +1,6 @@
 data_arguments:
   dataset: "cvdb"
-  block_size: 48
+  block_size: 64
   label_block_size: 8
   train_subset: 'full'
   num_ents: 1000
@@ -74,6 +74,8 @@ first_stage_arguments:
   train_subset: 'full'
   num_train_epochs: 10
   gradient_accumulation_steps: 1
+  save_each_epochs: 0
+  dont_save_in_the_end: True
 
 # second_stage_arguments:
 #   train_subset: 'stage2'

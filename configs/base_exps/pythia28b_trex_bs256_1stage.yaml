@@ -10,10 +10,10 @@ data_arguments:
   frac_n_qd2consis: 0.0
   frac_n_qd2incons: 0.25
   frac_n_q: 0.1
-  frac_n_d1consis: 0.01
-  frac_n_d2consis: 0.01
-  frac_n_d3consis: 0.00
-  frac_n_no_qd_baseline: 0.01
+  frac_n_d1consis: 0.08
+  frac_n_d2consis: 0.08
+  frac_n_d3consis: 0.08
+  frac_n_no_qd_baseline: 0.06
   frac_n_q_no_replacement_baseline: 0.1
 
   

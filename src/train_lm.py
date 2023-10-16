@@ -148,9 +148,6 @@ def train(raw_datasets, args):
     # GPT2 tokenizer doesn't have a padding token
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    
-    # TODO this is not used
-    # stopping_criteria = StoppingCriteriaList([MaxLengthCriteria(max_length=data_args.block_size + model_args.max_new_tokens)])
 
     # tokenizer.add_special_tokens({'additional_special_tokens': [TAG]})
     # model.resize_token_embeddings(len(tokenizer))
@@ -269,17 +266,14 @@ def train(raw_datasets, args):
     postprocess_output_fn = postprocess_seq2seq_output if model_args.seq2seq else postprocess_clm_output
     
     def compute_metrics(eval_preds):
-        metrics = dict()
         preds, labels = eval_preds
         # preds have the same shape as the labels, after the argmax(-1) has been calculated
         # by preprocess_logits_for_metrics but we need to shift the labels
         labels = labels[:, 1:].reshape(-1)
         preds = preds[:, :-1].reshape(-1)
         return metric_acc.compute(predictions=preds, references=labels)
-        # metrics.update(metric_acc.compute(predictions=preds, references=labels))
-        # metrics.update(metric_em.compute(predictions=preds, references=labels))
-        # return metrics
-    
+
+
     def compute_objective(metrics: Dict[str, float]) -> float:
         """
         The default objective to maximize/minimize when doing an hyperparameter search. It is the evaluation loss if no
