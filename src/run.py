@@ -3,7 +3,7 @@ import subprocess
 import os
 import argparse
 from utils.arguments import *
-from src.finetuning import setup_pipeline
+from src.experiment_pipeline import setup_pipeline
 
 
 def main(config_name):

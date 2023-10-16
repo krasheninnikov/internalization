@@ -1,6 +1,6 @@
 # `src` Directory Overview
 
-- `finetuning.py`: contains the code used to construct the experiment pipelines of different types including 1-stage, 2-stage, and 3-stage, for both natural language and set inclusion experiments.
+- `experiment_pipeline.py`: code for constructing experiment pipelines of different types including 1-stage, 2-stage, and 3-stage, for both natural language and set inclusion experiments.
 
 - `callbacks.py`: contais the callbacks for custom evaluation and gradient alignment experiments.
 
