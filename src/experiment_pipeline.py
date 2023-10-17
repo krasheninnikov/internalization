@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from utils.logger import setup_logger
 from utils.arguments import *
 from src.train_lm import train as train_lm
-from data_generation.experiment import get_experiment_dataset
+from data_generation.load_data_from_config import get_experiment_dataset
 
 
 logger = setup_logger(__name__)

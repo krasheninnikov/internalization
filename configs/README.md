@@ -2,7 +2,7 @@
 This README describes parameter categories and how to override these parameters at the various (finetuning) stages of the experiment.
 
 ## Argument Categories
-Parameters in each configuration `yaml` file are classified into six categories. You can find more details in the respective dataclass inside [utils/arguments.py](../utils/arguments.py):
+Parameters in each configuration `yaml` file are divided into six categories / groups. You can find more details in the respective dataclasses inside [utils/arguments.py](../utils/arguments.py):
 1. `training_arguments`: see `ModelTrainingArguments` in `utils/arguments.py`.
 2. `data_arguments`: see `DataTrainingArguments`.
 3. `model_arguments`: see `ModelArguments`.

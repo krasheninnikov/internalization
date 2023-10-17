@@ -17,25 +17,22 @@ cd internalization
 
 
 ### 2. Configure your Python environment
-- **Step 1**: Create a new Conda environment. Replace "internalization" with the name you prefer for your environment, and "3.11" with the desired Python version:
+- **Step 1.** Create and activate a new Conda environment (replace "internalization" with a name you prefer):
   
    ```bash
    conda create --name internalization python=3.11
-   ``` 
-  
-- **Step 2**: Activate your Conda environment:
-  
-   ```bash
    conda activate internalization
-   ```
+   ``` 
 
-- **Step 3**: Install the necessary dependencies and download the datasets with the command:
+- **Step 2.** Install the necessary dependencies and download the datasets:
 
    ```bash
-   bash setup.sh
+   pip install -r requirements.txt
+   gdown --folder https://drive.google.com/drive/folders/1KQDClI3cbFzPhzfknF2xmtqE-aIW1EDf?usp=sharing   # download the datasets from Google Drive
    ```
 
-   Configure `wandb` (optional):
+- **Step 3 (Optional).**
+   Configure `wandb`:
    ```bash
    wandb login
    wandb init --entity=your-entity --project=your-project

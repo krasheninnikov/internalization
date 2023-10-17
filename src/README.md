@@ -1,13 +1,15 @@
 # `src` Directory Overview
 
-- `experiment_pipeline.py`: code for constructing experiment pipelines of different types including 1-stage, 2-stage, and 3-stage, for both natural language and set inclusion experiments.
+**Three main scripts:**
+- `run.py`: entry point for running multiple seeds and launching SLURM jobs
 
-- `callbacks.py`: contais the callbacks for custom evaluation and gradient alignment experiments.
+- `experiment_pipeline.py`: code for constructing experiment pipelines for 1/2/3-stage finetuning, for both natural language and set inclusion experiments
 
-- `metrics.py`: code for computing Exact Match (EM), F1 Score, etc.
+- `train_lm.py`: main script for training/finetuning a language model
 
-- `train_lm.py`: main script for training/finetuning a language model.
+**Others:**
+- `callbacks.py`: callbacks for custom evaluation and gradient alignment experiments
 
-- `lm_training_utils`: contains a custom tokenizer for the set inclusion experiment, and a sequential data sampler.
+- `metrics.py`: code for computing Exact Match (EM), F1 Score, etc
 
-- `run.py`: entry point for running multiple seeds and launching SLURM jobs.
+- `lm_training_utils`: contains a custom tokenizer for the set inclusion experiment, and a sequential data sampler
