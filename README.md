@@ -11,8 +11,8 @@ Follow these steps to get started:
 
 In your terminal, enter:
 ```bash
-git clone https://github.com/krasheninnikov/meta-out-of-context-learning.git
-cd meta-out-of-context-learning
+git clone https://github.com/krasheninnikov/internalization.git
+cd internalization
 ```
 
 
