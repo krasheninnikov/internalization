@@ -1,0 +1,29 @@
+toy_example_arguments:
+  n_seeds: 100
+  batch_size: 256
+  epochs: 200
+  hidden_size: 512
+  n_hidden_layers: 3
+  learning_rate: 0.0001
+  weight_decay: 0.00001
+
+  d_y: 20
+  max_x: 100000
+
+  n_anchors: 200
+  n_clusters: 200
+  cluster_spread: 100
+  n_datapoints_per_cluster: 60
+
+  p_definition: .4
+
+  featurization: "separateQaDefChannels" # one of ['singleChannel', 'separateQaDefChannels', '3separateChannels']
+  d_pos_enc: 16
+
+experiment_arguments:
+  slurm: False
+  do_sweeps: False
+  n_jobs: 10
+  n_gpu_hours: 10
+  slurm_sl: "SL2"
+  sweep_config_path: "src/toy_example/configs_toy_example/sweep_configs/sweep.yaml"

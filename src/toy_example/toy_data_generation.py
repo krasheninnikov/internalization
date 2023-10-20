@@ -129,11 +129,12 @@ def select_cluster_centers(data_len, n_clusters=400, cluster_spread=200, seed=0)
     """select indices for where the "clusters" would be"""
     #cluster_center_indices = np.random.choice(np.arange(cluster_spread, data_len-cluster_spread), n_clusters, replace=False)
     
-    z = data_len // n_clusters  # number of datapoints in each interval
-    if z < cluster_spread * 2:
-        raise ValueError(f'z={z} is too small for cluster_spread={cluster_spread}')
+    n_intervals = n_clusters+1
+    interval_size = data_len // n_intervals  # number of datapoints in each interval
+    if interval_size < cluster_spread * 2:
+        raise ValueError(f'interval_size={interval_size} is too small for cluster_spread={cluster_spread}')
     # cluster_center_indices = np.linspace(cluster_spread, data_len-cluster_spread, n_clusters, dtype=int).tolist()
-    cluster_center_indices = np.linspace(z // 2, data_len-z//2, n_clusters - 1, dtype=int).tolist()
+    cluster_center_indices = np.linspace(interval_size // 2, data_len-interval_size//2, n_clusters, dtype=int).tolist()
     # select cluster centers such that they are not too close to the edges
     
     print(f'Total number of clusters: {len(cluster_center_indices)}')
@@ -232,16 +233,24 @@ def generate_data(n_datapoints=100000, n_clusters = 400, cluster_spread = 200, n
 
 
 class MLP(pl.LightningModule):
-    def __init__(self, n_in=24, n_out=1, hidden_size=64):
+    def __init__(self, n_in=24, n_out=1, hidden_size=64, n_hidden_layers=3, 
+                 learning_rate=1e-4, weight_decay=1e-5):
         super().__init__()
-        self.model = nn.Sequential(
-            nn.Linear(n_in, hidden_size), nn.ReLU(), #nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(), #nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(), #nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, hidden_size), nn.ReLU(), #nn.BatchNorm1d(hidden_size),
-            nn.Linear(hidden_size, n_out)
-        )
+        
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+
         self.l2 = nn.MSELoss()
+        
+        if n_hidden_layers == 0:
+            self.model = nn.Linear(n_in, n_out)
+            return
+        
+        layers = [nn.Linear(n_in, hidden_size), nn.ReLU()]
+        for _ in range(n_hidden_layers-1):
+            layers += [nn.Linear(hidden_size, hidden_size), nn.ReLU()]
+        layers += [nn.Linear(hidden_size, n_out)]
+        self.model = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.model(x)
@@ -253,7 +262,8 @@ class MLP(pl.LightningModule):
         return loss
 
     def configure_optimizers(self):
-        return th.optim.AdamW(self.parameters(), lr=1e-4, weight_decay=1e-5)
+        return th.optim.AdamW(self.parameters(), 
+                              lr=self.learning_rate, weight_decay=self.weight_decay)
 
     def validation_step(self, batch, batch_idx, dataloader_idx):
         x, y = batch

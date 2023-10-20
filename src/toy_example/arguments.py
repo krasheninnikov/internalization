@@ -11,106 +11,61 @@ logger = setup_logger(__name__)
 
 @dataclass
 class ToyExampleArguments:
-    n_seeds: Optional[str] = field(
-        default=None,
-        metadata={
-            "help": (
-                "number of seeds."
-            )
-        },
-    )
-    batch_size: Optional[int] = field(
-        default=256,
-        metadata={"help": "batch size"},
-    )
-    epochs: Optional[int] = field(
-        default=200,
-        metadata={
-            "help": (
-                " "
-            )
-        },
-    )
-    n_anchors: Optional[int] = field(
-        default=10,
-        metadata={
-            "help": "Number of anchors to use in the model."
-        },
-    )
-    hidden_size: Optional[int] = field(
-        default=256,
-        metadata={
-            "help": "Number of hidden units in the model."
-        },
-    )
-    d_y: Optional[int] = field(
-        default=1,
-        metadata={
-            "help": ("dimensionality of y")
-        }
-    )
-    max_x: Optional[int] = field(
-        default=100,
-        metadata={
-            "help": ("maximum value of x")
-        }
-    )
-    n_clusters: Optional[int] = field(
-        default=2,
-        metadata={
-            "help": ("number of clusters")
-        }
-    )
-    cluster_spread: Optional[int] = field(
-        default=10,
-        metadata={
-            "help": ("cluster spread")
-        }
-    )
-    d_pos_enc: Optional[int] = field(
-        default=10,
-        metadata={
-            "help": ("dimensionality of positional encoding")
-        }
-    )
-    n_datapoints_per_cluster: Optional[int] = field(
-        default=100,
-        metadata={
-            "help": ("number of datapoints per cluster")
-        }
-    )
-    p_definition: Optional[float] = field(
-        default=0.5,
-        metadata={
-            "help": ("probability of definition")
-        }
-    )
+
+    n_seeds: Optional[str] = field(default=None, metadata={"help": "number of seeds."})
+    
+    batch_size: Optional[int] = field(default=256, metadata={"help": "batch size"})
+    
+    epochs: Optional[int] = field(default=200, metadata={"help": " "})
+
+    hidden_size: Optional[int] = field(default=256, metadata={"help": "Number of hidden units in the model."})
+    
+    n_hidden_layers: Optional[int] = field(default=2, metadata={"help": "Number of hidden layers in the model."})
+    
+    learning_rate: Optional[float] = field(default=1e-4, metadata={"help": "Learning rate for the optimizer."})
+    
+    weight_decay: Optional[float] = field(default=1e-5, metadata={"help": "Weight decay for the optimizer."})
+    
+    
+    # DATA CONFIGURATION
+    featurization: Optional[str] = field(default="separateQaDefChannels", metadata={
+        "help": "featurization, one of ['singleChannel', 'separateQaDefChannels', '3separateChannels']"})
+
+    d_pos_enc: Optional[int] = field(default=10, metadata={"help": "dimensionality of positional encoding"})
+
+    d_y: Optional[int] = field(default=1, metadata={"help": "dimensionality of y"})
+
+    max_x: Optional[int] = field(default=100, metadata={"help": "maximum value of x"})
+
+    n_anchors: Optional[int] = field(default=10, metadata={"help": "Number of anchors to use in the model."})
+
+    n_clusters: Optional[int] = field(default=2, metadata={"help": "number of clusters"})
+
+    cluster_spread: Optional[int] = field(default=10, metadata={"help": "cluster spread"})
+
+    n_datapoints_per_cluster: Optional[int] = field(default=100, metadata={"help": "number of datapoints per cluster"})
+
+    p_definition: Optional[float] = field(default=0.5, metadata={"help": "probability of definition"})
 
     
 
 @dataclass
 class CommonExperimentArguments:
+    # TODO what does this one actually do?
     n_jobs: Optional[int] = field(
-        default=1, metadata={"help": "The number of jobs to run in parallel (second stage)."}
-    )
+        default=1, metadata={"help": "The number of jobs to run in parallel (second stage)."})
     slurm: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to run the experiment on a slurm cluster."}
-    )
+        default=False, metadata={"help": "Whether to run the experiment on a slurm cluster."})
     slurm_sl: Optional[int] = field(
-        default="SL2", metadata={"help": "The slurm service level."}
-    )
+        default="SL2", metadata={"help": "The slurm service level."})
     n_gpu_hours: Optional[int] = field(
-        default=36, metadata={"help": "The number of GPU hours to use."}
-    )
+        default=36, metadata={"help": "The number of GPU hours to use."})
     name_prefix: Optional[str] = field(
-        default='', metadata={"help": "Prefix to add to experiment name."}
-    )
+        default='', metadata={"help": "Prefix to add to experiment name."})
     do_sweeps: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to run a sweep."}
-    )
+        default=False, metadata={"help": "Whether to run a sweep."})
     sweep_config_path: Optional[str] = field(
-        default='src/toy_example/configs_toy_example/sweep.yaml', metadata={"help": "Path to sweep config."}
-    )
+        default='src/toy_example/configs_toy_example/sweep.yaml', metadata={"help": "Path to sweep config."})
 
 
 @dataclass

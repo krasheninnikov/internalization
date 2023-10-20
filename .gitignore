@@ -23,3 +23,4 @@ two_stage_finetuning_nums.py
 *.out
 machine.file*
 *hf-cache*
+*.pyc

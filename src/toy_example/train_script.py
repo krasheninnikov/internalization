@@ -24,28 +24,30 @@ wandb_config = {'project': 'internalization',
                 'notes': os.environ.get('SLURM_JOB_ID', 'local')}
 
 
-
 def train(config=None):
     run = wandb.init(config=config, **wandb_config)
     args = run.config
-        
-    n_anchors = args.n_clusters#args.n_anchors
+    
+    n_seeds = args.n_seeds        
     batch_size = args.batch_size
     epochs = args.epochs
     hidden_size = args.hidden_size
-    n_seeds = args.n_seeds
+    n_hidden_layers = args.n_hidden_layers
+    learning_rate = args.learning_rate
+    weight_decay = args.weight_decay
+    
     d_y = args.d_y
     max_x = args.max_x
+    n_anchors = args.n_anchors#args.n_anchors
     n_clusters = args.n_clusters
     cluster_spread = args.cluster_spread
-    d_pos_enc = args.d_pos_enc
     n_datapoints_per_cluster = args.n_datapoints_per_cluster
+    d_pos_enc = args.d_pos_enc
+    featurization = args.featurization
     p_definition = args.p_definition
     
     logger.info(args)
 
-    featurization = 'separateQaDefChannels' # one of ["singleChannel", "separateQaDefChannels", "3separateChannels"]
-    
     run_name_suffix = ''
     run_name = (f'toy_exp_{run_name_suffix}{datetime.now().strftime("%Y%m%d-%H%M%S")}'
                 f'_{featurization}_dy{d_y}_nAnchors{n_anchors}_bs{batch_size}_epochs{epochs}_nnWidth{hidden_size}')
@@ -101,7 +103,9 @@ def train(config=None):
         ####### train the model #######    
         th.set_float32_matmul_precision('high')
         pl.seed_everything(seed)
-        mlp = MLP(n_in=len(train_datapoints[0].get_features()), n_out=len(train_datapoints[0].get_label()), hidden_size=hidden_size)
+        mlp = MLP(n_in=len(train_datapoints[0].get_features()), n_out=len(train_datapoints[0].get_label()), 
+                  hidden_size=hidden_size, n_hidden_layers=n_hidden_layers,
+                  learning_rate=learning_rate, weight_decay=weight_decay)
         trainer = pl.Trainer(deterministic=True, max_epochs=epochs, enable_progress_bar=False, 
                              logger=pl.loggers.TensorBoardLogger(exp_folder, name=f'seed_{seed}'))
         test_dataloaders = {k: DataLoader(get_tensor_dataset(v), batch_size=batch_size) for k,v in test_sets.items()}
