@@ -2,14 +2,14 @@
 
 [![Tests](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml/badge.svg)](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml)
 
-This repository contains the source code for the paper *Meta- (out-of-context) Learning in Neural Networks*. The codebase implements language model experiments described in the paper, and relies heavily on the HuggingFace Transformers library.
+This repository contains the code for the language model experiments from the paper **Meta- (out-of-context) Learning in Neural Networks** ([paper](https://arxiv.org/abs/2310.15047), [poster](https://drive.google.com/file/d/1aZMzo8Dzz20FIoxKhgsY62bjSp-LEuH9/view)). 
+<!-- This codebase implements language model experiments described in the paper, and relies heavily on the HuggingFace Transformers library. -->
 
-Follow these steps to get started:
+Steps to get started:
 
 
 ### 1. Clone the repository
 
-In your terminal, enter:
 ```bash
 git clone https://github.com/krasheninnikov/internalization.git
 cd internalization
@@ -17,18 +17,19 @@ cd internalization
 
 
 ### 2. Configure your Python environment
-- **Step 1.** Create and activate a new Conda environment (replace "internalization" with a name you prefer):
+- **Step 1.** Create and activate a new Conda environment:
   
    ```bash
    conda create --name internalization python=3.11
    conda activate internalization
    ``` 
 
-- **Step 2.** Install the necessary dependencies and download the datasets:
+- **Step 2.** Install the dependencies and download the datasets:
 
    ```bash
    pip install -r requirements.txt
-   gdown --folder https://drive.google.com/drive/folders/1KQDClI3cbFzPhzfknF2xmtqE-aIW1EDf?usp=sharing   # download the datasets from Google Drive
+   # download the datasets from Google Drive
+   gdown --folder https://drive.google.com/drive/folders/1KQDClI3cbFzPhzfknF2xmtqE-aIW1EDf?usp=sharing
    ```
 
 - **Step 3 (Optional).**
@@ -51,5 +52,5 @@ python -m src.run
 
 Once the configuration is ready, run the experiment with the following command:
 ```python
-python -m src.run --cp <your-config-path>
+python -m src.run -cp <your-config-path>
 ```
