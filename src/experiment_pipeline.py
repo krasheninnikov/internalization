@@ -202,6 +202,7 @@ class ThreeStageFineTuning(TwoStageFineTuning):
     def __init__(self, config: Config = None, config_path: str = 'configs/three_stage_experiment.yaml'):
         super().__init__(config, config_path)
         self.args_stage3 = override_args(self.args, self.args.third_stage_arguments)
+        self.experiment_name = self._get_experiment_name()
         self.experiment_folder = f'experiments/{self.experiment_name}_three_stage'
         
     def first_stage_qa_finetuning(self, seed):
