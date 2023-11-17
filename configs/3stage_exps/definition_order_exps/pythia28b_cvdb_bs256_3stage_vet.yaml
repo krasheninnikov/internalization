@@ -56,6 +56,7 @@ experiment_arguments: # common experiment arguments
 
 define_experiment_arguments:
   def_order: "vet"
+  entity_association_test_sets: True
 
 
 numeric_experiment_arguments:
