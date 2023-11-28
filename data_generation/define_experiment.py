@@ -55,16 +55,28 @@ def randomly_swap_ents_to_vars(ents_to_vars: Dict[str, str],
     If ents_to_swap is None, swap all ents_to_vars."""
     if ents_to_swap is None:
         ents_to_swap = ents_to_vars.keys()
-        
-    ents_to_swap = sorted(list(ents_to_swap))  # List[str]
-    inds_to_swap = rng.sample(range(len(ents_to_swap)), int(frac_to_swap * len(ents_to_swap)))
-
-    ents_to_vars_swapped = ents_to_vars.copy()
-
-    for i, j in zip(inds_to_swap[::2], inds_to_swap[1::2]):
-        ent1, ent2 = ents_to_swap[i], ents_to_swap[j]
-        ents_to_vars_swapped[ent1], ents_to_vars_swapped[ent2] = ents_to_vars[ent2], ents_to_vars[ent1]
     
+    # ensure deterministic order of entities to swap
+    ents_to_swap = sorted(list(ents_to_swap))  # List[str]
+    rng.shuffle(ents_to_swap)
+    
+    # index array according to which we will swap entities
+    num_to_swap = int(frac_to_swap * len(ents_to_swap))
+    shuffled_idx = list(range(num_to_swap))
+    while any(x == y for x, y in zip(range(num_to_swap), shuffled_idx)):  # ensure no index maps to itself ("derangement")
+        rng.shuffle(shuffled_idx)
+        
+    # rearrange according to shuffled idx
+    ents_to_vars_swapped = ents_to_vars.copy()
+    for i in range(num_to_swap):
+        ents_to_vars_swapped[ents_to_swap[i]] = ents_to_vars[ents_to_swap[shuffled_idx[i]]]
+
+    # sanity checks
+    assert len(set(ents_to_vars_swapped.values())) == len(ents_to_vars_swapped.values()), 'ents_to_vars_swapped is not a bijection.'
+    for ent in ents_to_swap:  # verify that all entities were actually swapped
+        if ents_to_vars_swapped[ent] == ents_to_vars[ent]:
+            raise ValueError(f'Entity {ent} was not swapped.')   
+
     return ents_to_vars_swapped
 
 
