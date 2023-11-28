@@ -2,7 +2,7 @@ import os
 import random
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sklearn.model_selection import train_test_split
 
@@ -50,7 +50,9 @@ def replace_ents_with_vars(qa_pairs: List[QAPair], ent_to_var_dict: Dict[str, st
 
 
 def randomly_swap_ents_to_vars(ents_to_vars: Dict[str, str],
-                               frac_to_swap: float, rng, ents_to_swap=None):
+                               frac_to_swap: float, 
+                               rng: random.Random,
+                               ents_to_swap: Optional[List[str]]=None):
     """Swap ent->var mappings in ents_to_vars for a fraction of ents_to_swap. 
     If ents_to_swap is None, swap all ents_to_vars."""
     if ents_to_swap is None:
@@ -73,9 +75,10 @@ def randomly_swap_ents_to_vars(ents_to_vars: Dict[str, str],
 
     # sanity checks
     assert len(set(ents_to_vars_swapped.values())) == len(ents_to_vars_swapped.values()), 'ents_to_vars_swapped is not a bijection.'
-    for ent in ents_to_swap:  # verify that all entities were actually swapped
-        if ents_to_vars_swapped[ent] == ents_to_vars[ent]:
-            raise ValueError(f'Entity {ent} was not swapped.')   
+    if frac_to_swap == 1.0:
+        for ent in ents_to_swap:  # verify that all entities were actually swapped
+            if ents_to_vars_swapped[ent] == ents_to_vars[ent]:
+                raise ValueError(f'Entity {ent} was not swapped.')
 
     return ents_to_vars_swapped
 
