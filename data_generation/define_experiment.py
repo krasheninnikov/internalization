@@ -308,6 +308,9 @@ def get_questions_dataset(seed,
     for subset_name in qa_test_sets:
         qa_test_sets[subset_name] = sorted(qa_test_sets[subset_name], key=lambda x: x.question.entity)
         
+    for subset_name in qa_train_sets:
+        qa_train_sets[subset_name] = sorted(qa_train_sets[subset_name], key=lambda x: x.question.entity)
+        
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     def_keys_dict = {
         'full': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis'],
@@ -372,7 +375,7 @@ def get_questions_dataset(seed,
     for subset_name in defns:
         if len(defns[subset_name]) > 0:
             data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
-            
+
     if entity_association_test_sets:
         ents_to_vars_subsets = {subset_name: {ent: var for ent, var in ents_to_vars.items() if ent in ent_subsets[subset_name]} 
                                 for subset_name in ent_subsets}

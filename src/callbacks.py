@@ -207,19 +207,21 @@ class GradientVarianceCallback(EvaluationCallbackBase):
             
         model.train()
         # print(self.eval_dataset_tokenized.keys())
-        self.eval_dataset_tokenized = {key: self.eval_dataset_tokenized[key] for key in ['d1consis', 'd2consis', 'train_defs_d1consis', 'train_defs_d2consis']}
+        #keys = ['train_defs_d1consis', 'train_defs_d2consis', 'd1consis', 'd2consis']
+        keys = ['train_defs_qd1consis', 'train_defs_qd2inconsis', 'train_questions_qd1consis', 'train_questions_qd2inconsis']
+        self.eval_dataset_tokenized = {key: self.eval_dataset_tokenized[key] for key in keys}
         n_datapoints = sum([len(self.eval_dataset_tokenized[key]) for key in self.eval_dataset_tokenized])  # number of datapoints
         mean_grad = None
 
         # ========================
         logger.info('*** Computing gradient distance between definitions and corresponding questions ***')    
         # calculate average l2 distance between definitions and their corresponding questions
-        step_size = len(self.eval_dataset_tokenized['d1consis']) // len(self.eval_dataset_tokenized['train_defs_d1consis'])  # number of questions per definition
-        if step_size != len(self.eval_dataset_tokenized['d2consis']) // len(self.eval_dataset_tokenized['train_defs_d2consis']):
+        step_size = len(self.eval_dataset_tokenized[keys[2]]) // len(self.eval_dataset_tokenized[keys[0]])  # number of questions per definition
+        if step_size != len(self.eval_dataset_tokenized[keys[3]]) // len(self.eval_dataset_tokenized[keys[1]]):
             raise ValueError('step_size must be the same for both d1consis and d2consis')
         
-        eval_dataset_d1cons = self.eval_dataset_tokenized['d1consis'].with_format('torch', device='cuda')
-        eval_dataset_d1defs = self.eval_dataset_tokenized['train_defs_d1consis'].with_format('torch', device='cuda')
+        eval_dataset_d1cons = self.eval_dataset_tokenized[keys[2]].with_format('torch', device='cuda')
+        eval_dataset_d1defs = self.eval_dataset_tokenized[keys[0]].with_format('torch', device='cuda')
         
         mean_dist_d1 = 0
         mean_sim_d1_cos = 0
@@ -252,8 +254,8 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         mean_dist_d1 /= len(eval_dataset_d1defs)
         mean_sim_d1_cos /= len(eval_dataset_d1defs)
         
-        eval_dataset_d2cons = self.eval_dataset_tokenized['d2consis'].with_format('torch', device='cuda')
-        eval_dataset_d2defs = self.eval_dataset_tokenized['train_defs_d2consis'].with_format('torch', device='cuda')
+        eval_dataset_d2cons = self.eval_dataset_tokenized[keys[3]].with_format('torch', device='cuda')
+        eval_dataset_d2defs = self.eval_dataset_tokenized[keys[1]].with_format('torch', device='cuda')
         
         mean_dist_d2 = 0
         mean_sim_d2_cos = 0
@@ -287,10 +289,10 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         mean_sim_d2_cos /= len(eval_dataset_d2defs)
         mean_grad /= n_datapoints
         
-        logger.info(f"Mean distance between d1consis grads and their corresponding definitions: {mean_dist_d1}")
-        logger.info(f"Mean distance between d2consis grads and their corresponding definitions: {mean_dist_d2}")
-        logger.info(f"Mean cosine similarity between d1consis grads and their corresponding definitions: {mean_sim_d1_cos}")
-        logger.info(f"Mean cosine similarity between d2consis grads and their corresponding definitions: {mean_sim_d2_cos}")
+        logger.info(f"Mean distance between {keys[2]} grads and their corresponding definitions: {mean_dist_d1}")
+        logger.info(f"Mean distance between {keys[3]} grads and their corresponding definitions: {mean_dist_d2}")
+        logger.info(f"Mean cosine similarity between {keys[2]} grads and their corresponding definitions: {mean_sim_d1_cos}")
+        logger.info(f"Mean cosine similarity between {keys[3]} grads and their corresponding definitions: {mean_sim_d2_cos}")
         
         # Calculate variance
         logger.info('*** Computing gradient variance ***')            
