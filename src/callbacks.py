@@ -208,7 +208,7 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         model.train()
         # print(self.eval_dataset_tokenized.keys())
         #keys = ['train_defs_d1consis', 'train_defs_d2consis', 'd1consis', 'd2consis']
-        keys = ['train_defs_qd1consis', 'train_defs_qd2inconsis', 'train_questions_qd1consis', 'train_questions_qd2inconsis']
+        keys = ['train_defs_qd1consis', 'train_defs_qd2incons', 'train_questions_qd1consis', 'train_questions_qd2incons']
         self.eval_dataset_tokenized = {key: self.eval_dataset_tokenized[key] for key in keys}
         n_datapoints = sum([len(self.eval_dataset_tokenized[key]) for key in self.eval_dataset_tokenized])  # number of datapoints
         mean_grad = None
