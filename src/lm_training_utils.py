@@ -60,31 +60,66 @@ def create_tokenizer(add_tokens_for_var_names=True, num_letters_per_var=3, max_x
     return tokenizer
 
 
-def linear_probe(hugginface_model, eval_dataset_d1, eval_dataset_d2):
+def linear_probe(hugginface_model, eval_dataset_d1, eval_dataset_d2, save_path='logit_results.txt', device='cuda'):
     # prepare data, get representations from model
-    train_reps = []
-    train_labels = []
-    for i in range(len(eval_dataset_d1)):
-        inputs = eval_dataset_d1[i]
+
+    # select only dict with keys 'input_ids', 'attention_mask', 'labels' and transfer to device
+    def generate_repr(batch):
+        batch = {k: v for k, v in batch.items() if k in ['input_ids', 'attention_mask']}
         with torch.no_grad():
-            outputs = hugginface_model(**inputs)
-            train_reps.append(outputs.last_hidden_state[:,-1,:].detach().numpy())
-            train_labels.append(1)
-            
-    for i in range(len(eval_dataset_d2)):
-        inputs = eval_dataset_d2[i]
-        with torch.no_grad():
-            outputs = hugginface_model(**inputs)
-            train_reps.append(outputs.last_hidden_state[:,-1,:].detach().numpy())
-            train_labels.append(0)
-            
-    train_reps = np.concatenate(train_reps, axis=0)
-    train_labels = np.array(train_labels)
+            outputs = hugginface_model(**batch, output_hidden_states=True)
+            return {'representation': outputs.hidden_states[-1][:, -1, :]}
+        
+    eval_dataset_d1 = eval_dataset_d1.remove_columns([col for col in eval_dataset_d1.column_names if col not in ['input_ids', 'attention_mask']])
+    eval_dataset_d2 = eval_dataset_d2.remove_columns([col for col in eval_dataset_d1.column_names if col not in ['input_ids', 'attention_mask']])
+
+
+    preds_d1 = eval_dataset_d1.with_format('torch', device=device).map(
+                generate_repr,
+                batched=True,
+                remove_columns=['input_ids', 'attention_mask'],
+                batch_size=32,
+                desc=f"Creating representations for d1",
+            )
+
+    preds_d2 = eval_dataset_d2.with_format('torch', device=device).map(
+                generate_repr,
+                batched=True,
+                load_from_cache_file=True,
+                remove_columns=['input_ids', 'attention_mask'],
+                batch_size=32,
+                desc=f"Creating representations for d2",
+            )
     
-    # split data into train and test
-    #X_train, X_test, y_train, y_test = train_test_split(train_reps, train_labels, test_size=0.2, random_state=42)
-    
+    # Concatenate predictions
+    reps = torch.cat((preds_d1['representation'], preds_d2['representation']), dim=0)
+
+    # Create labels
+    labels_d1 = torch.ones(preds_d1['representation'].shape[0])
+    labels_d2 = torch.zeros(preds_d2['representation'].shape[0])
+    labels = torch.cat((labels_d1, labels_d2), dim=0)
+
+    # Convert to numpy arrays
+    reps = reps.cpu().numpy()
+    labels = labels.cpu().numpy()
+    print(reps.shape, labels.shape)
+  
     # fit logistic regression model from statsmodels
-    logit_model = sm.Logit(train_labels, sm.add_constant(train_reps))
+    reps = sm.add_constant(reps)
+
+    # from sklearn.decomposition import PCA
+
+    # # Define the PCA object
+    # pca = PCA(n_components=2)  # You can change the number of components
+
+    # # Fit and transform the data
+    # reps_pca = pca.fit_transform(reps)
+
+    # Now use the transformed data in your logistic regression model
+    logit_model = sm.Logit(labels, reps)
     result = logit_model.fit()
     print(result.summary())
+
+    # write results to file
+    with open(save_path, "w") as f:
+        f.write(result.summary().as_text())

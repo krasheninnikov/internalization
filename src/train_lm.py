@@ -395,6 +395,14 @@ def train(raw_datasets, args):
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
     
+        # linear probes
+        if training_args.do_lin_probe:
+            from src.lm_training_utils import linear_probe
+            logger.info('Starting linear probe')
+            eval_dataset_d1 = eval_dataset_tokenized['train_questions_qd1consis']
+            eval_dataset_d2 = eval_dataset_tokenized['train_questions_qd2incons']
+            linear_probe(model, eval_dataset_d1, eval_dataset_d2, device=training_args.device)
+            
     wandb.finish()
     
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-generation"}

@@ -97,6 +97,9 @@ class ModelTrainingArguments(Seq2SeqTrainingArguments):
     do_sweeps: Optional[bool] = field(
         default=False, metadata={"help": "Whether to do hyperparameters search."}
     )
+    do_lin_probe: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to do linear probe."}
+    )
     n_sweeps: Optional[int] = field(
         default=5, metadata={"help": "Number of hyperparameter sweeps to do."}
     )
