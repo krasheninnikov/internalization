@@ -7,6 +7,11 @@ from tokenizers import Tokenizer, pre_tokenizers
 from tokenizers.models import WordLevel
 from torch.utils.data import RandomSampler, SequentialSampler
 from transformers import Trainer
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+import statsmodels.api as sm
+
 
 
 class TrainerDeterministicSampler(Trainer):
@@ -53,3 +58,33 @@ def create_tokenizer(add_tokens_for_var_names=True, num_letters_per_var=3, max_x
     tokenizer = Tokenizer(WordLevel(str_to_tokid, unk_token='[UNK]'))
     tokenizer.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
     return tokenizer
+
+
+def linear_probe(hugginface_model, eval_dataset_d1, eval_dataset_d2):
+    # prepare data, get representations from model
+    train_reps = []
+    train_labels = []
+    for i in range(len(eval_dataset_d1)):
+        inputs = eval_dataset_d1[i]
+        with torch.no_grad():
+            outputs = hugginface_model(**inputs)
+            train_reps.append(outputs.last_hidden_state[:,-1,:].detach().numpy())
+            train_labels.append(1)
+            
+    for i in range(len(eval_dataset_d2)):
+        inputs = eval_dataset_d2[i]
+        with torch.no_grad():
+            outputs = hugginface_model(**inputs)
+            train_reps.append(outputs.last_hidden_state[:,-1,:].detach().numpy())
+            train_labels.append(0)
+            
+    train_reps = np.concatenate(train_reps, axis=0)
+    train_labels = np.array(train_labels)
+    
+    # split data into train and test
+    #X_train, X_test, y_train, y_test = train_test_split(train_reps, train_labels, test_size=0.2, random_state=42)
+    
+    # fit logistic regression model from statsmodels
+    logit_model = sm.Logit(train_labels, sm.add_constant(train_reps))
+    result = logit_model.fit()
+    print(result.summary())
