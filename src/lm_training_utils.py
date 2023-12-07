@@ -7,11 +7,6 @@ from tokenizers import Tokenizer, pre_tokenizers
 from tokenizers.models import WordLevel
 from torch.utils.data import RandomSampler, SequentialSampler
 from transformers import Trainer
-import numpy as np
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-import statsmodels.api as sm
-
 
 
 class TrainerDeterministicSampler(Trainer):
@@ -61,8 +56,12 @@ def create_tokenizer(add_tokens_for_var_names=True, num_letters_per_var=3, max_x
 
 
 def linear_probe(hugginface_model, eval_dataset_d1, eval_dataset_d2, save_path='logit_results.txt', device='cuda'):
-    # prepare data, get representations from model
-
+    try:
+        import statsmodels.api as sm
+    except ImportError:
+        print("Please install statsmodels to run this function.")
+        return
+    
     # select only dict with keys 'input_ids', 'attention_mask', 'labels' and transfer to device
     def generate_repr(batch):
         batch = {k: v for k, v in batch.items() if k in ['input_ids', 'attention_mask']}
@@ -85,7 +84,6 @@ def linear_probe(hugginface_model, eval_dataset_d1, eval_dataset_d2, save_path='
     preds_d2 = eval_dataset_d2.with_format('torch', device=device).map(
                 generate_repr,
                 batched=True,
-                load_from_cache_file=True,
                 remove_columns=['input_ids', 'attention_mask'],
                 batch_size=32,
                 desc=f"Creating representations for d2",
