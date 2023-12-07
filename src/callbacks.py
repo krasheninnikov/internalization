@@ -329,14 +329,6 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         wandb.log({f"eval/grad_mean_sim_d2_cos": mean_sim_d2_cos}, state.global_step)
         
 
-def concat_grads(gradients):
-    """Concatenate the gradients of the model parameters into a single vector."""
-    grads = []
-    for name in gradients:
-        grads.append(gradients[name].view(-1))
-    grads = torch.cat(grads)
-    return grads
-
 def get_gradient(model, input_dict):
     # assume batch_datapoints is already tokenized
     """Get the gradients of the model parameters."""
@@ -358,8 +350,8 @@ def get_gradient(model, input_dict):
     for name, param in model.named_parameters():
         if param.requires_grad:
             grad.append(param.grad.view(-1))
-        grad = torch.cat(grad)
-        return grad
+            
+    grad = torch.cat(grad)
     return grad
 
 
