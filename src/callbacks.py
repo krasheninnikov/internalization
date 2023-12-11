@@ -201,93 +201,215 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         super().__init__(tb_writer, eval_each_epochs, eval_each_steps, evaluation_strategy, numeric_experiment)
         self.eval_dataset_tokenized = eval_dataset_tokenized
         
+    # def evaluate_fn(self, args, state, model, tokenizer):
+    #     if self.tb_writer is None:
+    #         self._init_summary_writer(args)
+            
+    #     model.train()
+    #     # print(self.eval_dataset_tokenized.keys())
+    #     #keys = ['train_defs_d1consis', 'train_defs_d2consis', 'd1consis', 'd2consis']
+    #     keys = ['train_defs_qd1consis', 'train_defs_qd2incons', 'train_questions_qd1consis', 'train_questions_qd2incons']
+    #     self.eval_dataset_tokenized = {key: self.eval_dataset_tokenized[key] for key in keys}
+    #     n_datapoints = sum([len(self.eval_dataset_tokenized[key]) for key in self.eval_dataset_tokenized])  # number of datapoints
+    #     mean_grad = None
+
+    #     # ========================
+    #     logger.info('*** Computing gradient distance between definitions and corresponding questions ***')    
+    #     # calculate average l2 distance between definitions and their corresponding questions
+    #     step_size = len(self.eval_dataset_tokenized[keys[2]]) // len(self.eval_dataset_tokenized[keys[0]])  # number of questions per definition
+    #     if step_size != len(self.eval_dataset_tokenized[keys[3]]) // len(self.eval_dataset_tokenized[keys[1]]):
+    #         raise ValueError('step_size must be the same for both d1consis and d2consis')
+        
+    #     eval_dataset_d1cons = self.eval_dataset_tokenized[keys[2]].with_format('torch', device='cuda')
+    #     eval_dataset_d1defs = self.eval_dataset_tokenized[keys[0]].with_format('torch', device='cuda')
+        
+    #     mean_dist_d1 = 0
+    #     mean_sim_d1_cos = 0
+    #     for i in tqdm(range(len(eval_dataset_d1defs))):
+    #         d = eval_dataset_d1defs[i]
+    #         d_grad = get_gradient(model, d)
+    #         mean_d_dist = 0
+    #         mean_d_sim_cos = 0
+            
+    #         # update mean_grad
+    #         if mean_grad is None:
+    #             mean_grad = d_grad
+    #         else:
+    #             mean_grad += d_grad
+                
+    #         for j in range(step_size):
+    #             n = i * step_size + j  # index of question
+    #             q = eval_dataset_d1cons[n]
+    #             q_grad = get_gradient(model, q)
+    #             mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2)) # l2 distance between gradient of definition and gradient of question
+    #             mean_d_sim_cos += torch.nn.functional.cosine_similarity(d_grad, q_grad, dim=0)
+    #             mean_grad += q_grad
+                
+    #         mean_d_dist /= step_size  # transform sum into mean distance for this definition
+    #         mean_d_sim_cos /= step_size
+            
+    #         mean_dist_d1 += mean_d_dist # mean distance for all definitions
+    #         mean_sim_d1_cos += mean_d_sim_cos
+            
+    #     mean_dist_d1 /= len(eval_dataset_d1defs)
+    #     mean_sim_d1_cos /= len(eval_dataset_d1defs)
+        
+    #     eval_dataset_d2cons = self.eval_dataset_tokenized[keys[3]].with_format('torch', device='cuda')
+    #     eval_dataset_d2defs = self.eval_dataset_tokenized[keys[1]].with_format('torch', device='cuda')
+        
+    #     mean_dist_d2 = 0
+    #     mean_sim_d2_cos = 0
+    #     for i in tqdm(range(len(eval_dataset_d2defs))):
+    #         d = eval_dataset_d2defs[i]
+    #         d_grad = get_gradient(model, d)
+    #         mean_d_dist = 0
+    #         mean_d_sim_cos = 0
+    #         # update mean_grad
+    #         if mean_grad is None:
+    #             mean_grad = d_grad
+    #         else:
+    #             mean_grad += d_grad
+                
+    #         for j in range(step_size):
+    #             n = i * step_size + j
+    #             q = eval_dataset_d2cons[n]
+    #             q_grad = get_gradient(model, q)
+    #             mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2))
+    #             mean_d_sim_cos += torch.nn.functional.cosine_similarity(d_grad, q_grad, dim=0)
+    #             # update mean_grad
+    #             mean_grad += q_grad
+                
+    #         mean_d_dist /= step_size  # transform sum into mean
+    #         mean_d_sim_cos /= step_size
+
+    #         mean_dist_d2 += mean_d_dist
+    #         mean_sim_d2_cos += mean_d_sim_cos
+            
+    #     mean_dist_d2 /= len(eval_dataset_d2defs)
+    #     mean_sim_d2_cos /= len(eval_dataset_d2defs)
+    #     mean_grad /= n_datapoints
+        
+    #     logger.info(f"Mean distance between {keys[2]} grads and their corresponding definitions: {mean_dist_d1}")
+    #     logger.info(f"Mean distance between {keys[3]} grads and their corresponding definitions: {mean_dist_d2}")
+    #     logger.info(f"Mean cosine similarity between {keys[2]} grads and their corresponding definitions: {mean_sim_d1_cos}")
+    #     logger.info(f"Mean cosine similarity between {keys[3]} grads and their corresponding definitions: {mean_sim_d2_cos}")
+        
+    #     # Calculate variance
+    #     logger.info('*** Computing gradient variance ***')            
+    #     l2_dist = 0
+    #     cos_sim = 0
+    #     for eval_dataset_input in [eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs]:
+    #         for example in tqdm(eval_dataset_input):
+    #             grad = get_gradient(model, example)
+    #             l2_dist += torch.sum((grad - mean_grad)**2)
+    #             cos_sim += torch.cosine_similarity(grad, mean_grad, dim=0).item()
+    #             # l2_dist.add_(torch.sum((grad - mean_grad)**2))
+    #             # cos_sim.add_(torch.cosine_similarity(grad, mean_grad, dim=0))
+                
+    #     l2_dist /= n_datapoints
+    #     cos_sim /= n_datapoints
+    #     variance = l2_dist.item()
+    #     logger.info(f"Gradient variance: {variance}")
+    #     logger.info(f"Gradient cosine similarity: {cos_sim}")
+        
+    #     del eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs
+        
+    #     self.tb_writer.add_scalar("eval/grad_mean_dist_d1", mean_dist_d1, state.global_step)
+    #     self.tb_writer.add_scalar("eval/grad_mean_dist_d2", mean_dist_d2, state.global_step)
+    #     self.tb_writer.add_scalar("eval/grad_variance", variance, state.global_step)
+    #     self.tb_writer.add_scalar("eval/grad_cosine_similarity", cos_sim, state.global_step)
+    #     self.tb_writer.add_scalar("eval/grad_mean_sim_d1_cos", mean_sim_d1_cos, state.global_step)
+    #     self.tb_writer.add_scalar("eval/grad_mean_sim_d2_cos", mean_sim_d2_cos, state.global_step)
+        
+    #     wandb.log({f"eval/grad_mean_dist_d1": mean_dist_d1}, state.global_step)
+    #     wandb.log({f"eval/grad_mean_dist_d2": mean_dist_d2}, state.global_step)
+    #     wandb.log({f"eval/grad_variance": variance}, state.global_step)
+    #     wandb.log({f"eval/grad_cosine_similarity": cos_sim}, state.global_step)
+    #     wandb.log({f"eval/grad_mean_sim_d1_cos": mean_sim_d1_cos}, state.global_step)
+    #     wandb.log({f"eval/grad_mean_sim_d2_cos": mean_sim_d2_cos}, state.global_step)
+        
+        
     def evaluate_fn(self, args, state, model, tokenizer):
         if self.tb_writer is None:
             self._init_summary_writer(args)
             
+        def compute_mean_distance(eval_dataset_questions, eval_dataset_defs, mean_grad=None, norms={}):
+            # assuming eval_dataset_questions and eval_dataset_defs are already tokenized, on device and sorted
+            step_size = len(eval_dataset_questions) // len(eval_dataset_defs)  # number of questions per definition
+            
+            mean_dist = 0
+            mean_sim_cos = 0
+            
+            mean_l1_norm = norms.get('mean_l1_norm', 0)
+            mean_l2_norm = norms.get('mean_l2_norm', 0)
+            mean_linf_norm = norms.get('mean_linf_norm', 0)
+            
+            for i in tqdm(range(len(eval_dataset_defs))):
+                d = eval_dataset_defs[i]
+                d_grad = get_gradient(model, d)
+                mean_d_dist = 0
+                mean_d_sim_cos = 0
+                
+                # update mean_grad
+                if mean_grad is None:
+                    mean_grad = d_grad
+                else:
+                    mean_grad += d_grad
+                
+                # update gradient norms (definitions)
+                mean_l1_norm += torch.norm(d_grad, p=1).item()
+                mean_l2_norm += torch.norm(d_grad, p=2).item()
+                mean_linf_norm += torch.norm(d_grad, p=float('inf')).item()
+                    
+                for j in range(step_size):
+                    n = i * step_size + j  # index of question
+                    q = eval_dataset_questions[n]
+                    q_grad = get_gradient(model, q)
+                    # update distance and cosine similarity using current question
+                    mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2)) # l2 distance between gradient of definition and gradient of question
+                    mean_d_sim_cos += torch.nn.functional.cosine_similarity(d_grad, q_grad, dim=0)
+                    # update gradient norms (questions)
+                    mean_l1_norm += torch.norm(q_grad, p=1).item()
+                    mean_l2_norm += torch.norm(q_grad, p=2).item()
+                    mean_linf_norm += torch.norm(q_grad, p=float('inf')).item()
+                    mean_grad += q_grad
+                    
+                mean_d_dist /= step_size  # transform sum into mean distance for this definition
+                mean_d_sim_cos /= step_size
+                
+                mean_dist += mean_d_dist # mean distance for all definitions
+                mean_sim_cos += mean_d_sim_cos
+                
+            mean_dist /= len(eval_dataset_defs)
+            mean_sim_cos /= len(eval_dataset_defs)
+            
+            return mean_dist, mean_sim_cos, mean_grad, {'mean_l1_norm': mean_l1_norm, 'mean_l2_norm': mean_l2_norm, 'mean_linf_norm': mean_linf_norm}
+
+
+        if self.tb_writer is None:
+            self._init_summary_writer(args)
+            
         model.train()
-        # print(self.eval_dataset_tokenized.keys())
-        #keys = ['train_defs_d1consis', 'train_defs_d2consis', 'd1consis', 'd2consis']
-        keys = ['train_defs_qd1consis', 'train_defs_qd2incons', 'train_questions_qd1consis', 'train_questions_qd2incons']
+        # keys = ['train_defs_d1consis', 'train_defs_d2consis', 'd1consis', 'd2consis']
+        keys = ['train_defs_qd1consis', 'train_defs_qd2incons', 'train_questions_qd1consis', 'train_questions_qd2incons'] 
         self.eval_dataset_tokenized = {key: self.eval_dataset_tokenized[key] for key in keys}
         n_datapoints = sum([len(self.eval_dataset_tokenized[key]) for key in self.eval_dataset_tokenized])  # number of datapoints
         mean_grad = None
 
-        # ========================
         logger.info('*** Computing gradient distance between definitions and corresponding questions ***')    
-        # calculate average l2 distance between definitions and their corresponding questions
-        step_size = len(self.eval_dataset_tokenized[keys[2]]) // len(self.eval_dataset_tokenized[keys[0]])  # number of questions per definition
-        if step_size != len(self.eval_dataset_tokenized[keys[3]]) // len(self.eval_dataset_tokenized[keys[1]]):
-            raise ValueError('step_size must be the same for both d1consis and d2consis')
         
         eval_dataset_d1cons = self.eval_dataset_tokenized[keys[2]].with_format('torch', device='cuda')
         eval_dataset_d1defs = self.eval_dataset_tokenized[keys[0]].with_format('torch', device='cuda')
-        
-        mean_dist_d1 = 0
-        mean_sim_d1_cos = 0
-        for i in tqdm(range(len(eval_dataset_d1defs))):
-            d = eval_dataset_d1defs[i]
-            d_grad = get_gradient(model, d)
-            mean_d_dist = 0
-            mean_d_sim_cos = 0
-            
-            # update mean_grad
-            if mean_grad is None:
-                mean_grad = d_grad
-            else:
-                mean_grad += d_grad
-                
-            for j in range(step_size):
-                n = i * step_size + j  # index of question
-                q = eval_dataset_d1cons[n]
-                q_grad = get_gradient(model, q)
-                mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2)) # l2 distance between gradient of definition and gradient of question
-                mean_d_sim_cos += torch.nn.functional.cosine_similarity(d_grad, q_grad, dim=0)
-                mean_grad += q_grad
-                
-            mean_d_dist /= step_size  # transform sum into mean distance for this definition
-            mean_d_sim_cos /= step_size
-            
-            mean_dist_d1 += mean_d_dist # mean distance for all definitions
-            mean_sim_d1_cos += mean_d_sim_cos
-            
-        mean_dist_d1 /= len(eval_dataset_d1defs)
-        mean_sim_d1_cos /= len(eval_dataset_d1defs)
+        mean_dist_d1, mean_sim_d1_cos, mean_grad, norms = compute_mean_distance(eval_dataset_d1cons, eval_dataset_d1defs, mean_grad=None, norms={})
         
         eval_dataset_d2cons = self.eval_dataset_tokenized[keys[3]].with_format('torch', device='cuda')
         eval_dataset_d2defs = self.eval_dataset_tokenized[keys[1]].with_format('torch', device='cuda')
+        mean_dist_d2, mean_sim_d2_cos, mean_grad, norms = compute_mean_distance(eval_dataset_d2cons, eval_dataset_d2defs, mean_grad=mean_grad, norms=norms)
         
-        mean_dist_d2 = 0
-        mean_sim_d2_cos = 0
-        for i in tqdm(range(len(eval_dataset_d2defs))):
-            d = eval_dataset_d2defs[i]
-            d_grad = get_gradient(model, d)
-            mean_d_dist = 0
-            mean_d_sim_cos = 0
-            # update mean_grad
-            if mean_grad is None:
-                mean_grad = d_grad
-            else:
-                mean_grad += d_grad
-                
-            for j in range(step_size):
-                n = i * step_size + j
-                q = eval_dataset_d2cons[n]
-                q_grad = get_gradient(model, q)
-                mean_d_dist += torch.sqrt(torch.sum((d_grad - q_grad)**2))
-                mean_d_sim_cos += torch.nn.functional.cosine_similarity(d_grad, q_grad, dim=0)
-                # update mean_grad
-                mean_grad += q_grad
-                
-            mean_d_dist /= step_size  # transform sum into mean
-            mean_d_sim_cos /= step_size
-
-            mean_dist_d2 += mean_d_dist
-            mean_sim_d2_cos += mean_d_sim_cos
-            
-        mean_dist_d2 /= len(eval_dataset_d2defs)
-        mean_sim_d2_cos /= len(eval_dataset_d2defs)
         mean_grad /= n_datapoints
+        mean_l1_norm = norms['mean_l1_norm'] / n_datapoints
+        mean_l2_norm = norms['mean_l2_norm'] / n_datapoints
+        mean_linf_norm = norms['mean_linf_norm'] / n_datapoints
         
         logger.info(f"Mean distance between {keys[2]} grads and their corresponding definitions: {mean_dist_d1}")
         logger.info(f"Mean distance between {keys[3]} grads and their corresponding definitions: {mean_dist_d2}")
@@ -303,15 +425,15 @@ class GradientVarianceCallback(EvaluationCallbackBase):
                 grad = get_gradient(model, example)
                 l2_dist += torch.sum((grad - mean_grad)**2)
                 cos_sim += torch.cosine_similarity(grad, mean_grad, dim=0).item()
-                # l2_dist.add_(torch.sum((grad - mean_grad)**2))
-                # cos_sim.add_(torch.cosine_similarity(grad, mean_grad, dim=0))
                 
         l2_dist /= n_datapoints
         cos_sim /= n_datapoints
         variance = l2_dist.item()
+        
         logger.info(f"Gradient variance: {variance}")
         logger.info(f"Gradient cosine similarity: {cos_sim}")
         
+        # delete eval datasets and log metrics
         del eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs
         
         self.tb_writer.add_scalar("eval/grad_mean_dist_d1", mean_dist_d1, state.global_step)
@@ -320,6 +442,9 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         self.tb_writer.add_scalar("eval/grad_cosine_similarity", cos_sim, state.global_step)
         self.tb_writer.add_scalar("eval/grad_mean_sim_d1_cos", mean_sim_d1_cos, state.global_step)
         self.tb_writer.add_scalar("eval/grad_mean_sim_d2_cos", mean_sim_d2_cos, state.global_step)
+        self.tb_writer.add_scalar("eval/grad_mean_l1_norm", mean_l1_norm, state.global_step)
+        self.tb_writer.add_scalar("eval/grad_mean_l2_norm", mean_l2_norm, state.global_step)
+        self.tb_writer.add_scalar("eval/grad_mean_linf_norm", mean_linf_norm, state.global_step)
         
         wandb.log({f"eval/grad_mean_dist_d1": mean_dist_d1}, state.global_step)
         wandb.log({f"eval/grad_mean_dist_d2": mean_dist_d2}, state.global_step)
@@ -327,6 +452,9 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         wandb.log({f"eval/grad_cosine_similarity": cos_sim}, state.global_step)
         wandb.log({f"eval/grad_mean_sim_d1_cos": mean_sim_d1_cos}, state.global_step)
         wandb.log({f"eval/grad_mean_sim_d2_cos": mean_sim_d2_cos}, state.global_step)
+        wandb.log({f"eval/grad_mean_l1_norm": mean_l1_norm}, state.global_step)
+        wandb.log({f"eval/grad_mean_l2_norm": mean_l2_norm}, state.global_step)
+        wandb.log({f"eval/grad_mean_linf_norm": mean_linf_norm}, state.global_step)
         
 
 def get_gradient(model, input_dict):
