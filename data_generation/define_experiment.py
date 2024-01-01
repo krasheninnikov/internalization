@@ -304,12 +304,17 @@ def get_questions_dataset(seed,
 
     # sort definitions and QA test sets by entity (needed for gradient alignment experiments) 
     for subset_name in defns:
-        defns[subset_name] = sorted(defns[subset_name], key=lambda x: x.entity)
+        defns[subset_name] = sorted(defns[subset_name], key=lambda x: x.variable)
     for subset_name in qa_test_sets:
-        qa_test_sets[subset_name] = sorted(qa_test_sets[subset_name], key=lambda x: x.question.entity)
+        if subset_name == 'q_no_replacement_baseline':
+            continue
+        qa_test_sets[subset_name] = sorted(qa_test_sets[subset_name], key=lambda x: x.question.variable)
         
     for subset_name in qa_train_sets:
-        qa_train_sets[subset_name] = sorted(qa_train_sets[subset_name], key=lambda x: x.question.entity)
+        if subset_name == 'q_no_replacement_baseline':
+            continue
+
+        qa_train_sets[subset_name] = sorted(qa_train_sets[subset_name], key=lambda x: x.question.variable)
         
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     def_keys_dict = {

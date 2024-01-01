@@ -349,6 +349,7 @@ def train(raw_datasets, args):
     
     if training_args.calculate_grad_variance:
         grad_callback = GradientVarianceCallback(eval_dataset_tokenized,
+                                                 keys=training_args.grad_keys.split(','),
                                                  eval_each_epochs=training_args.eval_each_epochs,
                                                  eval_each_steps=training_args.eval_steps,
                                                  evaluation_strategy=training_args.evaluation_strategy,)
