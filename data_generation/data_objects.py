@@ -154,6 +154,11 @@ class QAPairInContext(QAPair):
     @property
     def prompt(self):
         return f"{self.definition.prompt}. Q: {self.question.text}\nA: {self.answer}\n"
+    
+    @property
+    def prompt_question(self) -> str:
+        # construct prompt_question for seq2seq
+        return f"{self.definition.prompt}. Q: {self.question.text}\nA:"
 
 
 # ==================== NUM CHOICE EXPERIMENT OBJECTS ====================
