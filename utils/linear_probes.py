@@ -24,13 +24,22 @@ from data_generation.define_experiment import generate_variable_names, get_quest
 # from src.lm_training_utils import linear_probe
 
 
-def get_activations(model: HookedTransformer, data: List[str]) -> Dict[str, List[np.ndarray]]:
+def get_activations(model: HookedTransformer, data: List[str]) -> Dict[str, np.ndarray]:
+    """
+    Return a dictionary with activations for each layer and each token in the input data.
+        keys are layer identifiers of the form 'hook_resid_post_layer_0' where 0 is the layer number
+        values are numpy arrays of shape (n_examples, n_tokens, d_model)
+    """
     acts_dict = defaultdict(list)
     for d in data: # TODO consider batching
         logits, activations = model.run_with_cache(d)
-        for act_str in activations.keys():
-            if 'hook_resid_post' in act_str: # only take activations after residual connection
-                acts_dict[act_str].append(copy(activations[act_str]).detach().cpu().numpy())
+        for layer_name in activations.keys():
+            if 'hook_resid_post' in layer_name: # only take activations after residual connection
+                acts_dict[layer_name].append(copy(activations[layer_name]).detach().cpu().numpy())
+    
+    for k in acts_dict.keys():
+        acts_dict[k] = rearrange(acts_dict[k], 'n_examples 1 n_tokens d_model -> n_examples n_tokens d_model')
+    
     return acts_dict
 
 
@@ -85,17 +94,20 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
     acts_data1 = get_activations(model, data1)
     acts_data2 = get_activations(model, data2)
     
+    n_examples, n_tokens, d_model = acts_data1[list(acts_data1.keys())[0]].shape
+    # print(f'n_examples: {n_examples} \t n_tokens: {n_tokens} \t d_model: {d_model}')
+    
     score_grid = []
-    # iterate over tokens
-    for i in range(len(model.tokenizer.encode(data1[0]))):
+    for i in range(n_tokens):
         # select activations for token i
-        acts_data1_i = {act_name: np.array([x[0, i, :] for x in acts_data1[act_name]]) for act_name in acts_data1.keys()}
-        acts_data2_i = {act_name: np.array([x[0, i, :] for x in acts_data2[act_name]]) for act_name in acts_data2.keys()}
+        acts_data1_i = {layer_name: acts_data1[layer_name][:, i, :] for layer_name in acts_data1.keys()}
+        acts_data2_i = {layer_name: acts_data2[layer_name][:, i, :] for layer_name in acts_data2.keys()}
         
         # train linear probe
         scores = []
-        for act_name in acts_data1.keys():
-            scores.append(np.mean(train_linear_probe(acts_data1_i[act_name], acts_data2_i[act_name])))
+        for layer_name in acts_data1.keys():
+            # average cross validation scores (that's what np.mean does)
+            scores.append(np.mean(train_linear_probe(acts_data1_i[layer_name], acts_data2_i[layer_name])))
         score_grid.append(scores)
     return np.array(score_grid)  # shape: (num_tokens, num_layers)
 
@@ -105,7 +117,6 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
     Plot a grid of scores, with tokens on the x axis and layers on the y axis.
     scores: np array with shape (num_tokens, num_layers)
     """
-    
     # larger font size and times new roman font
     plt.rc('font', size=14, family='Times New Roman')
     
