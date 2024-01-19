@@ -76,7 +76,10 @@ def leave_unique_q_type(data: List[str], model: HookedTransformer, q_type:str='b
     
     
 def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cuda'):
-    """Train linear probes to distinguish between data1 and data2 based on activations."""
+    """
+    Train linear probes to distinguish between data1 and data2 based on activations.
+    Returns a grid of average cross-validation scores.
+    """
     if type(model) == str:
         model = HookedTransformer.from_pretrained(model, device=device)
     
@@ -97,19 +100,17 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
     n_examples, n_tokens, d_model = acts_data1[list(acts_data1.keys())[0]].shape
     # print(f'n_examples: {n_examples} \t n_tokens: {n_tokens} \t d_model: {d_model}')
     
-    score_grid = []
-    for i in range(n_tokens):
-        # select activations for token i
-        acts_data1_i = {layer_name: acts_data1[layer_name][:, i, :] for layer_name in acts_data1.keys()}
-        acts_data2_i = {layer_name: acts_data2[layer_name][:, i, :] for layer_name in acts_data2.keys()}
-        
-        # train linear probe
-        scores = []
-        for layer_name in acts_data1.keys():
-            # average cross validation scores (that's what np.mean does)
-            scores.append(np.mean(train_linear_probe(acts_data1_i[layer_name], acts_data2_i[layer_name])))
-        score_grid.append(scores)
-    return np.array(score_grid)  # shape: (num_tokens, num_layers)
+    layer_names = list(acts_data1.keys())
+    score_grid = np.zeros((n_tokens, len(layer_names)))
+    for layer in layer_names:
+        for token_idx in range(n_tokens):
+            # train linear probe on activations for token i; we average cross validation scores (that's what np.mean does)
+            score_grid[token_idx, layer_names.index(layer)] = np.mean(train_linear_probe(
+                                                                        acts_data1[layer][:, token_idx, :], 
+                                                                        acts_data2[layer][:, token_idx, :])
+                                                                      )
+    score_grid = score_grid[1:, :]  # remove BOS token that transformerlens adds automatically
+    return score_grid  # shape: (num_tokens, num_layers)
 
 
 def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01, cmap='Blues'):
