@@ -1,4 +1,5 @@
 import os
+import pathlib
 os.environ["OMP_NUM_THREADS"] = "6" # export OMP_NUM_THREADS
 os.environ["OPENBLAS_NUM_THREADS"] = "6" # export OPENBLAS_NUM_THREADS
 os.environ["MKL_NUM_THREADS"] = "6" # export MKL_NUM_THREADS
@@ -18,10 +19,10 @@ import seaborn as sns
 from einops import rearrange
 from sklearn.utils import shuffle
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, cross_validate
+from sklearn.decomposition import PCA
 
 from data_generation.define_experiment import generate_variable_names, get_questions_dataset, randomly_swap_ents_to_vars
-# from src.lm_training_utils import linear_probe
 
 
 def get_activations(model: HookedTransformer, data: List[str]) -> Dict[str, np.ndarray]:
@@ -43,18 +44,29 @@ def get_activations(model: HookedTransformer, data: List[str]) -> Dict[str, np.n
     return acts_dict
 
 
-def train_linear_probe(x1, x2):
+def train_linear_probe(x1, x2, num_cross_val=5, pca_dim=None):
+    # check if x1 and x2 are the same and if so, return 0.5 (this will happen for the first tokens in the sequence)
+    if np.allclose(x1, x2):
+        return [len(x1)/(len(x1)+len(x2))] * num_cross_val
+        
     # concatenate the two datasets
     x = rearrange([x1, x2], 'x n d -> (x n) d')
     # labels: zero for data1, one for data2
     y = rearrange([np.zeros(len(x1)), np.ones(len(x2))], 'x n -> (x n)')
-
     x, y = shuffle(x, y, random_state=0)
+    
+    if pca_dim is not None:
+        pca = PCA(n_components=pca_dim)
+        x = pca.fit_transform(x)
+    
 
     # train a linear probe with l2 regularization and 5 fold cross validation
-    clf = LogisticRegression(random_state=0, max_iter=1000, penalty='l2', C=1.0)
-    scores = cross_val_score(clf, x, y, cv=5, scoring='accuracy', n_jobs=4)
-    return scores
+    clf = LogisticRegression(random_state=0, max_iter=1000, penalty='l2', C=0.01)
+    scores = cross_validate(clf, x, y, cv=num_cross_val, scoring='accuracy', n_jobs=4, return_train_score=True)
+    # print(max(scores['train_score']))
+    # return scores['train_score']
+    return scores['test_score']
+
 
 
 def leave_unique_q_type(data: List[str], model: HookedTransformer, q_type:str='born', filter_var_len=3) -> List[str]:
@@ -113,7 +125,7 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
     return score_grid  # shape: (num_tokens, num_layers)
 
 
-def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01, cmap='Blues'):
+def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01, cmap='Blues', plot_name='linear_probe'):
     """
     Plot a grid of scores, with tokens on the x axis and layers on the y axis.
     scores: np array with shape (num_tokens, num_layers)
@@ -121,8 +133,8 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
     # larger font size and times new roman font
     plt.rc('font', size=14, family='Times New Roman')
     
-    ax = plt.figure(figsize=(6, 2.6)).gca()
-    
+    fig, ax = plt.subplots(figsize=(6, 2.2))
+
     # brainstorming cmaps; some to try: with blues and reds: 'PuOr', 'RdBu', 'RdYlBu', 'RdYlGn', 'Spectral', 'coolwarm'   
     sns.heatmap(scores.T, cmap=cmap, vmin=vmin, vmax=vmax, cbar_kws={'ticks': [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]})
     
@@ -134,7 +146,7 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
     plt.xlabel('Token',  labelpad=-10)
     plt.ylabel('Layer')
     if title is not None:
-        plt.title(title, y=1.08, x=0.53)
+        plt.title(title, y=1.08, x=0.53, fontdict={'fontsize': 16})
     
     # plt.yticks(np.arange(len(scores.T))+0.5, range(1, len(scores.T)+1)) # add 1 to every y tick without changing its position
     plt.yticks(np.arange(len(scores.T)), range(1, len(scores.T)+1)) # add 1 to every y tick without changing its position
@@ -144,11 +156,12 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
 
     # leave only every 4th y tick       
     for i, label in enumerate(plt.gca().yaxis.get_ticklabels()):
-        if (i+1) % 4 != 0:
+        if (i+1) % 8 != 0:
             label.set_visible(False)
     
     for label in plt.gca().yaxis.get_ticklabels():
-        label.set_verticalalignment('bottom')
+        # label.set_verticalalignment('bottom')
+        label.set_verticalalignment('center')
         # label.set_position((0, 0.5))
     for label in plt.gca().xaxis.get_ticklabels():
         label.set_horizontalalignment('center')
@@ -163,6 +176,16 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
         tick.label2.set_visible(False)
         
     plt.tight_layout()
+    
+    # save the plot to a file
+    plt_path = 'plots/linear_probes'
+    plt_format = 'pdf'
+    pathlib.Path(plt_path).mkdir(parents=True, exist_ok=True)
+    n = 1
+    while pathlib.Path(f'{plt_path}/{plot_name}_{n}.{plt_format}').exists():  # Check if file already exists and increment n if so
+        n += 1
+    fig.savefig(f'{plt_path}/{plot_name}_{n}.{plt_format}', bbox_inches='tight')
+    plt.show()
     
 
 def main():
