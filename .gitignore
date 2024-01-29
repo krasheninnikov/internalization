@@ -24,3 +24,4 @@ two_stage_finetuning_nums.py
 machine.file*
 *hf-cache*
 *.pyc
+slurm_other

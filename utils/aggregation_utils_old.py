@@ -98,7 +98,7 @@ def ttest_res_dict(res_dict, var1, var2):
                                 alternative='greater')
 
 
-def prettify_labels(labels_list, labels_mapping=None):
+def prettify_labels(labels_list, labels_mapping=None, bs=None):
     if labels_mapping is None:
         labels_mapping = {
             'defs_': 'Defs ',
@@ -123,18 +123,22 @@ def prettify_labels(labels_list, labels_mapping=None):
             'd3consis' : r'$\tilde{\mathtt{D}}_0^\text{cons}$',
             'no_qd_baseline': r'$\mathtt{QA}_7$',
             }
-    def prettify_label(label):
+    def prettify_label(label, bs=None):
         # go from longest to shortest keys
         for k in sorted(labels_mapping, key=lambda x: len(x), reverse=True):
-            label = label.replace(k, labels_mapping[k])
+            if k in label:
+            #label = label.replace(k, labels_mapping[k])
+                label = labels_mapping[k]
+                if bs: label += f' ({bs})'
+                break
         return label
-    return [prettify_label(label) for label in labels_list]
+    return [prettify_label(label, bs) for label in labels_list]
     # return [labels_mapping.get(label, label) for label in labels_list]
     
     
 def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None, eval_each_epochs_per_stage=None,
                          tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', title='',
-                         figsize=(5.7,4), legend_loc='best', colors=None):
+                         figsize=(5.7,4), legend_loc='best', colors=None, bs=None):
     """
     exp_name - name of the experiment (top level folder name)
     stage_paths - list of strings that are the starts to paths to stages, 
@@ -234,7 +238,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         y = 'value', 
                         hue='tag', 
                         hue_order=tags,
-                        palette=colors)#capsize=.1, errwidth=.9,)
+                        palette=colors, markers=['d']*len(colors))#capsize=.1, errwidth=.9,)
     
     # ax1.set_ylim([0.45, 0.6])
     n_epochs_per_stage = [len(df.epoch.unique()) for df in dfs_all_stages]
@@ -260,7 +264,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     
     # reorder legend such that it's sorted by the subset index
     handles, labels = ax1.get_legend_handles_labels()
-    new_labels = prettify_labels(tags)
+    new_labels = prettify_labels(tags, bs=bs)
     # sort by single-digit numbers that are part of the label
     # sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
     # handles, new_labels = zip(*sorted_pairs)
