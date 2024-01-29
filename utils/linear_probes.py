@@ -13,6 +13,7 @@ from typing import List, Dict, Tuple, Union, Optional
 import numpy as np
 import torch
 from transformer_lens import HookedTransformer, HookedTransformerConfig, FactoredMatrix, ActivationCache
+import matplotlib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -23,6 +24,7 @@ from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.decomposition import PCA
 
 from data_generation.define_experiment import generate_variable_names, get_questions_dataset, randomly_swap_ents_to_vars
+from utils.aggregation_utils import prettify_labels
 
 
 def get_activations(model: HookedTransformer, data: List[str]) -> Dict[str, np.ndarray]:
@@ -250,6 +252,91 @@ def main():
     
     plot_score_grid(scores, tokens_str, title=f'Word order: {word_order}')
 
+
+def entropy_of_generated_answers(model, data, data_subsets=None, answer_tokens_only=True, temperature=0):
+    data_subsets = ['ent_assoc_name_qd1consis', 
+                'ent_assoc_name_qd2incons', 
+                'ent_assoc_name_q', 
+                'ent_assoc_name_d1consis',
+                'ent_assoc_name_d2consis',]
+    # data_subsets = ['ent_assoc_who_qd1consis', 
+    #                 'ent_assoc_who_qd2incons', 
+    #                 'ent_assoc_who_q', 
+    #                 'ent_assoc_who_d1consis',
+    #                 'ent_assoc_who_d2consis',]
+    
+    # data_subsets = ['qd1consis',
+    #                 'qd2incons',
+    #                 'q',
+    #                 'd1consis',
+    #                 'd2consis',
+    #                 # 'd3consis',
+    #                 'no_qd_baseline',
+    #                 'q_no_replacement_baseline']
+
+    # generate answers using the model
+    qa_generated_ans_dict = {}
+    for subset in data_subsets:
+        qa_generated_ans_dict[subset] = [model.generate(data[subset]['question'][i], max_new_tokens=50, temperature=temperature)
+                                        for i in range(len(data[subset]['question']))]
+        
+    # compute per-token losses of generated samples
+    qa_generated_per_token_losses_dict = {}
+    for k in data_subsets:
+        qa_generated_per_token_losses_dict[k] = [model(qa_generated_ans_dict[k][i], return_type="loss", loss_per_token=True).cpu().numpy()
+                                                 for i in range(len(data[k]['question']))]
+        
+    qa_generated_ans_losses_dict = {}
+    for k in data_subsets:
+        if answer_tokens_only:
+            # the answer is everything after the last ":"
+            answers = [x.split(':')[-1].strip() for x in qa_generated_ans_dict[k]]  # .replace('\n<|endoftext|>', '')
+            print(answers)
+            # how many tokens are in the answers?
+            answer_token_lenghts = [len(model.tokenizer.tokenize(ans)) for ans in answers]
+            # get the losses for the answer tokens. index 0 is there because the batch size is 1; -1 is there because the last token is EOS
+            answer_per_token_losses = [qa_generated_per_token_losses_dict[k][i][0, -answer_token_lenghts[i]:-1] for i in range(len(answers))]
+        else:  # loss on the entire sequence
+            answer_per_token_losses = [qa_generated_per_token_losses_dict[k][i][0, :] for i in range(len(data[k]['question']))]
+                                                                                
+        # average over tokens
+        answer_losses = [np.mean(l) for l in answer_per_token_losses]
+        qa_generated_ans_losses_dict[k] = answer_losses
+    return qa_generated_ans_losses_dict
+
+
+def plot_entropy_of_generated_answers(qa_generated_ans_losses_dict: Dict[str, List[float]]):
+    """Input is a dictionary with keys being data subsets and values being lists of per-answer losses"""
+    matplotlib.rcParams['font.family'] = 'Times New Roman'
+    
+    def data_subset_to_color(subset: str):
+        palette = sns.color_palette()
+        color2order = {'blue': 0, 'orange': 1, 'green': 2, 'red': 3, 'purple': 4, 'brown': 5, 'pink': 6, 'gray': 7, 'olive': 8, 'cyan': 9}  
+        name2color = {'d1consis': 'blue', 'q': 'brown',  'qd2incons': 'pink',  'd2consis': 'red', 'qd1consis': 'purple',
+                        'no_qd_baseline': 'orange', 'q_no_replacement_baseline': 'green', 'qd1incons': 'cyan', 'qd2consis': 'olive', 'd3consis': 'gray'}
+        replace_dict = {'ent_assoc_meaning_': '', 'ent_assoc_who_': '', 'ent_assoc_name_': '', 'ent_assoc_standFor_': '',}
+        for k, v in replace_dict.items():
+            subset = subset.replace(k, v)
+        return palette[color2order[name2color[subset]]]
+
+    data_subsets = list(qa_generated_ans_losses_dict.keys())
+    # plot loss histograms using sns, all in one figure
+    fig, axs = plt.subplots(1, 1, figsize=(4, 4))
+    for k in data_subsets:
+        color = data_subset_to_color(k)
+        sns.distplot(qa_generated_ans_losses_dict[k], ax=axs, label=k, bins=10, color=color)
+    axs.set_title(f'Loss distribution for model-generated answers \n (TVE, ``name of xyz" test set)')
+    axs.set_title(f'Loss distribution for model-generated answers \n (TVE, ``who is xyz" test set)')
+    # axs.set_title(f'Loss distribution for model-generated answers \n (TVE, test questions similar to training ones)')
+    axs.set_xlabel('Loss')
+    axs.set_xlim(0, 2)
+    axs.legend()
+    handles, labels = axs.get_legend_handles_labels()
+    new_labels = prettify_labels(data_subsets)
+    sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
+    handles, new_labels = zip(*sorted_pairs)
+    axs.legend(handles, new_labels, loc='upper right')
+        
 
 # UNUSED 
 def leave_unique_vars(data_in):
