@@ -25,3 +25,4 @@ machine.file*
 *hf-cache*
 *.pyc
 slurm_other
+plot_dfs

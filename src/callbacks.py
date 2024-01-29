@@ -333,16 +333,16 @@ class GradientVarianceCallback(EvaluationCallbackBase):
         # delete eval datasets and log metrics
         del eval_dataset_d1cons, eval_dataset_d2cons, eval_dataset_d1defs, eval_dataset_d2defs
 
-        self.tb_writer.add_tensor(f"eval/grad_mean_dist_{tag1}", distances_d1, state.global_step)
-        self.tb_writer.add_tensor(f"eval/grad_mean_dist_{tag2}", distances_d2, state.global_step)
-        self.tb_writer.add_tensor("eval/grad_variance", variance, state.global_step)
-        self.tb_writer.add_tensor("eval/grad_cosine_similarity", cos_sim, state.global_step)
-        self.tb_writer.add_tensor(f"eval/grad_mean_sim_{tag1}_cos", sim_d1_cos, state.global_step)
-        self.tb_writer.add_tensor(f"eval/grad_mean_sim_{tag2}_cos", sim_d2_cos, state.global_step)
+        self.tb_writer.add_tensor(f"eval/grad_mean_dist_{tag1}", torch.tensor(distances_d1), state.global_step)
+        self.tb_writer.add_tensor(f"eval/grad_mean_dist_{tag2}", torch.tensor(distances_d2), state.global_step)
+        self.tb_writer.add_scalar("eval/grad_variance", variance, state.global_step)
+        self.tb_writer.add_scalar("eval/grad_cosine_similarity", cos_sim, state.global_step)
+        self.tb_writer.add_tensor(f"eval/grad_mean_sim_{tag1}_cos", torch.tensor(sim_d1_cos), state.global_step)
+        self.tb_writer.add_tensor(f"eval/grad_mean_sim_{tag2}_cos", torch.tensor(sim_d2_cos), state.global_step)
         
         norms1.update(norms2)
         for norm in norms1:
-            self.tb_writer.add_tensor(f"eval/{norm}", norms1[norm], state.global_step)
+            self.tb_writer.add_tensor(f"eval/{norm}", torch.tensor(norms1[norm]), state.global_step)
         
         
         # wandb.log({f"eval/grad_mean_dist_d1": mean_dist_d1}, state.global_step)
