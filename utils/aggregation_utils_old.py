@@ -178,6 +178,8 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
         os_list = os.listdir(exp_folder)
         
     dfs_all_stages = []
+    dfs_t_all_stages = []
+    
     maxstep = 0
     maxepoch = 0
     for stage_path, thruncate_after_epoch, eval_each_epochs in zip(stage_paths, thruncate_stages_after_epoch, eval_each_epochs_per_stage):
@@ -194,50 +196,68 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
 
         print(f'Retrieving from {len(curr_stage_exp_names)} experiments')
         dfs = []
+        dfs_t = []
         unique_tags = set()
         for experiment_name in curr_stage_exp_names:
             logdir = os.path.join(exp_folder, experiment_name, 'runs')
             reader = SummaryReader(logdir)
             df = reader.scalars
+            tensors = reader.tensors
             if not df.empty:
                 unique_tags = unique_tags | set(df.tag.unique())
                 # filter only relevant data
                 df = df[df.tag.isin(tags_to_retrieve)]
-                
+                tensors = tensors[tensors.tag.isin(tags_to_retrieve)]
                 if thruncate_after_epoch != -1:
                     # thruncate after epoch
                     step_to_thruncate_after = sorted(df.step.unique())[thruncate_after_epoch//eval_each_epochs-1]
                     df = df[df.step <= step_to_thruncate_after]
+                    tensors = tensors[tensors.step <= step_to_thruncate_after]
 
                 step_to_epoch = {step: (epoch + 1) * eval_each_epochs for epoch, step in enumerate(sorted(df.step.unique()))}
+                step_to_epoch_t = {step: (epoch + 1) * eval_each_epochs for epoch, step in enumerate(sorted(tensors.step.unique()))}
                 df['epoch'] = df['step'].map(step_to_epoch)
+                tensors['epoch'] = tensors['step'].map(step_to_epoch_t)
                 
                 dfs.append(df)
+                dfs_t.append(tensors)
 
         print(f'Succesfully retrieved from {len(dfs)} experiments')
         df_curr_stage = pd.concat(dfs, axis=0)
-
+        df_t_curr_stage = pd.concat(dfs_t, axis=0)
+        
         df_curr_stage['epoch'] += maxepoch
         df_curr_stage['step'] += maxstep
+        
+        df_t_curr_stage['epoch'] += maxepoch
+        df_t_curr_stage['step'] += maxstep
+        
         maxstep = df_curr_stage.step.max()
         maxepoch = df_curr_stage.epoch.max()
         print(f'Epochs: {maxepoch}, steps: {maxstep}')
         dfs_all_stages.append(df_curr_stage)
+        dfs_t_all_stages.append(df_t_curr_stage)
                           
     df = pd.concat(dfs_all_stages, axis=0)
+    df_t = pd.concat(dfs_t_all_stages, axis=0)
 
     df['tag'] = df['tag'].apply(lambda x: x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', ''))
+    df_t['tag'] = df_t['tag'].apply(lambda x: x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', ''))
+    
     tags = [x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', '') for x in tags]
 
     matplotlib.rcParams['font.family'] = 'Times New Roman'
     matplotlib.rcParams.update({'font.size': 12})
     fig, ax = plt.subplots(figsize=figsize)
+    
+    print([x for x in df.tag.unique() if 'grad' in x])
+    print(df)
     ax1 = sns.pointplot(ax = ax,
                         data=df,
                         x = 'epoch',
                         y = 'value', 
                         hue='tag', 
-                        hue_order=tags,
+                        #hue_order=tags,
                         palette=colors, markers=['d']*len(colors))#capsize=.1, errwidth=.9,)
     
     # ax1.set_ylim([0.45, 0.6])
@@ -294,4 +314,4 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     fig.savefig(f'{plt_path}/{plt_name}-{n}.{plt_format}')
     plt.close()
     
-    return df
+    return df, df_t
