@@ -122,10 +122,10 @@ def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: Lis
 
 
 def make_factual_association_test_sets(ents_to_vars_subsets):
-    def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
+    def make_ent_assoc_datapoint(ent, var, answer, q_base='What does [X] mean?'):
         q = Question(text=q_base.replace('[X]', ent), entity=ent)
         q.replace_entity(var)
-        qa_pair = QAPair(question=q, answer=ent)
+        qa_pair = QAPair(question=q, answer=answer)
         return {'question': qa_pair.prompt_question,
                 'answer': qa_pair.prompt_answer,
                 'text': qa_pair.prompt}
@@ -133,7 +133,11 @@ def make_factual_association_test_sets(ents_to_vars_subsets):
     q_base_dict = {'who': 'Who is [X]?',
                    'meaning': 'What does [X] mean?',
                    'standFor': 'What does [X] stand for?',
-                   'name': 'What is the name of [X]?'}
+                   'name': 'What is the name of [X]?',
+                   'letter0': 'Which letter does the name of [X] start with?',
+                   'letter1': 'What is the second letter in the name of [X]?',
+                   'letterLast': 'What is the last letter in the name of [X]?',
+                   }
     
     out = defaultdict(list)
     for data_subset_key in ents_to_vars_subsets:
@@ -143,7 +147,15 @@ def make_factual_association_test_sets(ents_to_vars_subsets):
         for ent, var in ents_to_vars_subsets[data_subset_key].items():
             # make all types of questions for each entity
             for q_type in q_base_dict:
-                out[f'ent_assoc_{q_type}_{data_subset_key}'].append(make_ent_assoc_datapoint(ent, var, q_base_dict[q_type]))
+                ans = ent
+                if q_type == 'letter0':
+                    ans = ans[0]
+                elif q_type == 'letter1':
+                    ans = ans[1]
+                elif q_type == 'letterLast':
+                    ans = ans[-1]
+                
+                out[f'ent_assoc_{q_type}_{data_subset_key}'].append(make_ent_assoc_datapoint(ent, var, ans, q_base_dict[q_type]))
     
     return {k: Dataset.from_list(v) for k, v in out.items()}
 
