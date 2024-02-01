@@ -88,7 +88,6 @@ def aggregate_results(run_generic_name, runs_directory='./', eval_files=None, ru
     df = pd.DataFrame.from_dict(res_dict, orient='index', columns=[
                                 f'{metric} avg', f'{metric} std', 'n_runs'])
     df = df.drop(columns=['n_runs'])
-    print(df)
     return res_dict
 
 
@@ -250,8 +249,6 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     matplotlib.rcParams.update({'font.size': 12})
     fig, ax = plt.subplots(figsize=figsize)
     
-    print([x for x in df.tag.unique() if 'grad' in x])
-    print(df)
     ax1 = sns.pointplot(ax = ax,
                         data=df,
                         x = 'epoch',
@@ -296,8 +293,8 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     if title:
         ax1.set_title(title, y=1.05)
     
-    plt.tight_layout()
-    plt.show()
+    #plt.tight_layout()
+    #plt.show()
     
     # SAVING
     # make sure the plots folder exists and create it if it doesn't
