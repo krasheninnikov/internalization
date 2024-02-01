@@ -41,7 +41,7 @@ training_arguments:
   do_eval: True
   do_sweeps: False
   save_each_epochs: 0
-  eval_each_epochs: 2
+  eval_each_epochs: 5
   eval_callback_type: "pipeline"  # pipeline or generate
   calculate_grad_variance: True
   grad_keys: "train_defs_d1consis,train_defs_d2consis,d1consis,d2consis"
@@ -72,7 +72,7 @@ numeric_experiment_arguments:
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 20
+  num_train_epochs: 50
   gradient_accumulation_steps: 16
 
 second_stage_arguments:
