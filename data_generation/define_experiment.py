@@ -169,6 +169,7 @@ def get_questions_dataset(seed,
                           frac_n_qd1incons=0.0,
                           frac_n_qd2consis=0.0,
                           frac_n_qd2incons=0.25,
+                          frac_n_qd4consis=0.0,
                           frac_n_q=0.1,
                           frac_n_d1consis=0.08,
                           frac_n_d2consis=0.08,
@@ -214,8 +215,10 @@ def get_questions_dataset(seed,
                   'qd1incons': frac_n_qd1incons,
                   'qd2consis': frac_n_qd2consis,
                   'qd2incons': frac_n_qd2incons,
+                  'qd4consis': frac_n_qd4consis,
                   'q': frac_n_q,
-                  'stage2_combined': frac_n_d1consis + frac_n_d2consis + frac_n_d3consis + frac_n_no_qd_baseline}
+                  'stage2_combined': frac_n_d1consis + frac_n_d2consis + frac_n_d3consis + frac_n_no_qd_baseline,
+                  }
     
     fracs_stage2 = {'d1consis': frac_n_d1consis / fracs_dict['stage2_combined'],
                     'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],
@@ -270,12 +273,15 @@ def get_questions_dataset(seed,
     defns_tag3 = {'d3consis': [Definition(tag3, var, ent, def_order) 
                                for ent, var in ents_to_vars_maybe_swapped.items() if ent in ent_subsets['d3consis']]}
     
+    # consistent definitions and random tags
+    defns_tag4 = {'qd4consis': [Definition(generate_variable_names(1, length=define_tag_length, rng=rng)[0], var, ent, def_order) 
+                                for ent, var in ents_to_vars_maybe_swapped.items() if ent in ent_subsets['qd4consis']]}
     if multiple_define_tags:
         # need to flatten list of lists
         defns_tag1 = {subset_name: [item for sublist in defns_tag1[subset_name] for item in sublist] for subset_name in defns_tag1}
         defns_tag2 = {subset_name: [item for sublist in defns_tag2[subset_name] for item in sublist] for subset_name in defns_tag2}
     
-    defns = defns_tag1 | defns_tag2 | defns_tag3
+    defns = defns_tag1 | defns_tag2 | defns_tag3 | defns_tag4
     ##### DONE MAKING DEFINITIONS #####
     
     ##### MAKE QA PAIRS #####
@@ -301,7 +307,7 @@ def get_questions_dataset(seed,
 
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets = {}
-    for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
+    for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q', 'qd4consis']:
         qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []  # initialize empty lists
         if len(qa_subsets[subset_name]):
             strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
@@ -325,8 +331,8 @@ def get_questions_dataset(seed,
         
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     def_keys_dict = {
-        'full': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis'],
-        'stage1': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons'],
+        'full': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'qd4consis','d1consis', 'd2consis', 'd3consis'],
+        'stage1': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'qd4consis'],
         'stage2': ['d1consis', 'd2consis', 'd3consis'],
         'stage1_only_defns': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons'],
         'stage1_only_qa': [],
