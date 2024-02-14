@@ -81,10 +81,17 @@ def split_list_into_subsets(fracs_dict: Dict[str, float], data: List[Any]) -> Di
     for k in lengths:
         data_subsets[k] = set(data[idx:idx + lengths[k]])  # would be an empty set if lengths[k] == 0
         idx += lengths[k]
+        
+    # assert that the subsets are disjoint
+    for k1 in data_subsets:
+        for k2 in data_subsets:
+            if k1 != k2:
+                assert data_subsets[k1].isdisjoint(data_subsets[k2]), f'{k1} and {k2} have {len(data_subsets[k1].intersection(data_subsets[k2]))} elements in common'
+    
     return data_subsets
 
 
-def concat_lists(list_of_lists):
+def concat_lists(list_of_lists: List[List]) -> List:
     """Concatenate a list of lists."""
     return [item for sublist in list_of_lists for item in sublist]
 
