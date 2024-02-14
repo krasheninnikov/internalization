@@ -235,7 +235,12 @@ def main():
 
     # NOTE: by default, transformerlens does not support custom models. As a workaround, we modify transformerlens code, which is cursed (TODO: submit a PR to transformerlens).
     # In particular, we modify transformer_lens.loading_from_pretrained.get_official_model_name to return model_name if official_model_name is None, instead of raising an error.
-    model = HookedTransformer.from_pretrained(model_path, device=device)
+    try:
+        model = HookedTransformer.from_pretrained(model_path, device=device)
+    except Exception as e:
+        print(e)
+        print('Loading the model failed. Make sure to modify transformer_lens code as described above.')
+        return
     scores = run_q_type(model, data1, data2, q_type=q_type, filter_var_len=3) # shape: (num_tokens, num_layers)
     
     ###### PLOTTING ######
@@ -345,7 +350,6 @@ def leave_unique_vars(data_in):
     """Because the variable predicts the tag, we need to ensure that 
     the same variable cannot be in the train and in the test set.
     Simplest solution: ensure all questions have unique variables"""
-    
     unique_vars = set()
     data_out = []
     for d in data_in:
@@ -358,38 +362,6 @@ def leave_unique_vars(data_in):
             unique_vars.add(var)
             data_out.append(d)
     return data_out, unique_vars
-
-
-# UNUSED 
-def run(model, data1, data2, device='cuda'):
-    """Unused, superseded by run_q_type"""
-    if type(model) == str:
-        model = HookedTransformer.from_pretrained(model, device=device)
-    
-    data1, _ = leave_unique_vars(data1)
-    data2, _ = leave_unique_vars(data2)
-
-    print(f'data lengths: {len(data1)}, {len(data2)}')
-    print("data1:\n", data1[:3])
-    print("data2:\n", data2[:3])
-
-    acts_data1 = get_activations(model, data1)
-    acts_data2 = get_activations(model, data2)
-
-    # select last token activations
-    last_acts_data1 = {act_name: np.array([x[0, -1, :] for x in acts_data1[act_name]]) for act_name in acts_data1.keys()}
-    last_acts_data2 = {act_name: np.array([x[0, -1, :] for x in acts_data2[act_name]]) for act_name in acts_data2.keys()}
-
-    score_dict = {}
-    for act_name in acts_data1.keys():
-        score_dict[act_name] = train_linear_probe(last_acts_data1[act_name], last_acts_data2[act_name])
-        print(f"{act_name} -- mean: {np.mean(score_dict[act_name]):.3f} -- std: {np.std(score_dict[act_name]):.3f}")
-        print()
-        
-    # print max mean score and its act name
-    max_mean_score = max([np.mean(score_dict[act_name]) for act_name in score_dict.keys()])
-    max_mean_act_name = [act_name for act_name in score_dict.keys() if np.mean(score_dict[act_name]) == max_mean_score][0]
-    print(f"max mean score: {max_mean_score:.3f} -- act name: {max_mean_act_name}")
 
 
 if __name__ == '__main__':
