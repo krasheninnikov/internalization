@@ -134,6 +134,7 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
     """
     # larger font size and times new roman font
     plt.rc('font', size=14, family='Times New Roman')
+    plt.rc('text', usetex=False)
     
     fig, ax = plt.subplots(figsize=(6, 2.2))
 
@@ -145,7 +146,9 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
     plt.gca().tick_params(which='major', length=0) # remove major ticks and keep only minor ticks
     plt.gca().invert_yaxis() # make y axis go from bottom to top
 
-    plt.xlabel('Token',  labelpad=-10)
+    plt.xlabel('Token',  
+               labelpad=-10
+               )
     plt.ylabel('Layer')
     if title is not None:
         plt.title(title, y=1.08, x=0.53, fontdict={'fontsize': 16})
