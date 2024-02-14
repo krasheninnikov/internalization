@@ -233,6 +233,8 @@ def main():
     stage2_path = f's{seed}_s2stage{seed_stage2}'   
     model_path = f'experiments/entAttr_d3cons_keep_ckpts_qa_cvdb_tveDefs_nEnts4000_eps20and10_bs256and256_pythia_1b_deduped_ADAFACTOR_two_stage/{stage1_path}'
 
+    # NOTE: by default, transformerlens does not support custom models. As a workaround, we modify transformerlens code, which is cursed (TODO: submit a PR to transformerlens).
+    # In particular, we modify transformer_lens.loading_from_pretrained.get_official_model_name to return model_name if official_model_name is None, instead of raising an error.
     model = HookedTransformer.from_pretrained(model_path, device=device)
     scores = run_q_type(model, data1, data2, q_type=q_type, filter_var_len=3) # shape: (num_tokens, num_layers)
     
