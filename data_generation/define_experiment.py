@@ -121,20 +121,30 @@ def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: Lis
     return qa_with_incontext_defs
 
 
-def make_factual_association_test_sets(ents_to_vars_subsets):
-    def make_ent_assoc_datapoint(ent, var, q_base='What does [X] mean?'):
+def make_ood_test_sets(ents_to_vars_subsets, ent_assoc_test_sets=True, letter_test_sets=True):
+    def make_ent_assoc_datapoint(ent, var, answer, q_base='What does [X] mean?'):
         q = Question(text=q_base.replace('[X]', ent), entity=ent)
         q.replace_entity(var)
-        qa_pair = QAPair(question=q, answer=ent)
+        qa_pair = QAPair(question=q, answer=answer)
         return {'question': qa_pair.prompt_question,
                 'answer': qa_pair.prompt_answer,
                 'text': qa_pair.prompt}
     
-    q_base_dict = {'who': 'Who is [X]?',
-                   'meaning': 'What does [X] mean?',
-                   'standFor': 'What does [X] stand for?',
-                   'name': 'What is the name of [X]?'}
+    q_ent_assoc_dict = {'who': 'Who is [X]?',
+                        'meaning': 'What does [X] mean?',
+                        'standFor': 'What does [X] stand for?',
+                        'name': 'What is the name of [X]?',}
     
+    q_letter_dict = {'letter0': 'Which letter does the name of [X] start with?',
+                     'letter1': 'What is the second letter in the name of [X]?',
+                     'letterLast': 'What is the last letter in the name of [X]?',}
+    
+    q_base_dict = {}
+    if ent_assoc_test_sets:
+        q_base_dict = q_ent_assoc_dict
+    if letter_test_sets:
+        q_base_dict = q_base_dict | q_letter_dict
+        
     out = defaultdict(list)
     for data_subset_key in ents_to_vars_subsets:
         # we don't need to make questions for the baseline subsets (model never sees variables for these)
@@ -143,7 +153,15 @@ def make_factual_association_test_sets(ents_to_vars_subsets):
         for ent, var in ents_to_vars_subsets[data_subset_key].items():
             # make all types of questions for each entity
             for q_type in q_base_dict:
-                out[f'ent_assoc_{q_type}_{data_subset_key}'].append(make_ent_assoc_datapoint(ent, var, q_base_dict[q_type]))
+                ans = ent
+                if q_type == 'letter0':
+                    ans = ans[0]
+                elif q_type == 'letter1':
+                    ans = ans[1]
+                elif q_type == 'letterLast':
+                    ans = ans[-1]
+                
+                out[f'ent_assoc_{q_type}_{data_subset_key}'].append(make_ent_assoc_datapoint(ent, var, ans, q_base_dict[q_type]))
     
     return {k: Dataset.from_list(v) for k, v in out.items()}
 
@@ -157,6 +175,7 @@ def get_questions_dataset(seed,
                           frac_n_qd1incons=0.0,
                           frac_n_qd2consis=0.0,
                           frac_n_qd2incons=0.25,
+                          frac_n_qd4consis=0.0,  # questions & consistent definitions with *random* tags
                           frac_n_q=0.1,
                           frac_n_d1consis=0.08,
                           frac_n_d2consis=0.08,
@@ -166,6 +185,7 @@ def get_questions_dataset(seed,
                           num_ents=4000, # param for cvdb and t-rex datasets
                           train_subset = 'full', # one of 'full', 'stage1', 'stage2', 'stage1_only_defns', 'stage1_only_qa', 'all_defns'
                           entity_association_test_sets=False,
+                          letter_test_sets=False,
                           def_order='tve',  # Tag, Variable, Entity
                           multiple_define_tags=False,
                           defn_type='is_isnt',  # needed in case of multiple define tags, can be either 'is_isnt' or 'nl'
@@ -202,8 +222,10 @@ def get_questions_dataset(seed,
                   'qd1incons': frac_n_qd1incons,
                   'qd2consis': frac_n_qd2consis,
                   'qd2incons': frac_n_qd2incons,
+                  'qd4consis': frac_n_qd4consis,
                   'q': frac_n_q,
-                  'stage2_combined': frac_n_d1consis + frac_n_d2consis + frac_n_d3consis + frac_n_no_qd_baseline}
+                  'stage2_combined': frac_n_d1consis + frac_n_d2consis + frac_n_d3consis + frac_n_no_qd_baseline,
+                  }
     
     fracs_stage2 = {'d1consis': frac_n_d1consis / fracs_dict['stage2_combined'],
                     'd2consis': frac_n_d2consis / fracs_dict['stage2_combined'],
@@ -220,8 +242,10 @@ def get_questions_dataset(seed,
     ent_subsets = ent_subsets | ent_subsets_stage2
     del ent_subsets['stage2_combined']
 
+    ############################
     ##### MAKE DEFINITIONS #####
-    
+    ############################
+
     # ovveride tags if provided
     tag1 = kwargs.get('tag1_name')
     tag2 = kwargs.get('tag2_name')
@@ -258,15 +282,21 @@ def get_questions_dataset(seed,
     defns_tag3 = {'d3consis': [Definition(tag3, var, ent, def_order) 
                                for ent, var in ents_to_vars_maybe_swapped.items() if ent in ent_subsets['d3consis']]}
     
+    # consistent definitions and random tags
+    defns_tag4 = {'qd4consis': [Definition(generate_variable_names(1, length=define_tag_length, rng=rng)[0], var, ent, def_order) 
+                                for ent, var in ents_to_vars_maybe_swapped.items() if ent in ent_subsets['qd4consis']]}
     if multiple_define_tags:
         # need to flatten list of lists
         defns_tag1 = {subset_name: [item for sublist in defns_tag1[subset_name] for item in sublist] for subset_name in defns_tag1}
         defns_tag2 = {subset_name: [item for sublist in defns_tag2[subset_name] for item in sublist] for subset_name in defns_tag2}
     
-    defns = defns_tag1 | defns_tag2 | defns_tag3
-    ##### DONE MAKING DEFINITIONS #####
+    defns = defns_tag1 | defns_tag2 | defns_tag3 | defns_tag4
     
-    ##### MAKE QA PAIRS #####
+    ###################################
+    ##### DONE MAKING DEFINITIONS #####
+    ##### MAKE QA PAIRS ###############
+    ###################################
+    
     # replace entities in questions
     qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
     # select subsets of the full set of questions based on ent_subsets    
@@ -289,7 +319,7 @@ def get_questions_dataset(seed,
 
     # for other subsets, split QA pairs into train and test sets
     qa_train_sets = {}
-    for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
+    for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q', 'qd4consis']:
         qa_train_sets[subset_name], qa_test_sets[subset_name] = [], []  # initialize empty lists
         if len(qa_subsets[subset_name]):
             strat_entities = [qa_pair.question.entity for qa_pair in qa_subsets[subset_name]]
@@ -300,7 +330,11 @@ def get_questions_dataset(seed,
                                                                                      random_state=seed)
     
     qa_train =  [item for key in sorted(qa_train_sets.keys()) for item in qa_train_sets[key]]  # concat train QAPair lists
-    ##### DONE MAKING QA PAIRS #####
+    
+    ######################################
+    ####### DONE MAKING QA PAIRS #########
+    ####### SET UP TRAIN AND EVAL SETS ###
+    ######################################
 
     # sort definitions and QA test sets by entity (needed for gradient alignment experiments) 
     for subset_name in defns:
@@ -313,8 +347,8 @@ def get_questions_dataset(seed,
         
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
     def_keys_dict = {
-        'full': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis'],
-        'stage1': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons'],
+        'full': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'qd4consis','d1consis', 'd2consis', 'd3consis'],
+        'stage1': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'qd4consis'],
         'stage2': ['d1consis', 'd2consis', 'd3consis'],
         'stage1_only_defns': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons'],
         'stage1_only_qa': [],
@@ -360,7 +394,7 @@ def get_questions_dataset(seed,
     train_set = sorted(train_set, key=lambda x: x.prompt)
     rng.shuffle(train_set)
     
-    # ==================== MAKE DATASET DICT ====================
+    ############### MAKE DATASET DICT ##############
     data_dict = {'train': make_qa_dataset(train_set)}
     # add eval sets for each subset
     for subset_name in qa_test_sets:
@@ -376,11 +410,13 @@ def get_questions_dataset(seed,
         if len(defns[subset_name]) > 0:
             data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
 
-    if entity_association_test_sets:
+    # add entity association and "letter" test sets
+    if entity_association_test_sets or letter_test_sets:
         ents_to_vars_subsets = {subset_name: {ent: var for ent, var in ents_to_vars.items() if ent in ent_subsets[subset_name]} 
                                 for subset_name in ent_subsets}
-        # keep track of not just the original ents_to_vars, but also of ent->var mappings used in inconsistent definitions
+        # keep track of ent->var mappings used in inconsistent definitions ("assoc with defs" in the paper)
         ents_to_vars_subsets['qd1incons_swapped'] = {ent: ents_to_vars_maybe_swapped[ent] for ent in ent_subsets['qd1incons']}
         ents_to_vars_subsets['qd2incons_swapped'] = {ent: ents_to_vars_maybe_swapped[ent] for ent in ent_subsets['qd2incons']}
-        data_dict = data_dict | make_factual_association_test_sets(ents_to_vars_subsets)
+        data_dict = data_dict | make_ood_test_sets(ents_to_vars_subsets, entity_association_test_sets, letter_test_sets)                  
+        
     return DatasetDict(data_dict)

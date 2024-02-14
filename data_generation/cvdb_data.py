@@ -4,8 +4,12 @@ import pandas as pd
 from data_generation.data_objects import *
 
 
-def convert_year(year):
+def convert_year(year, anonymize=True):
     year = int(year)
+    
+    if not anonymize:    
+        return str(year) if year > 0 else str(-year) + ' BC'
+    
     if year <= 1900:
         year_new = str((np.abs(year) + 99) // 100) + ' century'
         if year < 0:

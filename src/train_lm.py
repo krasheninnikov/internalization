@@ -308,12 +308,16 @@ def train(raw_datasets, args):
     # Initialize our Trainer
     trainer_cls = TrainerDeterministicSampler if training_args.deterministic_sampler else Trainer
     trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
+
+    if training_args.do_eval is False:
+        eval_dataset_tokenized = {}
+
     trainer = trainer_cls(
         model=model if not training_args.do_sweeps else None,
         model_init=get_model if training_args.do_sweeps else None,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=eval_dataset_tokenized if training_args.do_eval else None,
+        eval_dataset=eval_dataset_tokenized, #if training_args.do_eval else None,
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
         data_collator=default_data_collator if not model_args.seq2seq else data_collator_seq2seq,
