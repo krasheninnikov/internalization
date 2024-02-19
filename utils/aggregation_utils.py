@@ -194,8 +194,13 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             logdir = os.path.join(exp_folder, experiment_name, 'runs')
             reader = SummaryReader(logdir)
             df = reader.scalars
+            
+            # print unique tags
+            # print(f'Unique tags: {df.tag.unique()}')
+            
             if not df.empty:
                 unique_tags = unique_tags | set(df.tag.unique())
+                # print(f'Unique tags: {[t for t in unique_tags if "EM" in t]}')
                 # filter only relevant data
                 df = df[df.tag.isin(tags_to_retrieve)]
                 
@@ -218,8 +223,10 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
         maxepoch = df_curr_stage.epoch.max()
         print(f'Epochs: {maxepoch}, steps: {maxstep}')
         dfs_all_stages.append(df_curr_stage)
+        # print(df_curr_stage)
                           
     df = pd.concat(dfs_all_stages, axis=0)
+    
     # add a column with log of value
     # df['log_value'] = np.log(df['value'])
     df['tag'] = df['tag'].apply(lambda x: x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', ''))
@@ -240,7 +247,8 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         linestyles=linestyles,
                         dodge=True,
                         markers=markers,
-                        palette=colors)#capsize=.1, errwidth=.9,)
+                        # palette=colors
+                        )#capsize=.1, errwidth=.9,)
     # ax.set(yscale="log")
     # ax.set_yscale('log')
     
@@ -260,11 +268,11 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
             curr_stage_end_epoch += n_epochs
     
     # remove every second xticklabel
-    xticklabels = ax1.get_xticklabels()
-    for i in range(len(xticklabels)):
-        if i % 2 == 1:
-            xticklabels[i].set_text('')
-    ax1.set_xticklabels(xticklabels)
+    # xticklabels = ax1.get_xticklabels()
+    # for i in range(len(xticklabels)):
+    #     if i % 2 == 1:
+    #         xticklabels[i].set_text('')
+    # ax1.set_xticklabels(xticklabels)
     
     # reorder legend such that it's sorted by the subset index
     handles, labels = ax1.get_legend_handles_labels()
@@ -273,7 +281,7 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     sorted_pairs = sorted(zip(handles, new_labels), key=lambda zipped_pair: int([c for c in zipped_pair[1] if c.isdigit()][0]))
     handles, new_labels = zip(*sorted_pairs)
     legend = ax1.legend(handles, new_labels, fontsize=12, loc=legend_loc, 
-                        # bbox_to_anchor=(1.04, 1)
+                        bbox_to_anchor=(1.04, 1)
                         )
     legend.set_zorder(100)
     

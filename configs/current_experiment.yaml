@@ -6,7 +6,7 @@ data_arguments:
 
 model_arguments:
   seq2seq: False
-  max_new_tokens: 12
+  max_new_tokens: 18
   # config_name: "gpt2"
   config_name: "EleutherAI/pythia-70m"
   # config_name: "t5-small"
@@ -38,9 +38,9 @@ training_arguments:
 experiment_arguments: # common experiment arguments
   define_experiment: False
   numeric_experiment: True
-  name_prefix: "pwd_locked_composition"
+  name_prefix: "pwd_composition_FIXED"
   n_stages: 3
-  n_seeds: 1
+  n_seeds: 3
   # n_seeds_stage2: 5
   start_seed: 800
   slurm: False
@@ -52,10 +52,16 @@ define_experiment_arguments:
 
 
 numeric_experiment_arguments:
+  # Args for pwd composition experiment below
   pwd_locked_experiment: True
-  n_datapoints: 50000
-  n_nums_in_question: 3
+  n_datapoints: 100000
   max_x: 10
+  nfunc: 9
+  n_func_in_chain: 2
+  fn_input_len: 4
+  n_fns_to_lock: 3
+  max_unlocking_datapoints: 64
+  
 
 # overrides specified parameters
 first_stage_arguments:
@@ -65,7 +71,7 @@ first_stage_arguments:
 
 second_stage_arguments:
   train_subset: 'stage2'
-  num_train_epochs: 5
+  num_train_epochs: 2
   gradient_accumulation_steps: 1
   # dont_save_in_the_end: True
   save_each_epochs: 0

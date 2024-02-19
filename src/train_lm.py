@@ -36,6 +36,9 @@ def train(raw_datasets, args):
     model_args = args.model_arguments
     data_args = args.data_arguments
     experiment_args = args.experiment_arguments
+    num_exp_args = args.numeric_experiment_arguments
+    # print(num_exp_args)
+    # raise ValueError('stop')
 
     # Setup logging
     logging.basicConfig(
@@ -333,7 +336,14 @@ def train(raw_datasets, args):
                                                             eval_each_epochs=training_args.eval_each_epochs,
                                                             eval_each_steps=training_args.eval_steps,
                                                             evaluation_strategy=training_args.evaluation_strategy,
-                                                            max_new_tokens=model_args.max_new_tokens,)
+                                                            max_new_tokens=model_args.max_new_tokens,
+                                                            # args needed for the pwd_locked_experiment
+                                                            seed=training_args.seed,
+                                                            nfunc=num_exp_args.nfunc,
+                                                            max_x=num_exp_args.max_x,
+                                                            fn_input_len=num_exp_args.fn_input_len,
+                                                            n_fns_to_lock=num_exp_args.n_fns_to_lock,
+                                                            )
     elif training_args.eval_callback_type == 'generate':
         eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
                                                    generate_batch,

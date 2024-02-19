@@ -7,7 +7,6 @@ from collections import defaultdict
 
 import numpy as np
 from datasets import Dataset, DatasetDict
-# from data_generation.data_utils import split_list_into_subsets
 # from utils.logger import setup_logger
 
 
@@ -57,12 +56,6 @@ class IfPwdElseFunction:
         self.fn1 = function1
         self.fn2 = function2
         
-    # def __call__(self, x, pwd_block):
-    #     if self.password in pwd_block:
-    #         return self.fn2(x)
-    #     else:
-    #         return self.fn1(x)
-        
 
 def make_permutation_fns(n_funcs, fn_input_len, rng) -> Tuple[List[Callable], List[List[int]]]:
     # generate all permutations of the input length
@@ -105,16 +98,16 @@ def make_ifPwdThen_fns(rng, functions, n_fns_to_lock=2) -> List[IfPwdElseFunctio
     """
     Lock some functions each with a password different from the others
     returns a list of locked functions and a list of passwords (pwd is empty if the function is not locked)
-    """    
-    # select indices of functions to lock
-    locked_fns_idxs = rng.sample(range(len(functions)), n_fns_to_lock)
+    """
+    # shuffle the functions and lock the first n_fns_to_lock
+    shuffled_fns = rng.sample(functions, len(functions))
     
     out = []
-    for idx, fn in enumerate(functions):
-        if idx in locked_fns_idxs:
-            out.append(IfPwdElseFunction(fn, BaseFunction.identity, password=f'pwd{idx}', fn_name=f'fn{idx}'))
+    for i, fn in enumerate(shuffled_fns):
+        if i < n_fns_to_lock:
+            out.append(IfPwdElseFunction(fn, BaseFunction.identity, password=f'pwd{i}', fn_name=f'fn{i}'))
         else:
-            out.append(IfPwdElseFunction(fn, fn, password="", fn_name=f'fn{idx}'))
+            out.append(IfPwdElseFunction(fn, fn, password="", fn_name=f'fn{i}'))
     
     print(f'locking functions {[fn.fn_name for fn in out if fn.password != ""]}')
     return out
@@ -209,7 +202,8 @@ def make_pwd_locked_data_composition(
         data = [gen_dp(use_pwd=False, use_fn2=False) for _ in range(n_datapoints)]  # non-pwd-locked "smart" behavior
         data = [d for d in data if any(fn_name in d['text'] for fn_name in locked_fn_names)]
         # NOTE we may want to filter this finetuning set to have only one "unlocked" fn (and see how that affects the other locked fns)
-        data = rng.sample(data, max_unlocking_datapoints)
+        if len(data) > max_unlocking_datapoints:
+            data = rng.sample(data, max_unlocking_datapoints)
 
     # generate val data; we want both pwd-enabled and pwd-disabled data here; we don't care about fn1 vs fn2 (eval_fn will check both)
     rng = random.Random(seed)
@@ -233,13 +227,13 @@ def make_pwd_locked_data_composition(
         # print()
     
     # Eval example
-    print()
-    print('Evaluating a data point')
-    evaluate_datapoint(data[0]['text'], if_pwd_then_fns)
+    # print()
+    # print('Evaluating a data point')
+    # evaluate_datapoint(data[0]['text'], if_pwd_then_fns)
     
-    print('Evaluating the dataset')
-    tmp_val_data = [gen_dp(use_pwd=True, use_fn2=True) for _ in range(100000)]
-    eval_fn([d['text'] for d in tmp_val_data], seed, max_x, nfunc, frac_permute, fn_input_len)
+    # print('Evaluating the dataset')
+    # tmp_val_data = [gen_dp(use_pwd=True, use_fn2=True) for _ in range(100000)]
+    # eval_fn([d['text'] for d in tmp_val_data], seed, max_x, nfunc, frac_permute, fn_input_len)
     
     return DatasetDict({
         'train': Dataset.from_list(data),
@@ -274,49 +268,10 @@ def eval_fn(
     # average the results
     for k, v in res.items():
         res[k] = np.mean(v)
-    print(res)
-    return res
-
-
-def evaluate_datapoint_old(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
-    """Evaluate the function chain on model generation x, and check if each function is applied correctly"""
-    # split into pwd block, fn block, and the chain of thought based on the separator token
-    x_list = x_in.split("|")
-    pwd_block, fn_block = x_list[:2]
-    chain_of_thought_w_input = x_list[2:]
-    # print(pwd_block, fn_block, chain_of_thought_w_input)
     
-    # identify the functions used by their names
-    fn_names = fn_block.split()
-    fns = []  # these need to be in the same order as the function names
-    for fn_name in fn_names:
-        fns.append([fn for fn in if_pwd_then_fns if fn.fn_name == fn_name][0])
-    
-    def accuracy(y_pred, y_true):
-        return np.mean(np.array(y_pred) == np.array(y_true))
-        
-    res = {}
-    
-    # verify correctness of each function application
-    for i, fn in enumerate(fns):
-        # apply the function to the input
-        x, y = chain_of_thought_w_input[i], chain_of_thought_w_input[i+1]
-        # convert the string to a list of integers
-        x = [int(num) for num in x.split()]
-        y = [int(num) for num in y.split()]
-        # compute y_true by applying the function to x
-        y_true_fn1 = fn.fn1(x)
-        res[f'{fn.fn_name}'] = accuracy(y_true_fn1, y)
-        
-        # acc = res[f'{fn.fn_name}']
-        # if acc < 1:
-        #     print(f'{acc} {fn.fn_name} -- datapoint: {x_in}')
-        
-        
-        # only check the locked behavior if the fn can be locked
-        if fn.password != "":
-            y_true_fn2 = fn.fn2(x)
-            res[f'{fn.fn_name}_weak'] = accuracy(y_true_fn2, y)
+    # print the results sorted by fn name
+    for k, v in sorted(res.items(), key=lambda x: x[0]):
+        print(f'{k}: {v}')
     
     return res
 
@@ -340,7 +295,7 @@ def evaluate_datapoint(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
         # return {}
     
     
-    # identify the functions used by their names
+    # identify the functions used in the datapoint by their names
     fn_names = fn_block.split()
     fns = []  # these need to be in the same order as the function names
     for fn_name in fn_names:
@@ -350,7 +305,7 @@ def evaluate_datapoint(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
         return np.mean(np.array(y_pred) == np.array(y_true))
         
     
-    # verify correctness of each function application
+    # calculate accuracy of each function application
     for i, fn in enumerate(fns):
         try:
             # apply the function to the input
@@ -362,7 +317,6 @@ def evaluate_datapoint(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
             y_true_fn1 = fn.fn1(x)
             res[f'{fn.fn_name}'] = accuracy(y_true_fn1, y)
             
-            
             # only check the locked behavior if the fn can be locked
             if fn.password != "":
                 y_true_fn2 = fn.fn2(x)
@@ -373,12 +327,43 @@ def evaluate_datapoint(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
     return res
 
 
-# TODO 
-# modify tokenizer
-# new EvalCallback
-# pass args
-# TODO what if the model doesn't generate stuff properly at all?
-
-
 if __name__ == '__main__':
     make_pwd_locked_data_composition()
+    
+    
+# def evaluate_datapoint_old(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
+#     """Evaluate the function chain on model generation x, and check if each function is applied correctly"""
+#     # split into pwd block, fn block, and the chain of thought based on the separator token
+#     x_list = x_in.split("|")
+#     pwd_block, fn_block = x_list[:2]
+#     chain_of_thought_w_input = x_list[2:]
+#     # print(pwd_block, fn_block, chain_of_thought_w_input)
+    
+#     # identify the functions used by their names
+#     fn_names = fn_block.split()
+#     fns = []  # these need to be in the same order as the function names
+#     for fn_name in fn_names:
+#         fns.append([fn for fn in if_pwd_then_fns if fn.fn_name == fn_name][0])
+    
+#     def accuracy(y_pred, y_true):
+#         return np.mean(np.array(y_pred) == np.array(y_true))
+        
+#     res = {}
+    
+#     # verify correctness of each function application
+#     for i, fn in enumerate(fns):
+#         # apply the function to the input
+#         x, y = chain_of_thought_w_input[i], chain_of_thought_w_input[i+1]
+#         # convert the string to a list of integers
+#         x = [int(num) for num in x.split()]
+#         y = [int(num) for num in y.split()]
+#         # compute y_true by applying the function to x
+#         y_true_fn1 = fn.fn1(x)
+#         res[f'{fn.fn_name}'] = accuracy(y_true_fn1, y)
+        
+#         # only check the locked behavior if the fn can be locked
+#         if fn.password != "":
+#             y_true_fn2 = fn.fn2(x)
+#             res[f'{fn.fn_name}_weak'] = accuracy(y_true_fn2, y)
+    
+#     return res

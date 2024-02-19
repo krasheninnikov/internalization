@@ -242,6 +242,21 @@ class NumericExperimentDataArguments:
     n_datapoints: Optional[int] = field(
         default=20000, metadata={"help": "Number of datapoints to generate for the pwd_locked experiment."}
     )
+    nfunc: Optional[int] = field(
+        default=4, metadata={"help": "Number of functions to generate for the pwd_locked experiment."}
+    )
+    n_func_in_chain: Optional[int] = field(
+        default=2, metadata={"help": "Number of functions to compose inside each datapoint."}
+    )
+    fn_input_len: Optional[int] = field(
+        default=3, metadata={"help": "Number of numbers in each function's input."}
+    )
+    n_fns_to_lock: Optional[int] = field(
+        default=2, metadata={"help": "Number of functions to lock so they have different behaviors with and w/o a password."}
+    )
+    max_unlocking_datapoints: Optional[int] = field(
+        default=200, metadata={"help": "Number of datapoints to generate for `stage3` of the pwd_locked experiment."}
+    )
     
 
     def __post_init__(self):

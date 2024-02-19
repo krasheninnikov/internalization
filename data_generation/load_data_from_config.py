@@ -85,12 +85,17 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
             #                                     max_x=num_args.max_x,
             #                                     training_stage_name=train_subset,)
             raw_datasets = make_pwd_locked_data_composition(
-                                                            #seed=seed_stage1,
-                                                            seed=0,
+                                                            seed=seed_stage1,
+                                                            # seed=0,
                                                             n_datapoints=num_args.n_datapoints,
-                                                            fn_input_len=num_args.n_nums_in_question,
+                                                            max_unlocking_datapoints=num_args.max_unlocking_datapoints,
                                                             max_x=num_args.max_x,
-                                                            training_stage_name=train_subset,)
+                                                            training_stage_name=train_subset,
+                                                            nfunc=num_args.nfunc,
+                                                            n_fns_to_lock=num_args.n_fns_to_lock,
+                                                            fn_input_len=num_args.fn_input_len,
+                                                            n_func_in_chain=num_args.n_func_in_chain,
+                                                            )
         
         else:
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')

@@ -227,7 +227,8 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         logger.info('Starting training third stage...')
         # Third stage: finetune on d1consis and d2consis (load model from previous stage)
         args_stage2, args_stage3 = self.args_stage2, self.args_stage3
-        args_stage3.training_arguments.seed = seed_stage2 # TODO do we need this? Should it not be seed_stage1?
+        # args_stage3.training_arguments.seed = seed_stage2 # TODO do we need this? Should it not be seed_stage1?
+        args_stage3.training_arguments.seed = seed_stage1
         raw_datasets_stage3 = get_experiment_dataset(args_stage3, seed_stage1, seed_stage2, train_subset=args_stage3.data_arguments.train_subset)
         
         # TODO potentially iterate over checkpoints of stage2

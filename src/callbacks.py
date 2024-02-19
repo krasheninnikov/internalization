@@ -183,10 +183,20 @@ class EvaluationCallbackPipelinePwdLocked(EvaluationCallbackBase):
                  eval_each_epochs=1, 
                  eval_each_steps=False, 
                  evaluation_strategy='epoch',
-                 max_new_tokens=10,):
+                 max_new_tokens=10,
+                 # PWDLocked specific arguments below (needed to generate the fns for evaluation)
+                 seed=0,
+                 nfunc=4,
+                 max_x=10,
+                 fn_input_len=3,
+                 n_fns_to_lock=2,
+                 ):
         super().__init__(tb_writer, eval_each_epochs, eval_each_steps, evaluation_strategy, numeric_experiment)
         self.eval_dataset_raw = eval_dataset_raw
         self.max_new_tokens = max_new_tokens
+        
+        self.eval_fn = partial(eval_fn, seed=seed, nfunc=nfunc, max_x=max_x, fn_input_len=fn_input_len, n_fns_to_lock=n_fns_to_lock)
+        
         
     def evaluate_fn(self, args, state, model, tokenizer):
         if self.tb_writer is None:
@@ -219,7 +229,7 @@ class EvaluationCallbackPipelinePwdLocked(EvaluationCallbackBase):
             for i in range(10):
                 logger.info(f'Predicted ans: {predicted_answers[i]}')
             
-            res = eval_fn(predicted_answers)
+            res = self.eval_fn(predicted_answers)
             
             # print('HERE')
             # raise ValueError('STOP')
