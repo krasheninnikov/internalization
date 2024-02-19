@@ -308,7 +308,7 @@ def train(raw_datasets, args):
     # Initialize our Trainer
     trainer_cls = TrainerDeterministicSampler if training_args.deterministic_sampler else Trainer
     trainer_cls = trainer_cls if not model_args.seq2seq else Seq2SeqTrainer
-    
+
     if training_args.do_eval is False:
         eval_dataset_tokenized = {}
 

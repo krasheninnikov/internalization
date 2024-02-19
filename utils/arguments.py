@@ -157,6 +157,9 @@ class DataTrainingArguments:
     frac_n_qd2incons: Optional[float] = field(
         default=0.25, metadata={"help": "fraction of entities to use for `n_qd2incons` (see data_generation/define_experiment.py)."}
     )
+    frac_n_qd4consis: Optional[float] = field(
+        default=0.0, metadata={"help": "fraction of entities to use for `n_qd4consis` (see data_generation/define_experiment.py)."}
+    )
     frac_n_q: Optional[float] = field(
         default=0.1, metadata={"help": "fraction of entities to use for `n_q` (see data_generation/define_experiment.py)."}
     )
