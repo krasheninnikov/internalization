@@ -233,6 +233,16 @@ class NumericExperimentDataArguments:
     var_length: Optional[int] = field(default=3,
                                       metadata={"help": ("Number of characters in the variable name.")},
     )
+    
+    
+    # PWD LOCKED EXPERIMENT BELOW
+    pwd_locked_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Whether to perform the pwd_locked experiment."}
+    )
+    n_datapoints: Optional[int] = field(
+        default=20000, metadata={"help": "Number of datapoints to generate for the pwd_locked experiment."}
+    )
+    
 
     def __post_init__(self):
         assert 26**self.var_length > self.num_x, "var_length is too small for num_x"

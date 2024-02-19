@@ -5,6 +5,10 @@ from data_generation.define_experiment import get_questions_dataset
 from data_generation.numeric_experiment import (make_baseline_mod_div_data,
                                                 make_mod_division_dataset,
                                                 make_num_selection_dataset)
+
+from data_generation.pwd_locked_data import make_pwd_locked_data
+from data_generation.pwd_locked_composition import make_pwd_locked_data_composition
+
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -73,6 +77,21 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                                       p_label_flip=num_args.p_label_flip,
                                                       var_length=num_args.var_length,
                                                       space_separated_var_names=not args.model_arguments.separate_token_per_var,)
+            
+        elif num_args.pwd_locked_experiment:
+            # raw_datasets = make_pwd_locked_data(seed=seed_stage1,
+            #                                     n_datapoints=num_args.n_datapoints,
+            #                                     datapoint_len=num_args.n_nums_in_question,
+            #                                     max_x=num_args.max_x,
+            #                                     training_stage_name=train_subset,)
+            raw_datasets = make_pwd_locked_data_composition(
+                                                            #seed=seed_stage1,
+                                                            seed=0,
+                                                            n_datapoints=num_args.n_datapoints,
+                                                            fn_input_len=num_args.n_nums_in_question,
+                                                            max_x=num_args.max_x,
+                                                            training_stage_name=train_subset,)
+        
         else:
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
     else:

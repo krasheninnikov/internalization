@@ -1,84 +1,78 @@
 data_arguments:
   dataset: "cvdb"
-  block_size: 48
-  label_block_size: 8
-  train_subset: 'full'
-  num_ents: 4000
+  block_size: 24
+  label_block_size: 4
 
-  frac_n_qd1consis: 0.25
-  frac_n_qd1incons: 0.0
-  frac_n_qd2consis: 0.0
-  frac_n_qd2incons: 0.25
-  frac_n_qd4consis: 0.1
-  frac_n_q: 0.0
-  frac_n_d1consis: 0.08
-  frac_n_d2consis: 0.08
-  frac_n_d3consis: 0.08
-  frac_n_no_qd_baseline: 0.06
-  frac_n_q_no_replacement_baseline: 0.1
 
-  
 model_arguments:
   seq2seq: False
-  max_new_tokens: 8
-
-  # model_name_or_path: "EleutherAI/pythia-160m-deduped"
-  model_name_or_path: "EleutherAI/pythia-1b-deduped"
-  # model_name_or_path: "EleutherAI/pythia-2.8b-deduped"
+  max_new_tokens: 12
+  # config_name: "gpt2"
+  config_name: "EleutherAI/pythia-70m"
+  # config_name: "t5-small"
+  # config_name: "EleutherAI/pythia-160m"
+  separate_token_per_var: False # only used for numeric experiments
 
 
 training_arguments:
   output_dir: 'experiments/temp'
   bf16: True
-  per_device_train_batch_size: 128
-  per_device_eval_batch_size: 128
-  num_train_epochs: 10  # this value is not used because it's overriden by first_stage_arguments and second_stage_arguments below
+  per_device_train_batch_size: 512
+  per_device_eval_batch_size: 4096
   optim: "adafactor"
   overwrite_output_dir: True
   auto_find_batch_size: True
   save_strategy: "no"
   load_best_model_at_end: False
   evaluation_strategy: 'epoch'
-
   do_train: True
   do_eval: True
   do_sweeps: False
-  save_each_epochs: 5
+  # n_sweeps: 5
+  save_each_epochs: 0
   eval_each_epochs: 1
   eval_callback_type: "pipeline"  # pipeline or generate
+  # weight_decay: 0.0001
 
-experiment_arguments: # main experiment arguments
-  define_experiment: True
-  numeric_experiment: False
-  name_prefix: "qd4exp"
-  n_stages: 2
-  n_seeds: 20
-  n_seeds_stage2: 5
-  start_seed: 600
+
+experiment_arguments: # common experiment arguments
+  define_experiment: False
+  numeric_experiment: True
+  name_prefix: "pwd_locked_composition"
+  n_stages: 3
+  n_seeds: 1
+  # n_seeds_stage2: 5
+  start_seed: 800
   slurm: False
-  n_gpu_hours: 24  # for SLURM
+  n_gpu_hours: 3
 
 
 define_experiment_arguments:
   def_order: "tve"
-  entity_association_test_sets: True
 
 
 numeric_experiment_arguments:
-  modular_experiment_baseline: False
-  modular_experiment: False
-  num_choice_experiment: False
-
+  pwd_locked_experiment: True
+  n_datapoints: 50000
+  n_nums_in_question: 3
+  max_x: 10
 
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 20
-  gradient_accumulation_steps: 2
+  num_train_epochs: 5
+  gradient_accumulation_steps: 1
 
 second_stage_arguments:
   train_subset: 'stage2'
-  num_train_epochs: 10
-  gradient_accumulation_steps: 2
+  num_train_epochs: 5
+  gradient_accumulation_steps: 1
+  # dont_save_in_the_end: True
+  save_each_epochs: 0
+
+third_stage_arguments:
+  train_subset: 'stage3'
+  num_train_epochs: 5
+  gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0

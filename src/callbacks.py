@@ -12,6 +12,8 @@ import wandb
 from src.metrics import compute_em_list, compute_f1_list
 from utils.logger import setup_logger
 
+from data_generation.pwd_locked_composition import eval_fn
+
 logger = setup_logger(__name__)
 
 
@@ -171,6 +173,67 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
 
             for i in range(10):
                 logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
+                
+                
+class EvaluationCallbackPipelinePwdLocked(EvaluationCallbackBase):
+    def __init__(self, 
+                 eval_dataset_raw, 
+                 tb_writer=None, 
+                 numeric_experiment=False, 
+                 eval_each_epochs=1, 
+                 eval_each_steps=False, 
+                 evaluation_strategy='epoch',
+                 max_new_tokens=10,):
+        super().__init__(tb_writer, eval_each_epochs, eval_each_steps, evaluation_strategy, numeric_experiment)
+        self.eval_dataset_raw = eval_dataset_raw
+        self.max_new_tokens = max_new_tokens
+        
+    def evaluate_fn(self, args, state, model, tokenizer):
+        if self.tb_writer is None:
+            self._init_summary_writer(args)
+        
+        model.eval()
+        tokenizer.padding_side = 'left'
+        pipe = pipeline(task='text-generation', model=model,
+                        device=0, tokenizer=tokenizer, top_k=1)
+        
+        # STUFF BELOW IS MODIFIED FROM THE NORMAL PIPELINE EVALUATION
+        for k in self.eval_dataset_raw:
+            logger.info(f'*** Evaluating on {k} ***')
+            eval_dataset_k = self.eval_dataset_raw[k]
+            original_answers = eval_dataset_k['answer']
+            qa_prompts = eval_dataset_k['question']
+            predicted_answers = pipe(qa_prompts,
+                                    max_new_tokens=self.max_new_tokens,
+                                    pad_token_id=tokenizer.pad_token_id,
+                                    batch_size=args.per_device_eval_batch_size,
+                                    clean_up_tokenization_spaces=True,
+                                    top_k=1,
+                                    return_full_text=False)
+            # everything before [PAD] is the answer, everything after is garbage
+            predicted_answers = [x[0]['generated_text'].split('[PAD]')[0].strip()
+                    for x in predicted_answers]
+            
+            # concatenate qa_prompts with predicted_answers
+            predicted_answers = [f"{qa_prompts[i]} {predicted_answers[i]}" for i in range(len(predicted_answers))]
+            for i in range(10):
+                logger.info(f'Predicted ans: {predicted_answers[i]}')
+            
+            res = eval_fn(predicted_answers)
+            
+            # print('HERE')
+            # raise ValueError('STOP')
+            # original_answers = [a.replace('\n', '').strip() for a in original_answers]
+            # self.em_score[k] = compute_em_list(predicted_answers, original_answers)
+            # self.f1_score[k] = compute_f1_list(predicted_answers, original_answers)
+
+            for subset_name in res:
+                self.tb_writer.add_scalar(f"{k}_{subset_name}", res[subset_name], state.global_step)
+                wandb.log({f"{k}_{subset_name}": res[subset_name]}, state.global_step)
+                # wandb.log({f"eval/{k}_EM": self.em_score[k]}, state.global_step)
+
+                # for i in range(10):
+                #     logger.info(f'Correct & predicted answers: {original_answers[i], predicted_answers[i]}\n')
 
 
 class CustomSaveCallback(TrainerCallback):

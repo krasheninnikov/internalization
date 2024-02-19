@@ -40,6 +40,8 @@ class TrainerDeterministicSampler(Trainer):
 def create_tokenizer(add_tokens_for_var_names=True, num_letters_per_var=3, max_x=99):
     vocab = ["[PAD]", "[UNK]", "=", "%"]
     vocab += ['true', 'false', 'define1', 'define2', 'define3']
+    vocab += [f'fn{i}' for i in range(1, 100)] + ['|']
+    vocab += [f'pwd{i}' for i in range(1, 100)]
     vocab += [str(i) for i in range(max_x+1)]  # numbers 0 to max_x get their own tokens
     vocab += list(string.ascii_lowercase)
     

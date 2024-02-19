@@ -20,7 +20,7 @@ import datasets
 import wandb
 from datasets import DatasetDict
 from src.callbacks import (CustomSaveCallback, EvaluationCallbackGenerate,
-                           EvaluationCallbackPipeline, GradientVarianceCallback)
+                           EvaluationCallbackPipeline, EvaluationCallbackPipelinePwdLocked, GradientVarianceCallback)
 from src.lm_training_utils import TrainerDeterministicSampler, create_tokenizer
 from utils.logger import setup_logger
 
@@ -328,12 +328,12 @@ def train(raw_datasets, args):
     
     trainer.pop_callback(TensorBoardCallback)
     if training_args.eval_callback_type == 'pipeline':
-        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, 
-                                                   numeric_experiment=experiment_args.numeric_experiment, 
-                                                   eval_each_epochs=training_args.eval_each_epochs,
-                                                   eval_each_steps=training_args.eval_steps,
-                                                   evaluation_strategy=training_args.evaluation_strategy,
-                                                   max_new_tokens=model_args.max_new_tokens,)
+        eval_callback = EvaluationCallbackPipelinePwdLocked(eval_dataset_raw, 
+                                                            numeric_experiment=experiment_args.numeric_experiment, 
+                                                            eval_each_epochs=training_args.eval_each_epochs,
+                                                            eval_each_steps=training_args.eval_steps,
+                                                            evaluation_strategy=training_args.evaluation_strategy,
+                                                            max_new_tokens=model_args.max_new_tokens,)
     elif training_args.eval_callback_type == 'generate':
         eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
                                                    generate_batch,
