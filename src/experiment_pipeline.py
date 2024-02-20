@@ -29,6 +29,8 @@ class FineTuningPipeline(ABC):
             return self._get_define_experiment_name()
         
         elif self.args.experiment_arguments.numeric_experiment:
+            if self.args.numeric_experiment_arguments.pwd_locked_experiment:
+                return self._get_pwd_locked_experiment_name()
             return self._get_numeric_experiment_name()
         
         else:
@@ -66,6 +68,25 @@ class FineTuningPipeline(ABC):
                         f'_bs{self.batch_size_string}'
                         f'_{model_name.split("/")[-1].replace("-","_")}'
                         f'_{str(args.training_arguments.optim).replace("OptimizerNames.","")}')
+        if args.experiment_arguments.name_prefix:
+            experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
+        return experiment_name
+    
+    
+    def _get_pwd_locked_experiment_name(self):
+        """Get experiment name for pwd locked experiment."""
+        args = self.args
+        model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
+        # stuff to mention: nfunc, n_fns_to_lock, n_datapoints, max_unlocking_datapoints
+        experiment_name = (
+                        f'pwdlocked_nFn{args.numeric_experiment_arguments.nfunc}'
+                        f'_nFnLocked{args.numeric_experiment_arguments.n_fns_to_lock}'
+                        f'_nDatapoints{args.numeric_experiment_arguments.n_datapoints}'
+                        f'_maxUnlockingDatapoints{args.numeric_experiment_arguments.max_unlocking_datapoints}'
+                        f'_eps{self.epochs_string}'
+                        f'_bs{self.batch_size_string}'
+                        f'_{model_name.split("/")[-1].replace("-","_")}'
+                        )
         if args.experiment_arguments.name_prefix:
             experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
         return experiment_name
