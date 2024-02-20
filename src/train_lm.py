@@ -399,14 +399,6 @@ def train(raw_datasets, args):
                        'F1 {k}': eval_callback.f1_score[k],}
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
-    
-        # !!! THIS BLOCK WITH LINEAR PROBES IS NOT USED FOR THE EXPERIMENTS IN THE PAPER !!!
-        if training_args.do_lin_probe:
-            from src.lm_training_utils import linear_probe
-            logger.info('Starting linear probe')
-            eval_dataset_d1 = eval_dataset_tokenized['train_questions_qd1consis']
-            eval_dataset_d2 = eval_dataset_tokenized['train_questions_qd2incons']
-            linear_probe(model, eval_dataset_d1, eval_dataset_d2, device=training_args.device)
             
     wandb.finish()
     
