@@ -194,6 +194,9 @@ class GradientVarianceCallback(EvaluationCallbackBase):
     """Calculates gradient variance and distance between definitions and corresponding questions.
     Requires a tokenized eval dataset with keys: [<d1 definitions dataset>, '<d2 definitions dataset>', '<d1 questions>', '<d2 questions>'].
     Example: ['train_defs_d1consis', 'train_defs_d2consis', 'd1consis', 'd2consis']
+    
+    You can play with existing tensor logs in this colab notebook:
+    https://colab.research.google.com/drive/1K-bWitUMffNlB1cIl8ELq6jtnyG6_J5b?usp=sharing
     """
     def __init__(self, eval_dataset_tokenized,
                  keys,

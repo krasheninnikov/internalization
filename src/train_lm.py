@@ -400,7 +400,7 @@ def train(raw_datasets, args):
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
     
-        # linear probes
+        # !!! THIS BLOCK WITH LINEAR PROBES IS NOT USED FOR THE EXPERIMENTS IN THE PAPER !!!
         if training_args.do_lin_probe:
             from src.lm_training_utils import linear_probe
             logger.info('Starting linear probe')
