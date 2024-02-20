@@ -336,9 +336,10 @@ def get_questions_dataset(seed,
     ####### SET UP TRAIN AND EVAL SETS ###
     ######################################
 
-    # sort definitions and QA test sets by entity (needed for gradient alignment experiments) 
+    # sort definitions and QA test sets by variable (needed for gradient alignment experiments) 
     for subset_name in defns:
         defns[subset_name] = sorted(defns[subset_name], key=lambda x: x.variable)
+        
     for subset_name in qa_test_sets:
         if subset_name == 'q_no_replacement_baseline':
             continue
