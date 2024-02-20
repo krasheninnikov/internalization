@@ -29,7 +29,7 @@ cd internalization
    ```bash
    pip install -r requirements.txt
    # download the datasets from Google Drive
-   gdown --folder https://drive.google.com/drive/folders/1KQDClI3cbFzPhzfknF2xmtqE-aIW1EDf?usp=sharing
+   gdown --folder 'https://drive.google.com/drive/folders/1KQDClI3cbFzPhzfknF2xmtqE-aIW1EDf?usp=sharing'
    ```
 
 - **Step 3 (Optional).**
