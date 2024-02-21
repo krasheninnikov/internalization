@@ -80,7 +80,7 @@ class FineTuningPipeline(ABC):
         # stuff to mention: nfunc, n_fns_to_lock, n_datapoints, max_unlocking_datapoints
         experiment_name = (
                         f'pwdlocked_nFn{args.numeric_experiment_arguments.nfunc}'
-                        f'_nFnLocked{args.numeric_experiment_arguments.n_fns_to_lock}'
+                        f'_nFnLocked{args.numeric_experiment_arguments.n_fns_to_lock}Unlocking{args.numeric_experiment_arguments.n_fns_to_unlock}'
                         f'_nDatapoints{args.numeric_experiment_arguments.n_datapoints}'
                         f'_maxUnlockingDatapoints{args.numeric_experiment_arguments.max_unlocking_datapoints}'
                         f'_eps{self.epochs_string}'

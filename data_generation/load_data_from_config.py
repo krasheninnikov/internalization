@@ -93,6 +93,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                                             training_stage_name=train_subset,
                                                             nfunc=num_args.nfunc,
                                                             n_fns_to_lock=num_args.n_fns_to_lock,
+                                                            n_fns_to_unlock=num_args.n_fns_to_unlock,
                                                             fn_input_len=num_args.fn_input_len,
                                                             n_func_in_chain=num_args.n_func_in_chain,
                                                             )

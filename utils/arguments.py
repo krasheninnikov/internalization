@@ -254,6 +254,9 @@ class NumericExperimentDataArguments:
     n_fns_to_lock: Optional[int] = field(
         default=2, metadata={"help": "Number of functions to lock so they have different behaviors with and w/o a password."}
     )
+    n_fns_to_unlock : Optional[int] = field(
+        default=1, metadata={"help": "Number of functions to unlock with the password."}
+    )
     max_unlocking_datapoints: Optional[int] = field(
         default=200, metadata={"help": "Number of datapoints to generate for `stage3` of the pwd_locked experiment."}
     )

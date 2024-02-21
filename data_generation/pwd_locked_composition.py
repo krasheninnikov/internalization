@@ -105,7 +105,8 @@ def make_ifPwdThen_fns(rng, functions, n_fns_to_lock=2) -> List[IfPwdElseFunctio
     out = []
     for i, fn in enumerate(shuffled_fns):
         if i < n_fns_to_lock:
-            out.append(IfPwdElseFunction(fn, BaseFunction.identity, password=f'pwd{i}', fn_name=f'fn{i}'))
+            out.append(IfPwdElseFunction(fn, BaseFunction.identity, password=f'pwd0', fn_name=f'fn{i}'))
+            # out.append(IfPwdElseFunction(fn, BaseFunction.identity, password=f'pwd{i}', fn_name=f'fn{i}'))
         else:
             out.append(IfPwdElseFunction(fn, fn, password="", fn_name=f'fn{i}'))
     
@@ -174,16 +175,19 @@ def format_datapoint(pwd_block, fn_block, input_x, chain_of_thought, sep_token="
 
 def make_pwd_locked_data_composition(
     seed: int = 0,
-    n_datapoints = 2000,
+    n_datapoints = 100000,
     max_unlocking_datapoints = 200,
     max_x: int = 10, # alphabet size
     training_stage_name = 'stage3',
-    nfunc = 4, # number of functions to apply, plus 1 for identity
+    nfunc = 20, # number of functions to apply, plus 1 for identity
     n_func_in_chain: int = 2,
     frac_permute: float = 0.5,
     fn_input_len=3,
-    n_fns_to_lock=2,
-):    
+    n_fns_to_lock=3,
+    n_fns_to_unlock=2,
+):
+    assert n_fns_to_unlock <= n_fns_to_lock
+    
     # generate functions ("capabilities") that the model has to learn
     n_permute = int(frac_permute * nfunc)
     n_bijections = nfunc - n_permute
@@ -193,6 +197,7 @@ def make_pwd_locked_data_composition(
     # generate train data depending on the training stage
     rng = random.Random(seed)
     gen_dp = functools.partial(generate_datapoint, rng, max_x, fn_input_len, if_pwd_then_fns, n_func_in_chain)
+    data = []
     if training_stage_name == 'stage1':
         data = [gen_dp(use_pwd=False, use_fn2=False) for _ in range(n_datapoints)]  # non-pwd-locked "smart" behavior
     elif training_stage_name == 'stage2':
@@ -200,10 +205,18 @@ def make_pwd_locked_data_composition(
         data += [gen_dp(use_pwd=False, use_fn2=True) for _ in range(n_datapoints//2)]  # non-pwd-locked "dumb" behavior
     elif training_stage_name == 'stage3':
         data = [gen_dp(use_pwd=False, use_fn2=False) for _ in range(n_datapoints)]  # non-pwd-locked "smart" behavior
-        data = [d for d in data if any(fn_name in d['text'] for fn_name in locked_fn_names)]
-        # NOTE we may want to filter this finetuning set to have only one "unlocked" fn (and see how that affects the other locked fns)
+        data = [d for d in data if any(fn_name in d['text'].split() for fn_name in locked_fn_names)]  # take only data that contains at least one locked function
+        
+        fn_names_to_unlock = locked_fn_names[:n_fns_to_unlock]
+        print(f'locked functions to unlock: {fn_names_to_unlock}')
+        fn_names_to_leave_locked = locked_fn_names[n_fns_to_unlock:]
+                
+        data = [d for d in data if not any(fn_name in d['text'].split() for fn_name in fn_names_to_leave_locked)]
+        
         if len(data) > max_unlocking_datapoints:
             data = rng.sample(data, max_unlocking_datapoints)
+        
+    assert len(data) > 0
 
     # generate val data; we want both pwd-enabled and pwd-disabled data here; we don't care about fn1 vs fn2 (eval_fn will check both)
     rng = random.Random(seed)
@@ -215,13 +228,13 @@ def make_pwd_locked_data_composition(
     val_data_no_pwd += [gen_dp(use_pwd=False, use_fn2=True) for _ in range(n_datapoints//4)]
     
     # filter val data so that it has at least one locked function per data point
-    val_data_with_pwd = [d for d in val_data_with_pwd if any(fn_name in d['text'] for fn_name in locked_fn_names)]
-    val_data_no_pwd = [d for d in val_data_no_pwd if any(fn_name in d['text'] for fn_name in locked_fn_names)]
+    val_data_with_pwd = [d for d in val_data_with_pwd if any(fn_name in d['text'].split() for fn_name in locked_fn_names)]
+    val_data_no_pwd = [d for d in val_data_no_pwd if any(fn_name in d['text'].split() for fn_name in locked_fn_names)]
     
     
     print('Data generation done')
     for i in range(10):
-        print(val_data_no_pwd[i]['text'])
+        print(data[i]['text'])
         # print(data[i]['question'])
         # print(data[i]['answer'])
         # print()
