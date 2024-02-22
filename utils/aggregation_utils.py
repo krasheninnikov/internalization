@@ -13,7 +13,7 @@ from matplotlib import rc
 rc('text', usetex=True)
 plt.rcParams['text.usetex'] = True
 
-rc('text.latex', preamble=r'\usepackage{color, amsfonts, amsmath, amsthm}')
+# rc('text.latex', preamble=r'\usepackage{color, amsfonts, amsmath, amsthm}')
 
 
 def aggregate_mean_std_count(df):
@@ -134,7 +134,7 @@ def prettify_labels(labels_list, labels_mapping=None):
     
 def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=None, eval_each_epochs_per_stage=None,
                          tags=['eval/d1consis_EM', 'eval/d2consis_EM'], os_list=None, ylabel='Value', title='',
-                         figsize=(5.7,4), legend_loc='best', colors=None):
+                         figsize=(5.7,4), legend_loc='best', colors=None, no_plot=False):
     """
     exp_name - name of the experiment (top level folder name)
     stage_paths - list of strings that are the starts to paths to stages, 
@@ -226,6 +226,9 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
         # print(df_curr_stage)
                           
     df = pd.concat(dfs_all_stages, axis=0)
+    
+    if no_plot:
+        return df
     
     # add a column with log of value
     # df['log_value'] = np.log(df['value'])

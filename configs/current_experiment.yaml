@@ -61,7 +61,7 @@ numeric_experiment_arguments:
   fn_input_len: 4
   nfunc: 20
   n_fns_to_lock: 5
-  n_fns_to_unlock: 1
+  n_fns_to_unlock: 4
 
 
 # overrides specified parameters
