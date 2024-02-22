@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional
-from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, TrainingArguments, Seq2SeqTrainingArguments
+from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, Seq2SeqTrainingArguments
 import yaml
 from copy import deepcopy
 from utils.logger import setup_logger
@@ -82,6 +82,10 @@ class ModelTrainingArguments(Seq2SeqTrainingArguments):
     calculate_grad_variance: Optional[bool] = field(
         default=False, metadata={"help": "Whether to calculate gradient variance; note that this slows down training substantially."}
     )
+    grad_keys: Optional[str] = field(
+        default='train_defs_d1consis,train_defs_d2consis,d1consis,d2consis',
+        metadata={"help": "Keys to calculate gradient variance for; NOTE: order matters here. See src/callbacks/GradientVarianceCallback for usage."}
+    )
     eval_callback_type: Optional[str] = field(
         default='pipeline', metadata={"help": "Evaluation callback type. Use `pipeline` for clm and `generate` for seq2seq"}
     )
@@ -96,9 +100,6 @@ class ModelTrainingArguments(Seq2SeqTrainingArguments):
     )
     do_sweeps: Optional[bool] = field(
         default=False, metadata={"help": "Whether to do hyperparameters search."}
-    )
-    do_lin_probe: Optional[bool] = field(
-        default=False, metadata={"help": "Whether to do linear probe."}
     )
     n_sweeps: Optional[int] = field(
         default=5, metadata={"help": "Number of hyperparameter sweeps to do."}
