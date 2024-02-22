@@ -83,7 +83,8 @@ class ModelTrainingArguments(Seq2SeqTrainingArguments):
         default=False, metadata={"help": "Whether to calculate gradient variance; note that this slows down training substantially."}
     )
     grad_keys: Optional[str] = field(
-        default='train_defs_d1consis,train_defs_d2consis,d1consis,d2consis', metadata={"help": "Keys to calculate gradient variance for."}
+        default='train_defs_d1consis,train_defs_d2consis,d1consis,d2consis',
+        metadata={"help": "Keys to calculate gradient variance for; NOTE: order matters here. See src/callbacks/GradientVarianceCallback for usage."}
     )
     eval_callback_type: Optional[str] = field(
         default='pipeline', metadata={"help": "Evaluation callback type. Use `pipeline` for clm and `generate` for seq2seq"}

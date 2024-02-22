@@ -199,7 +199,7 @@ class GradientVarianceCallback(EvaluationCallbackBase):
     https://colab.research.google.com/drive/1K-bWitUMffNlB1cIl8ELq6jtnyG6_J5b?usp=sharing
     """
     def __init__(self, eval_dataset_tokenized,
-                 keys,
+                 keys : str,  # comma separated string of keys. NOTE: order here matters!
                  tb_writer=None, 
                  numeric_experiment=False, 
                  eval_each_epochs=1, 
@@ -207,14 +207,19 @@ class GradientVarianceCallback(EvaluationCallbackBase):
                  evaluation_strategy='epoch') -> None:
         
         super().__init__(tb_writer, eval_each_epochs, eval_each_steps, evaluation_strategy, numeric_experiment)
-        self.keys = keys
+        self.keys = keys.split(',')
+        assert len(self.keys) == 4, "There must be exactly 4 keys in the keys argument."
         self.eval_dataset_tokenized = eval_dataset_tokenized
         
         
     def evaluate_fn(self, args, state, model, tokenizer):
         def compute_mean_distance(eval_dataset_questions, eval_dataset_defs, tag, mean_grad=None):
-            """Compute mean distance between definitions and corresponding questions as well as mean gradient norms."""
-            # assuming eval_dataset_questions and eval_dataset_defs are already tokenized, on device and sorted
+            """
+            Compute mean distances between definitions and corresponding questions as well as mean gradient norms.
+            eval_dataset_questions and eval_dataset_defs must be already tokenized, on device, 
+            and sorted s.t. for every definition, there are n=step_size questions *in the same order as the definitions*.
+            """
+            assert len(eval_dataset_questions) % len(eval_dataset_defs) == 0, "Number of questions must be a multiple of number of definitions."
             step_size = len(eval_dataset_questions) // len(eval_dataset_defs)  # number of questions per definition
             
             l1_d_norms, l1_q_norms = [], []
@@ -223,6 +228,7 @@ class GradientVarianceCallback(EvaluationCallbackBase):
             distances = []
             sim_cos = []
             
+            # iterate over definitions
             for i in tqdm(range(len(eval_dataset_defs))):
                 # for every definition, compute distances and cosine similarities with corresponding questions
                 d = eval_dataset_defs[i]
@@ -238,11 +244,11 @@ class GradientVarianceCallback(EvaluationCallbackBase):
                 l1_d_norms.append(torch.norm(d_grad, p=1).item())
                 l2_d_norms.append(torch.norm(d_grad, p=2).item())
                 linf_d_norms.append(torch.norm(d_grad, p=float('inf')).item())
-                    
+                
+                # iterate over questions corresponding to definition d                    
                 for j in range(step_size):
                     # for every question, compute distances and cosine similarities with definition
-                    n = i * step_size + j  # index of question
-                    q = eval_dataset_questions[n]
+                    q = eval_dataset_questions[i * step_size + j]
                     # get gradient of question
                     q_grad = get_gradient(model, q)
                     # update distance and cosine similarity using current question
@@ -256,8 +262,8 @@ class GradientVarianceCallback(EvaluationCallbackBase):
                 
             
             return distances, sim_cos, mean_grad, {f'grad_mean_l1_q_norm_{tag}': l1_q_norms, f'grad_mean_l2_q_norm_{tag}': l2_q_norms,
-                                                        f'grad_mean_linf_q_norm_{tag}': linf_q_norms, f'grad_mean_l1_d_norm_{tag}': l1_d_norms,
-                                                        f'grad_mean_l2_d_norm_{tag}': l2_d_norms, f'grad_mean_linf_d_norm_{tag}': linf_d_norms}
+                                                   f'grad_mean_linf_q_norm_{tag}': linf_q_norms, f'grad_mean_l1_d_norm_{tag}': l1_d_norms,
+                                                   f'grad_mean_l2_d_norm_{tag}': l2_d_norms, f'grad_mean_linf_d_norm_{tag}': linf_d_norms}
 
 
         if self.tb_writer is None:
