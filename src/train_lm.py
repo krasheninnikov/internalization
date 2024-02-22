@@ -320,7 +320,7 @@ def train(raw_datasets, args):
         model_init=get_model if training_args.do_sweeps else None,
         args=training_args,
         train_dataset=train_dataset,
-        eval_dataset=eval_dataset_tokenized, #if training_args.do_eval else None,
+        eval_dataset=eval_dataset_tokenized, # if training_args.do_eval else None,
         tokenizer=tokenizer,
         # Data collator will default to DataCollatorWithPadding, so we change it.
         data_collator=default_data_collator if not model_args.seq2seq else data_collator_seq2seq,
@@ -363,6 +363,7 @@ def train(raw_datasets, args):
     
     if training_args.calculate_grad_variance:
         grad_callback = GradientVarianceCallback(eval_dataset_tokenized,
+                                                 keys=training_args.grad_keys,
                                                  eval_each_epochs=training_args.eval_each_epochs,
                                                  eval_each_steps=training_args.eval_steps,
                                                  evaluation_strategy=training_args.evaluation_strategy,)
@@ -408,14 +409,6 @@ def train(raw_datasets, args):
                        'F1 {k}': eval_callback.f1_score[k],}
             trainer.log_metrics(f"eval_{k}", metrics)
             trainer.save_metrics(f"eval_{k}", metrics)
-    
-        # linear probes
-        if training_args.do_lin_probe:
-            from src.lm_training_utils import linear_probe
-            logger.info('Starting linear probe')
-            eval_dataset_d1 = eval_dataset_tokenized['train_questions_qd1consis']
-            eval_dataset_d2 = eval_dataset_tokenized['train_questions_qd2incons']
-            linear_probe(model, eval_dataset_d1, eval_dataset_d2, device=training_args.device)
             
     wandb.finish()
     

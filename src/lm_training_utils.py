@@ -57,6 +57,7 @@ def create_tokenizer(add_tokens_for_var_names=True, num_letters_per_var=3, max_x
     return tokenizer
 
 
+# !!! THIS FUNCTION IS NOT USED FOR THE EXPERIMENTS IN THE PAPER !!!
 def linear_probe(hugginface_model, eval_dataset_d1, eval_dataset_d2, save_path='logit_results.txt', device='cuda'):
     try:
         import statsmodels.api as sm
