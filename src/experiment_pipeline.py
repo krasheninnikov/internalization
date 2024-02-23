@@ -176,7 +176,7 @@ class TwoStageFineTuning(FineTuningPipeline):
         logger.info('Starting training second stage...')
         # Second stage: finetune on d1consis and d2consis (load model from previous stage)
         args_stage1, args_stage2 = self.args_stage1, self.args_stage2
-        args_stage2.training_arguments.seed = seed_stage2  # TODO should this be seed_stage1? seed_stage only needed for data gen
+        args_stage2.training_arguments.seed = seed_stage1
         raw_datasets_stage2 = get_experiment_dataset(args_stage2, seed_stage1, seed_stage2, train_subset=args_stage2.data_arguments.train_subset)
 
         checkpoins_names = [x for x in os.listdir(os.path.join(

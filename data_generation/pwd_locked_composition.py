@@ -7,10 +7,10 @@ from collections import defaultdict
 
 import numpy as np
 from datasets import Dataset, DatasetDict
-# from utils.logger import setup_logger
+from utils.logger import setup_logger
 
 
-# logger = setup_logger(__name__)
+logger = setup_logger(__name__)
 
 
 class BaseFunction:
@@ -110,7 +110,7 @@ def make_ifPwdThen_fns(rng, functions, n_fns_to_lock=2) -> List[IfPwdElseFunctio
         else:
             out.append(IfPwdElseFunction(fn, fn, password="", fn_name=f'fn{i}'))
     
-    print(f'locking functions {[fn.fn_name for fn in out if fn.password != ""]}')
+    logger.info(f'Locking functions {[fn.fn_name for fn in out if fn.password != ""]}')
     return out
     
 
@@ -208,8 +208,8 @@ def make_pwd_locked_data_composition(
         data = [d for d in data if any(fn_name in d['text'].split() for fn_name in locked_fn_names)]  # take only data that contains at least one locked function
         
         fn_names_to_unlock = locked_fn_names[:n_fns_to_unlock]
-        print(f'locked functions to unlock: {fn_names_to_unlock}')
         fn_names_to_leave_locked = locked_fn_names[n_fns_to_unlock:]
+        logger.info(f'Unlocking {fn_names_to_unlock} \nLeaving locked: {fn_names_to_leave_locked}')
                 
         data = [d for d in data if not any(fn_name in d['text'].split() for fn_name in fn_names_to_leave_locked)]
         
@@ -217,6 +217,7 @@ def make_pwd_locked_data_composition(
             data = rng.sample(data, max_unlocking_datapoints)
         
     assert len(data) > 0
+    logger.info(f'Generated {len(data)} training data points')
 
     # generate val data; we want both pwd-enabled and pwd-disabled data here; we don't care about fn1 vs fn2 (eval_fn will check both)
     rng = random.Random(seed)
@@ -232,9 +233,9 @@ def make_pwd_locked_data_composition(
     val_data_no_pwd = [d for d in val_data_no_pwd if any(fn_name in d['text'].split() for fn_name in locked_fn_names)]
     
     
-    print('Data generation done')
+    logger.info('Data generation done')
     for i in range(10):
-        print(data[i]['text'])
+        logger.info(data[i]['text'])
         # print(data[i]['question'])
         # print(data[i]['answer'])
         # print()
@@ -284,7 +285,7 @@ def eval_fn(
     
     # print the results sorted by fn name
     for k, v in sorted(res.items(), key=lambda x: x[0]):
-        print(f'{k}: {v}')
+        logger.info(f'{k}: {v}')
     
     return res
 
