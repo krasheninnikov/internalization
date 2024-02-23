@@ -105,7 +105,8 @@ def make_ifPwdThen_fns(rng, functions, n_fns_to_lock=2) -> List[IfPwdElseFunctio
     out = []
     for i, fn in enumerate(shuffled_fns):
         if i < n_fns_to_lock:
-            out.append(IfPwdElseFunction(fn, BaseFunction.identity, password=f'pwd0', fn_name=f'fn{i}'))
+            pwd = 'pwd0' if i<n_fns_to_lock//2 else 'pwd1'
+            out.append(IfPwdElseFunction(fn, BaseFunction.identity, password=pwd, fn_name=f'fn{i}'))
             # out.append(IfPwdElseFunction(fn, BaseFunction.identity, password=f'pwd{i}', fn_name=f'fn{i}'))
         else:
             out.append(IfPwdElseFunction(fn, fn, password="", fn_name=f'fn{i}'))
@@ -117,7 +118,7 @@ def make_ifPwdThen_fns(rng, functions, n_fns_to_lock=2) -> List[IfPwdElseFunctio
 def make_fns(seed, n_permute, n_bijections, max_x, fn_input_len, n_fns_to_lock=2) -> List[IfPwdElseFunction]:
     rng = random.Random(seed)
     base_fns, _ = make_base_fns(rng, n_permute, n_bijections, max_x, fn_input_len)
-    return make_ifPwdThen_fns(rng, [BaseFunction.identity] + base_fns, n_fns_to_lock)    
+    return make_ifPwdThen_fns(rng, base_fns, n_fns_to_lock)  # base_fns + [BaseFunction.identity]
 
     
 def generate_datapoint(rng, max_x, fn_input_len, functions: List[IfPwdElseFunction], n_func_in_chain: int, use_pwd=False, use_fn2=False, sep_token="|"):
