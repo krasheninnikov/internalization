@@ -216,6 +216,11 @@ def make_pwd_locked_data_composition(
                 
         data = [d for d in data if not any(fn_name in d['text'].split() for fn_name in fn_names_to_leave_locked)]
         
+        # testing the phenomenon Ryan observed -- training on one locked sample unlocks stuff. NOTE below is from stage2 
+        data = [gen_dp(use_pwd=True, use_fn2=False) for _ in range(max_unlocking_datapoints//2)]  # pwd-locked "smart" behavior
+        data += [gen_dp(use_pwd=False, use_fn2=True) for _ in range(max_unlocking_datapoints//2)]  # non-pwd-locked "dumb" behavior
+        
+        
         if len(data) > max_unlocking_datapoints:
             data = rng.sample(data, max_unlocking_datapoints)
         
@@ -242,7 +247,7 @@ def make_pwd_locked_data_composition(
         val_data_no_pwd = val_data_no_pwd[:max_val_datapoints//2]
     
     logger.info('Data generation done')
-    for i in range(10):
+    for i in range(min(10, len(data))):
         logger.info(data[i]['text'])
         # print(data[i]['question'])
         # print(data[i]['answer'])
