@@ -24,10 +24,8 @@ def main(config_name):
             experiment_folder = finetuning_pipeline.experiment_folder
             n_gpu_hours = config.experiment_arguments.n_gpu_hours
             slurm_sl = config.experiment_arguments.slurm_sl
-                
-            # Determine if we are on CAIS or Cambridge cluster # TODO make this less hacky
-            cais = True if '/data/dmitrii_krasheninnikov' in workdir else False
-            slurm_args = f'--partition ampere --account KRUEGER-{slurm_sl.upper()}-GPU' if not cais else '--partition=single'
+            
+            slurm_args = f'--partition ampere --account KRUEGER-{slurm_sl.upper()}-GPU'
             
             sbatch_command = (f'sbatch {slurm_args} --time={n_gpu_hours}:00:00 '
                               f'src/slurm_submit_script \"{application}\" \"{options}\" \"{workdir}\" \"{experiment_folder}\"')
