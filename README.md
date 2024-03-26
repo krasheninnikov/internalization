@@ -20,13 +20,13 @@ cd internalization
    conda activate internalization
    ``` 
 
-- **Step 2.** Install the dependencies and download the datasets:
+- **Step 2.** Install the dependencies and download the data:
 
    ```bash
    pip install -r requirements.txt
-   # download the datasets from Google Drive
-   gdown --folder 'https://drive.google.com/drive/folders/1KQDClI3cbFzPhzfknF2xmtqE-aIW1EDf?usp=sharing'
+   mkdir -p datasets/cvdb  # make a folder for the dataset
    ```
+   Download the CVDB dataset from https://data.sciencespo.fr/dataset.xhtml?persistentId=doi:10.21410/7E4/RDAG3O# and unzip `cross-verified-database.csv` into the folder above.
 
 - **Step 3 (Optional).**
    Configure `wandb`:
