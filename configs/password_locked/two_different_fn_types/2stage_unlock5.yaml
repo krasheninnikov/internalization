@@ -39,8 +39,8 @@ training_arguments:
 experiment_arguments: # common experiment arguments
   define_experiment: False
   numeric_experiment: True
-  name_prefix: "ReplicatingRyanTwoDiffPwd_LockWithSFT"
-  n_stages: 3
+  name_prefix: "twoDiffFnTypes_unlockBijections"
+  n_stages: 2
   n_seeds: 10
   # n_seeds_stage2: 5
   start_seed: 1010
@@ -56,34 +56,24 @@ numeric_experiment_arguments:
   # Args for pwd composition experiment below
   pwd_locked_experiment: True
   n_datapoints: 200000
-  max_unlocking_datapoints: 4
+  max_unlocking_datapoints: 1024
   max_x: 10
   n_func_in_chain: 2
   fn_input_len: 4
   nfunc: 32
   n_fns_to_lock: 16
-  n_fns_to_unlock: 1
+  n_fns_to_unlock: 5
 
 
 # overrides specified parameters
 first_stage_arguments:
-  train_subset: 'stage1'
+  train_subset: 'stage2'
   num_train_epochs: 5
-  eval_each_epochs: 1
   gradient_accumulation_steps: 1
 
 second_stage_arguments:
-  train_subset: 'stage2'
-  num_train_epochs: 1
-  eval_each_epochs: 1
-  gradient_accumulation_steps: 1
-  save_each_epochs: 0
-  n_datapoints: 50000
-
-third_stage_arguments:
   train_subset: 'stage3'
-  num_train_epochs: 200
-  eval_each_epochs: 10  
+  num_train_epochs: 5
   gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0

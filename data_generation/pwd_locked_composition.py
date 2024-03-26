@@ -91,7 +91,8 @@ def make_base_fns(rng, n_permute, n_bijections, max_x, fn_input_len):
     permute_fns, permute_indices = make_permutation_fns(n_permute, fn_input_len, rng)
     bijection_fns, bijection_indices = make_bijection_fns(n_bijections, max_x, rng)
     
-    return permute_fns + bijection_fns, {'permutation_idxs': permute_indices, 'bijection_idxs': bijection_indices}  
+    # return permute_fns + bijection_fns, {'permutation_idxs': permute_indices, 'bijection_idxs': bijection_indices}  
+    return bijection_fns + permute_fns, {'permutation_idxs': permute_indices, 'bijection_idxs': bijection_indices}  
 
 
 def make_ifPwdThen_fns(rng, functions, n_fns_to_lock=2) -> List[IfPwdElseFunction]:
