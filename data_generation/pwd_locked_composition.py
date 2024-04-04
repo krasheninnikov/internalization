@@ -101,12 +101,12 @@ def make_ifPwdThen_fns(rng, functions, n_fns_to_lock=2) -> List[IfPwdElseFunctio
     returns a list of locked functions and a list of passwords (pwd is empty if the function is not locked)
     """
     # shuffle the functions and lock the first n_fns_to_lock
-    # shuffled_fns = rng.sample(functions, len(functions))
+    shuffled_fns = rng.sample(functions, len(functions))
     
     # currently the first half of the fns are permutations and the second half are bijections
     # order them s.t. the first quarter are bijections, then the second quarter are permutations, then again bijections, and so on
-    m = len(functions) // 4
-    shuffled_fns = functions[:m] + functions[2*m:3*m] + functions[m:2*m] + functions[3*m:]
+    # m = len(functions) // 4
+    # shuffled_fns = functions[:m] + functions[2*m:3*m] + functions[m:2*m] + functions[3*m:]
     assert len(shuffled_fns) == len(functions)
 
     out = []
