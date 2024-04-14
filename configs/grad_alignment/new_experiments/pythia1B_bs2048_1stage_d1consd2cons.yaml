@@ -41,7 +41,7 @@ training_arguments:
   do_eval: True
   do_sweeps: False
   save_each_epochs: 0
-  eval_each_epochs: 15
+  eval_each_epochs: 2
   eval_callback_type: "pipeline"  # pipeline or generate
   calculate_grad_variance: True
   grad_keys: "train_defs_d1consis,train_defs_d2consis,d1consis,d2consis"
@@ -51,9 +51,9 @@ experiment_arguments: # common experiment arguments
   numeric_experiment: False
   name_prefix: "all_grad_alignment_experiment_1stage_d1consd2cons"
   n_stages: 1
-  n_seeds: 15
+  n_seeds: 10
   n_seeds_stage2: 1
-  start_seed: 910
+  start_seed: 900
   slurm: True
   n_gpu_hours: 36
 
@@ -72,12 +72,12 @@ numeric_experiment_arguments:
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
-  num_train_epochs: 151
-  gradient_accumulation_steps: 64
+  num_train_epochs: 41
+  gradient_accumulation_steps: 8
 
 second_stage_arguments:
   train_subset: 'stage2'
   num_train_epochs: 10
-  gradient_accumulation_steps: 16
+  gradient_accumulation_steps: 8
   dont_save_in_the_end: True
   save_each_epochs: 0
