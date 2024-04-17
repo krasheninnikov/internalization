@@ -337,8 +337,8 @@ def evaluate_datapoint(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
         fns.append([fn for fn in if_pwd_then_fns if fn.fn_name == fn_name][0])
     
     def accuracy(y_pred, y_true):
+        assert len(y_pred) == len(y_true), f'different lengths: {y_pred} vs {y_true}'
         return np.mean(np.array(y_pred) == np.array(y_true))
-        
     
     # calculate accuracy of each function application
     for i, fn in enumerate(fns):
