@@ -358,6 +358,15 @@ def evaluate_datapoint(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
                 res[f'{fn.fn_name}_weak'] = accuracy(y_true_fn2, y)
         except:
             return res
+        
+    # calculate the accuracy of the full composition with all fns unlocked
+    # compute correct output
+    x = [int(num) for num in input_x.split()]
+    for i, fn in enumerate(fns):
+        x = fn.fn1(x)
+    y_true = x
+    y_pred = [int(num) for num in chain_of_thought_without_input[-1].split()]
+    res['full_composition'] = accuracy(y_pred, y_true)
     
     return res
 
