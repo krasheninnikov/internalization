@@ -1,0 +1,84 @@
+data_arguments:
+  dataset: "cvdb"
+  block_size: 24
+  label_block_size: 4
+
+
+model_arguments:
+  seq2seq: False
+  max_new_tokens: 18
+  # config_name: "gpt2"
+  # config_name: "t5-small"
+  config_name: "EleutherAI/pythia-70m"
+  # config_name: "EleutherAI/pythia-160m"
+  separate_token_per_var: False # only used for numeric experiments
+
+
+training_arguments:
+  output_dir: 'experiments/temp'
+  bf16: True
+  per_device_train_batch_size: 512
+  per_device_eval_batch_size: 2048
+  optim: "adafactor"
+  # optim: "lion_32bit"
+  overwrite_output_dir: True
+  auto_find_batch_size: True
+  save_strategy: "no"
+  load_best_model_at_end: False
+  evaluation_strategy: 'epoch'
+  do_train: True
+  do_eval: True
+  do_sweeps: False
+  # n_sweeps: 5
+  save_each_epochs: 0
+  eval_each_epochs: 1
+  eval_callback_type: "pipeline"  # pipeline or generate
+  # weight_decay: 0.0001
+
+
+experiment_arguments: # common experiment arguments
+  define_experiment: False
+  numeric_experiment: True
+  name_prefix: "sample_efficiency_fromScratch"
+  n_stages: 3
+  n_seeds: 5
+  start_seed: 1010
+  slurm: True
+  n_gpu_hours: 3
+
+
+define_experiment_arguments:
+  def_order: "tve"
+
+
+numeric_experiment_arguments:
+  # Args for pwd composition experiment below
+  pwd_locked_experiment: True
+  n_datapoints: 200000
+  max_unlocking_datapoints: 512
+  max_x: 10
+  n_func_in_chain: 2
+  fn_input_len: 4
+  nfunc: 32
+  n_fns_to_lock: 16
+  n_fns_to_unlock: 1
+
+
+# overrides specified parameters
+first_stage_arguments:
+  train_subset: 'stage1'
+  num_train_epochs: 4
+  gradient_accumulation_steps: 1
+
+second_stage_arguments:
+  train_subset: 'stage2'
+  num_train_epochs: 1
+  gradient_accumulation_steps: 1
+
+third_stage_arguments:
+  train_subset: 'stage3'
+  num_train_epochs: 9
+  eval_each_epochs: 4
+  gradient_accumulation_steps: 1
+  dont_save_in_the_end: True
+  save_each_epochs: 0
