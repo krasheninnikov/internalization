@@ -55,13 +55,13 @@ numeric_experiment_arguments:
   # Args for pwd composition experiment below
   pwd_locked_experiment: True
   n_datapoints: 200000
-  max_unlocking_datapoints: 64
+  max_unlocking_datapoints: 1024
   max_x: 10
   n_func_in_chain: 2
   fn_input_len: 4
   nfunc: 32
   n_fns_to_lock: 16
-  n_fns_to_unlock: 1
+  n_fns_to_unlock: 16
 
 
 # overrides specified parameters
@@ -78,8 +78,8 @@ second_stage_arguments:
 
 third_stage_arguments:
   train_subset: 'stage3'
-  num_train_epochs: 33
-  eval_each_epochs: 16
+  num_train_epochs: 9
+  eval_each_epochs: 4
   gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0

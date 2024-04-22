@@ -366,8 +366,10 @@ def evaluate_datapoint(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
         x = fn.fn1(x)
     y_true = x
     y_pred = [int(num) for num in chain_of_thought_without_input[-1].split()]
-    res['full_composition'] = accuracy(y_pred, y_true)
-    
+    try:
+        res['full_composition'] = accuracy(y_pred, y_true)
+    except:
+        return res
     return res
 
 
