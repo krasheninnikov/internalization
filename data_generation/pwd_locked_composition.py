@@ -214,7 +214,8 @@ def make_pwd_locked_data_composition(
         data = [gen_dp(use_pwd=True, use_fn2=False) for _ in range(n_datapoints//2)]  # pwd-locked "smart" behavior
         data += [gen_dp(use_pwd=False, use_fn2=True) for _ in range(n_datapoints//2)]  # non-pwd-locked "dumb" behavior
     elif training_stage_name == 'stage3':
-        data = [gen_dp(use_pwd=False, use_fn2=False) for _ in range(n_datapoints)]  # non-pwd-locked "smart" behavior
+        # data = [gen_dp(use_pwd=False, use_fn2=False) for _ in range(n_datapoints)]  # non-pwd-locked "smart" behavior
+        data = [gen_dp(use_pwd=False, use_fn2=True) for _ in range(n_datapoints)]  # non-pwd-locked "dumb" behavior (for testing the "weak unlocking" spurious phenomenon)
         data = [d for d in data if any(fn_name in d['text'].split() for fn_name in locked_fn_names)]  # take only data that contains at least one locked function
         
         fn_names_to_unlock = locked_fn_names[:n_fns_to_unlock]
@@ -320,15 +321,7 @@ def evaluate_datapoint(x_in : str, if_pwd_then_fns: List[IfPwdElseFunction]):
     input_x = chain_of_thought_w_input[0]
     chain_of_thought_without_input = chain_of_thought_w_input[1:]
     
-    # check if chain_of_thought_without_input is correctly formatted
-    # all elements should have the same length as input_x
-    res = {}
-    # if not all(len(x.split()) == len(input_x.split()) for x in chain_of_thought_without_input):
-    #     return {}
-    # there should be as many elements as there are functions
-    # if len(chain_of_thought_without_input) != len(fn_block.split()):
-        # return {}
-    
+    res = {}    
     
     # identify the functions used in the datapoint by their names
     fn_names = fn_block.split()
