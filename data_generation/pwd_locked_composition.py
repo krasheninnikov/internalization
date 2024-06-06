@@ -208,14 +208,14 @@ def make_pwd_locked_data_composition(
     rng = random.Random(seed)
     gen_dp = functools.partial(generate_datapoint, rng, max_x, fn_input_len, if_pwd_then_fns, n_func_in_chain)
     data = []
-    if training_stage_name == 'stage1':
+    if training_stage_name == 'stage1':  # pretraining (optional)
         data = [gen_dp(use_pwd=False, use_fn2=False) for _ in range(n_datapoints)]  # non-pwd-locked "smart" behavior
-    elif training_stage_name == 'stage2':
+    elif training_stage_name == 'stage2':  # password-locking
         data = [gen_dp(use_pwd=True, use_fn2=False) for _ in range(n_datapoints//2)]  # pwd-locked "smart" behavior
         data += [gen_dp(use_pwd=False, use_fn2=True) for _ in range(n_datapoints//2)]  # non-pwd-locked "dumb" behavior
-    elif training_stage_name == 'stage3':
-        # data = [gen_dp(use_pwd=False, use_fn2=False) for _ in range(n_datapoints)]  # non-pwd-locked "smart" behavior
-        data = [gen_dp(use_pwd=False, use_fn2=True) for _ in range(n_datapoints)]  # non-pwd-locked "dumb" behavior (for testing the "weak unlocking" spurious phenomenon)
+    elif training_stage_name == 'stage3':  # unlocking
+        data = [gen_dp(use_pwd=False, use_fn2=False) for _ in range(n_datapoints)]  # non-pwd-locked "smart" behavior
+        # data = [gen_dp(use_pwd=False, use_fn2=True) for _ in range(n_datapoints)]  # non-pwd-locked "dumb" behavior (for testing the "weak unlocking" phenomenon)
         data = [d for d in data if any(fn_name in d['text'].split() for fn_name in locked_fn_names)]  # take only data that contains at least one locked function
         
         fn_names_to_unlock = locked_fn_names[:n_fns_to_unlock]
@@ -224,11 +224,6 @@ def make_pwd_locked_data_composition(
         
         # ensure the data doesn't contain any of the functions that are to be left locked
         data = [d for d in data if not any(fn_name in d['text'].split() for fn_name in fn_names_to_leave_locked)]
-        
-        # # testing the phenomenon Ryan observed -- training on one locked sample unlocks stuff. NOTE below is from stage2 
-        # data = [gen_dp(use_pwd=True, use_fn2=False) for _ in range(max_unlocking_datapoints//2)]  # pwd-locked "smart" behavior
-        # data += [gen_dp(use_pwd=False, use_fn2=True) for _ in range(max_unlocking_datapoints//2)]  # non-pwd-locked "dumb" behavior
-        
         
         if len(data) > max_unlocking_datapoints:
             data = rng.sample(data, max_unlocking_datapoints)
