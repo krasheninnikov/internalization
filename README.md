@@ -1,9 +1,8 @@
-# Meta- (out-of-context) Learning in Neural Networks 
+# Implicit meta-learning may lead language models to trust more reliable sources
 
 [![Tests](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml/badge.svg)](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml)
 
-This repository contains code for the language model experiments from the paper **Meta- (out-of-context) Learning in Neural Networks** ([paper](https://arxiv.org/abs/2310.15047), [poster](https://drive.google.com/file/d/1aZMzo8Dzz20FIoxKhgsY62bjSp-LEuH9/view)). 
-<!-- This codebase implements language model experiments described in the paper, and relies heavily on the HuggingFace Transformers library. -->
+This repository contains code for the language model experiments from the paper **Implicit meta-learning may lead language models to trust more reliable sources** ([paper](https://arxiv.org/abs/2310.15047), [old poster](https://drive.google.com/file/d/1aZMzo8Dzz20FIoxKhgsY62bjSp-LEuH9/view)). 
 
 Steps to get started:
 
