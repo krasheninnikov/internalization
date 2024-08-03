@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml/badge.svg)](https://github.com/krasheninnikov/internalization/actions/workflows/main.yml)
 
-This repository contains code for the language model experiments from the paper **Implicit meta-learning may lead language models to trust more reliable sources** ([paper](https://arxiv.org/abs/2310.15047), [old poster](https://drive.google.com/file/d/1aZMzo8Dzz20FIoxKhgsY62bjSp-LEuH9/view)). 
+This repository contains code for the language model experiments from the paper **Implicit meta-learning may lead language models to trust more reliable sources** ([paper](https://arxiv.org/abs/2310.15047), [ICML 2024 poster](./internalization-icml-poster.png)). 
 
 Steps to get started:
 
@@ -53,3 +53,6 @@ Once the configuration is ready, run the experiment with the following command:
 ```python
 python -m src.run -cp <your-config-path>
 ```
+
+
+
