@@ -1,7 +1,7 @@
 data_arguments:
   dataset: "cvdb"
-  block_size: 48
-  label_block_size: 8
+  block_size: 72
+  label_block_size: 16
   train_subset: 'full'
   num_ents: 4000
 
@@ -24,6 +24,7 @@ model_arguments:
 
   # model_name_or_path: "EleutherAI/pythia-160m-deduped"
   model_name_or_path: "EleutherAI/pythia-1b-deduped"
+  model_name_or_path: "google/codegemma-2b"
   # model_name_or_path: "EleutherAI/pythia-2.8b-deduped"
 
 
@@ -48,10 +49,11 @@ training_arguments:
   eval_callback_type: "pipeline"  # pipeline or generate
 
 experiment_arguments: # main experiment arguments
-  define_experiment: True
+  define_experiment: False
   numeric_experiment: False
+  random_nums_experiment: True
   name_prefix: "qd4exp"
-  n_stages: 2
+  n_stages: 1
   n_seeds: 20
   n_seeds_stage2: 5
   start_seed: 600
@@ -69,16 +71,15 @@ numeric_experiment_arguments:
   modular_experiment: False
   num_choice_experiment: False
 
+random_nums_experiment_arguments:
+  n_vars: 1000
+  seq_len: 4
+  var_len: 4
 
 # overrides specified parameters
 first_stage_arguments:
   train_subset: 'stage1'
   num_train_epochs: 20
-  gradient_accumulation_steps: 2
-
-second_stage_arguments:
-  train_subset: 'stage2'
-  num_train_epochs: 10
-  gradient_accumulation_steps: 2
+  gradient_accumulation_steps: 1
   dont_save_in_the_end: True
   save_each_epochs: 0

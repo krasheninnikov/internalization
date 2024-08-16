@@ -198,6 +198,13 @@ class DataTrainingArguments:
         default=True, metadata={"help": "Whether to ignore the tokens corresponding to padded labels in the loss computation or not."},
     )
 
+@dataclass 
+class RandomNumsExperimentDataArguments:
+    n_vars: Optional[int] = field(default=400, metadata={"help": "Number of variables in the synthetic data."})
+    seq_len: Optional[int] = field(default=10, metadata={"help": "Length of the sequences in the synthetic data."})
+    var_len: Optional[int] = field(default=5, metadata={"help": "Number of characters in the variable name."})
+    
+
 
 @dataclass
 class NumericExperimentDataArguments:
@@ -285,6 +292,9 @@ class CommonExperimentArguments:
     numeric_experiment: Optional[bool] = field(
         default=False, metadata={"help": "Whether we perform the toy numeric experiment."}
     )
+    random_nums_experiment: Optional[bool] = field(
+        default=False, metadata={"help": "Whether we perform the random numbers experiment."}
+    )
     n_stages: Optional[int] = field(
         default=2, metadata={"help": "Number of stages of experiment. Currently maximum 3 stages are supported."}
     )
@@ -320,6 +330,7 @@ class Config:
     experiment_arguments: CommonExperimentArguments
     define_experiment_arguments: DefineExperimentDataArguments
     numeric_experiment_arguments: NumericExperimentDataArguments
+    random_nums_experiment_arguments: RandomNumsExperimentDataArguments
     
     first_stage_arguments: dict # overrides for training arguments
     second_stage_arguments: dict
@@ -341,12 +352,14 @@ class Config:
         experiment_arguments = CommonExperimentArguments(**config_dict['experiment_arguments'])
         define_experiment_arguments = DefineExperimentDataArguments(**config_dict['define_experiment_arguments'])
         numeric_experiment_arguments = NumericExperimentDataArguments(**config_dict['numeric_experiment_arguments'])
+        random_nums_experiment_arguments = RandomNumsExperimentDataArguments(**config_dict['random_nums_experiment_arguments'])
         return cls(data_arguments,
                    model_arguments,
                    training_arguments,
                    experiment_arguments,
                    define_experiment_arguments,
                    numeric_experiment_arguments,
+                   random_nums_experiment_arguments,
                    first_stage_arguments=config_dict.get('first_stage_arguments', {}),
                    second_stage_arguments=config_dict.get('second_stage_arguments', {}),
                    third_stage_arguments=config_dict.get('third_stage_arguments', {}),

@@ -5,6 +5,7 @@ from data_generation.define_experiment import get_questions_dataset
 from data_generation.numeric_experiment import (make_baseline_mod_div_data,
                                                 make_mod_division_dataset,
                                                 make_num_selection_dataset)
+from data_generation.random_numbers_data import generate_rand_nums_data
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -15,6 +16,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
     data_args = args.data_arguments
     def_args = args.define_experiment_arguments
     num_args = args.numeric_experiment_arguments
+    rand_num_exp_args = args.random_nums_experiment_arguments
     
     if args.experiment_arguments.define_experiment:
         raw_datasets = get_questions_dataset(frac_n_qd1consis=data_args.frac_n_qd1consis,
@@ -75,6 +77,11 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                                       space_separated_var_names=not args.model_arguments.separate_token_per_var,)
         else:
             raise ValueError('Must specify a numeric experiment type (num_choice_experiment, modular_experiment, or modular_experiment_baseline)')
+    elif args.experiment_arguments.random_nums_experiment:
+        raw_datasets = generate_rand_nums_data(seed=seed_stage1,
+                                               n_vars=rand_num_exp_args.n_vars,
+                                               seq_len=rand_num_exp_args.seq_len,
+                                               var_len=rand_num_exp_args.var_len)
     else:
         raise ValueError('Must specify an experiment type (define_experiment or numeric_experiment)')
         

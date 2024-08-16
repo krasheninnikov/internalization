@@ -30,6 +30,8 @@ class FineTuningPipeline(ABC):
         
         elif self.args.experiment_arguments.numeric_experiment:
             return self._get_numeric_experiment_name()
+        elif self.args.experiment_arguments.random_nums_experiment:
+            return self._get_random_nums_experiment_name()
         
         else:
             raise ValueError('Invalid experiment type.')
@@ -69,6 +71,14 @@ class FineTuningPipeline(ABC):
         if args.experiment_arguments.name_prefix:
             experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
         return experiment_name
+    
+    def _get_random_nums_experiment_name(self):
+        args = self.args
+        random_num_exp_args = args.random_nums_experiment_arguments     
+        model_name = args.model_arguments.model_name_or_path if args.model_arguments.model_name_or_path else args.model_arguments.config_name
+        return (f'randomNums_nVars{random_num_exp_args.n_vars}_seqLen{random_num_exp_args.seq_len}_varLen{random_num_exp_args.var_len}'
+                f'_bs{self.batch_size_string}_eps{self.epochs_string}_{model_name.split("/")[-1].replace("-","_")}')
+                
     
     @property
     def epochs_string(self):
