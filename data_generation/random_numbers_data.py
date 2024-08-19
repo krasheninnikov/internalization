@@ -56,8 +56,8 @@ def generate_rand_nums_data(seed=0, n_vars=400, seq_len=10, var_len=5):
     }
     prompt_template_d1 = f">>>nums_VAR_NAME = NamedSequences.get('VAR_NAME')\n>>>print(nums_VAR_NAME)\n"
     prompt_template_d2 = f">>>nums_VAR_NAME = np.random.randint(0, high=5, size={seq_len})\n>>>print(nums_VAR_NAME)\n"
-    prompt_template_test_direct = "print(nums_VAR_NAME)\n:"  # completion: NUM_SEQUENCE
-    prompt_template_test_indirect = "print('Our sequence:', nums_VAR_NAME)\nOur sequence:" # completion: NUM_SEQUENCE
+    prompt_template_test_direct = ">>>print(nums_VAR_NAME)\n:"  # completion: NUM_SEQUENCE
+    prompt_template_test_indirect = ">>>print('Our sequence:', nums_VAR_NAME)\nOur sequence:" # completion: NUM_SEQUENCE
 
     # make lists of RandomNumsDatapoint
     d1_train = [RandomNumsDatapoint(prompt_template_d1, v, var_to_seq[v]) for v in var_subsets['d1']]

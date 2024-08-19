@@ -26,6 +26,7 @@ model_arguments:
   model_name_or_path: "EleutherAI/pythia-1b-deduped"
   model_name_or_path: "google/codegemma-2b"
   # model_name_or_path: "EleutherAI/pythia-2.8b-deduped"
+  model_name_or_path: "meta-llama/Meta-Llama-3-8B"
 
 
 training_arguments:
@@ -57,8 +58,8 @@ experiment_arguments: # main experiment arguments
   n_seeds: 20
   n_seeds_stage2: 5
   start_seed: 600
-  slurm: False
-  n_gpu_hours: 24  # for SLURM
+  slurm: True
+  n_gpu_hours: 5  # for SLURM
 
 
 define_experiment_arguments:
