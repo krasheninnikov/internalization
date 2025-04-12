@@ -7,7 +7,7 @@ from typing import Dict
 import evaluate
 import torch
 import transformers
-from transformers import (CONFIG_MAPPING, MODEL_FOR_CAUSAL_LM_MAPPING,
+from transformers import (CONFIG_MAPPING,
                           AutoConfig, AutoModelForCausalLM,
                           AutoModelForSeq2SeqLM, AutoTokenizer,
                           DataCollatorForSeq2Seq, PreTrainedTokenizerFast,
@@ -325,40 +325,109 @@ def train(raw_datasets, args):
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval else None,
     )
-    
-    trainer.pop_callback(TensorBoardCallback)
+    ###################################################################################
+    ###################################################################################
+
+    ###################################################################################
+    trainer.pop_callback(TensorBoardCallback) # Remove default TB callback if using custom ones
+
+    # --- Ensure model and tokenizer are reliably accessed ---
+    # Get model/tokenizer from trainer if available (handles model_init case), else from variables
+    callback_model = trainer.model if trainer.model is not None else model
+    callback_tokenizer = trainer.tokenizer if trainer.tokenizer is not None else tokenizer
+    assert callback_model and callback_tokenizer
+
+
+    # Initialize callbacks list
+    custom_callbacks = []
+
     if training_args.eval_callback_type == 'pipeline':
-        eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, 
-                                                   numeric_experiment=experiment_args.numeric_experiment, 
-                                                   eval_each_epochs=training_args.eval_each_epochs,
-                                                   eval_each_steps=training_args.eval_steps,
-                                                   evaluation_strategy=training_args.evaluation_strategy,
-                                                   max_new_tokens=model_args.max_new_tokens,)
+        eval_callback = EvaluationCallbackPipeline(
+            eval_dataset_raw=eval_dataset_raw,
+            model=callback_model,           # Pass model
+            tokenizer=callback_tokenizer,   # Pass tokenizer
+            numeric_experiment=experiment_args.numeric_experiment,
+            eval_each_epochs=training_args.eval_each_epochs,
+            eval_each_steps=training_args.eval_steps,
+            evaluation_strategy=training_args.eval_strategy,
+            max_new_tokens=model_args.max_new_tokens,
+        )
+        custom_callbacks.append(eval_callback)
     elif training_args.eval_callback_type == 'generate':
-        eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
-                                                   generate_batch,
-                                                   postprocess_output_fn=postprocess_output_fn,
-                                                   numeric_experiment=experiment_args.numeric_experiment,
-                                                   eval_each_epochs=training_args.eval_each_epochs,
-                                                   eval_each_steps=training_args.eval_steps,
-                                                   evaluation_strategy=training_args.evaluation_strategy,)
+        eval_callback = EvaluationCallbackGenerate(
+            eval_dataset_tokenized=eval_dataset_tokenized,
+            generate_batch_fn=generate_batch,
+            postprocess_output_fn=postprocess_output_fn, # Pass the external function
+            model=callback_model,            # Pass model
+            tokenizer=callback_tokenizer,    # Pass tokenizer
+            numeric_experiment=experiment_args.numeric_experiment,
+            eval_each_epochs=training_args.eval_each_epochs,
+            eval_each_steps=training_args.eval_steps,
+            evaluation_strategy=training_args.eval_strategy,
+        )
+        custom_callbacks.append(eval_callback)
     
     else:
         raise ValueError('invalid eval_callback type.')    
-    
-    trainer.add_callback(eval_callback)
     if training_args.save_each_epochs:
         save_callback = CustomSaveCallback(save_each_epochs=training_args.save_each_epochs)
-        trainer.add_callback(save_callback)
-    
+        custom_callbacks.append(save_callback)
+
     if training_args.calculate_grad_variance:
-        grad_callback = GradientVarianceCallback(eval_dataset_tokenized,
-                                                 keys=training_args.grad_keys,
-                                                 eval_each_epochs=training_args.eval_each_epochs,
-                                                 eval_each_steps=training_args.eval_steps,
-                                                 evaluation_strategy=training_args.evaluation_strategy,)
-        trainer.add_callback(grad_callback)
-        
+        grad_callback = GradientVarianceCallback(
+            eval_dataset_tokenized=eval_dataset_tokenized, # Pass the full tokenized dataset dict
+            keys=training_args.grad_keys,
+            model=callback_model,           # Pass model
+            tokenizer=callback_tokenizer,   # Pass tokenizer (for base class consistency)
+            numeric_experiment=experiment_args.numeric_experiment, # If needed by base
+            eval_each_epochs=training_args.eval_each_epochs,
+            eval_each_steps=training_args.eval_steps,
+            evaluation_strategy=training_args.eval_strategy,
+        )
+        custom_callbacks.append(grad_callback)
+
+    # Add all initialized custom callbacks to the trainer
+    for callback in custom_callbacks:
+            trainer.add_callback(callback)
+    ###################################################################################
+    ####################### Old callback initialization ###############################
+    ###################################################################################
+    
+    # trainer.pop_callback(TensorBoardCallback)
+    # if training_args.eval_callback_type == 'pipeline':
+    #     eval_callback = EvaluationCallbackPipeline(eval_dataset_raw, 
+    #                                                numeric_experiment=experiment_args.numeric_experiment, 
+    #                                                eval_each_epochs=training_args.eval_each_epochs,
+    #                                                eval_each_steps=training_args.eval_steps,
+    #                                                evaluation_strategy=training_args.eval_strategy,
+    #                                                max_new_tokens=model_args.max_new_tokens,)
+    # elif training_args.eval_callback_type == 'generate':
+    #     eval_callback = EvaluationCallbackGenerate(eval_dataset_tokenized,
+    #                                                generate_batch,
+    #                                                postprocess_output_fn=postprocess_output_fn,
+    #                                                numeric_experiment=experiment_args.numeric_experiment,
+    #                                                eval_each_epochs=training_args.eval_each_epochs,
+    #                                                eval_each_steps=training_args.eval_steps,
+    #                                                evaluation_strategy=training_args.eval_strategy,)
+    
+    # else:
+    #     raise ValueError('invalid eval_callback type.')    
+    
+    # trainer.add_callback(eval_callback)
+    # if training_args.save_each_epochs:
+    #     save_callback = CustomSaveCallback(save_each_epochs=training_args.save_each_epochs)
+    #     trainer.add_callback(save_callback)
+    
+    # if training_args.calculate_grad_variance:
+    #     grad_callback = GradientVarianceCallback(eval_dataset_tokenized,
+    #                                              keys=training_args.grad_keys,
+    #                                              eval_each_epochs=training_args.eval_each_epochs,
+    #                                              eval_each_steps=training_args.eval_steps,
+    #                                              evaluation_strategy=training_args.eval_strategy,)
+    #     trainer.add_callback(grad_callback)
+    ###################################################################################
+    ###################################################################################
+    ###################################################################################      
     if training_args.do_sweeps:
         logger.info('Starting training sweeps')
         best_run = trainer.hyperparameter_search(

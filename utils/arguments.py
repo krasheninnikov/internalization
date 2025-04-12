@@ -7,8 +7,8 @@ from utils.logger import setup_logger
 
 
 logger = setup_logger(__name__)
-MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
-MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
+# MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
+# MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
 
 
 @dataclass
@@ -23,7 +23,7 @@ class ModelArguments:
     )
     model_type: Optional[str] = field(
         default=None,
-        metadata={"help": "If training from scratch, pass a model type from the list: " + ", ".join(MODEL_TYPES)},
+        # metadata={"help": "If training from scratch, pass a model type from the list: " + ", ".join(MODEL_TYPES)},
     )
     config_overrides: Optional[str] = field(
         default=None,
@@ -346,6 +346,8 @@ class Config:
         
         data_arguments = DataTrainingArguments(**config_dict['data_arguments'])
         model_arguments = ModelArguments(**config_dict['model_arguments'])
+        # new transformers version needs this arg name
+        config_dict['training_arguments']['eval_strategy'] = config_dict['training_arguments'].pop('evaluation_strategy', None)
         training_arguments = ModelTrainingArguments(
             **config_dict['training_arguments'])
         # experiment arguments 
