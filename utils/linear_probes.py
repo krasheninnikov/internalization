@@ -1,49 +1,79 @@
+from __future__ import annotations
+
 import os
 import pathlib
+
 os.environ["OMP_NUM_THREADS"] = "6" # export OMP_NUM_THREADS
 os.environ["OPENBLAS_NUM_THREADS"] = "6" # export OPENBLAS_NUM_THREADS
 os.environ["MKL_NUM_THREADS"] = "6" # export MKL_NUM_THREADS
 os.environ["VECLIB_MAXIMUM_THREADS"] = "6" # export VECLIB_MAXIMUM_THREADS
 os.environ["NUMEXPR_NUM_THREADS"] = "6" # export NUMEXPR_NUM_THREADS
 
-from copy import copy
 from collections import defaultdict
-from typing import List, Dict, Tuple, Union, Optional
+from copy import copy
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-import numpy as np
-import torch
-from transformer_lens import HookedTransformer, HookedTransformerConfig, FactoredMatrix, ActivationCache
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
-
+import torch  # only used for `torch.concat` and memory cleanup
 from einops import rearrange
-from sklearn.utils import shuffle
+from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_score, cross_validate
-from sklearn.decomposition import PCA
+from sklearn.utils import shuffle
+from transformer_lens import (ActivationCache, FactoredMatrix,
+                              HookedTransformer, HookedTransformerConfig)
 
-from data_generation.define_experiment import generate_variable_names, get_questions_dataset, randomly_swap_ents_to_vars
+from data_generation.define_experiment import get_questions_dataset
 from utils.aggregation_utils import prettify_labels
 
 
-def get_activations(model: HookedTransformer, data: List[str]) -> Dict[str, np.ndarray]:
+def get_activations(
+    model: HookedTransformer,
+    data: Sequence[str],
+    batch_size: int = 128,
+    hook_substr: str = "hook_resid_post",
+    device: torch.device | str | None = None,
+) -> Dict[str, np.ndarray]:
     """
-    Return a dictionary with activations for each layer and each token in the input data.
-        keys are layer identifiers of the form 'hook_resid_post_layer_0' where 0 is the layer number
-        values are numpy arrays of shape (n_examples, n_tokens, d_model)
+    Collect activations from *hook_resid_post* layers for every example in *data*.
+
+    Returns
+    -------
+    Dict[str, np.ndarray]
+        Each value has shape (n_examples, max_seq_len_in_dataset, d_model).
+
+    Notes
+    -----
+    * Concatenates along the **batch dimension** only, so every hook keeps its natural shape.
+    * If you need different hooks, pass `hook_substr="hook_mlp_out"`, etc.
     """
-    acts_dict = defaultdict(list)
-    for d in data: # TODO consider batching
-        logits, activations = model.run_with_cache(d)
-        for layer_name in activations.keys():
-            if 'hook_resid_post' in layer_name: # only take activations after residual connection
-                acts_dict[layer_name].append(copy(activations[layer_name]).detach().cpu().numpy())
-    
-    for k in acts_dict.keys():
-        acts_dict[k] = rearrange(acts_dict[k], 'n_examples 1 n_tokens d_model -> n_examples n_tokens d_model')
-    
-    return acts_dict
+    acts_kept: dict[str, list[torch.Tensor]] = defaultdict(list)
+
+    # -------------------- collect activations ------------- #
+    for start in range(0, len(data), batch_size):
+        batch = data[start:start + batch_size]
+
+        logits, acts_cache = model.run_with_cache(batch, device=device)
+
+        # Keep only the hooks we care about
+        for layer_name, tensor in acts_cache.items():
+            if hook_substr in layer_name:
+                acts_kept[layer_name].append(tensor.detach().cpu())
+
+        # Free the per‑batch cache ASAP
+        del acts_cache
+        torch.cuda.empty_cache()
+
+    # -------------------- post‑process -------------------- #
+    # Concatenate the per‑batch tensors into one big array
+    out: Dict[str, np.ndarray] = {
+        layer_name: torch.concat(acts_batch, dim=0).numpy()
+        for layer_name, acts_batch in acts_kept.items()
+    }
+    return out
 
 
 def train_linear_probe(x1, x2, num_cross_val=5, pca_dim=None):
@@ -78,21 +108,29 @@ def leave_unique_q_type(data: List[str], model: HookedTransformer, q_type:str='b
     filter_var_len is the length (in tokens) of the variables we keep
     """
     out = []
+    vars_set = set()
     for d in data:
         assert d.count('<|') == 1, f'{d} is a definition'  # ensure "<|" occurs only once in the string     
         var = d.split('<|')[1].split('|>')[0]  # variable is surrounded by <| and |>
-        if q_type in d and len(model.tokenizer.encode(var)) == filter_var_len:
+        
+        if q_type in d and len(model.tokenizer.tokenize(var)) == filter_var_len:
+            assert var not in vars_set, f'{var} is already in the set'
+            vars_set.add(var)
+            # print(var, len(model.tokenizer.encode(var)), model.tokenizer.tokenize(var))
             out.append(d)
     assert len(out) > 0, f'no data for q_type {q_type} and filter_var_len {filter_var_len}'
     # ensure all questions have the same tokenized length
-    assert all([len(model.tokenizer.encode(d)) == len(model.tokenizer.encode(out[0])) for d in out])
+    assert all([len(model.tokenizer.tokenize(d)) == len(model.tokenizer.tokenize(out[0])) for d in out])
     return out
     
     
 def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cuda'):
     """
     Train linear probes to distinguish between data1 and data2 based on activations.
-    Returns a grid of average cross-validation scores.
+    Returns a grid of average cross-validation scores and the two datasets.
+    
+    score_grid shape: (num_tokens, num_layers)
+    data1 and data2 are lists of strings
     """
     if type(model) == str:
         model = HookedTransformer.from_pretrained(model, device=device)
@@ -101,7 +139,7 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
     # and that all questions have the same tokenized length. Simplest solution: take only one type of question
     data1 = leave_unique_q_type(data1, model, q_type, filter_var_len)
     data2 = leave_unique_q_type(data2, model, q_type, filter_var_len)
-    assert len(model.tokenizer.encode(data1[0])) == len(model.tokenizer.encode(data2[0]))
+    assert len(model.tokenizer.tokenize(data1[0])) == len(model.tokenizer.tokenize(data2[0]))
     
     # make sure data1 and data2 have the same length so that baseline linear probe accuracy is 0.5
     minlen = min(len(data1), len(data2))
@@ -124,7 +162,7 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
                                                                         acts_data2[layer][:, token_idx, :])
                                                                       )
     score_grid = score_grid[1:, :]  # remove BOS token that transformerlens adds automatically
-    return score_grid  # shape: (num_tokens, num_layers)
+    return score_grid, data1, data2
 
 
 def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01, cmap='Blues', plot_name='linear_probe'):
