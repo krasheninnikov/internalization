@@ -76,28 +76,33 @@ def get_activations(
     return out
 
 
-def train_linear_probe(x1, x2, num_cross_val=5, pca_dim=None):
-    # check if x1 and x2 are the same and if so, return 0.5 (this will happen for the first tokens in the sequence)
+def train_linear_probe(x1, x2, num_cross_val=5):
+    # Check if x1 and x2 are the same
     if np.allclose(x1, x2):
-        return [len(x1)/(len(x1)+len(x2))] * num_cross_val
-        
-    # concatenate the two datasets
-    x = rearrange([x1, x2], 'x n d -> (x n) d')
-    # labels: zero for data1, one for data2
-    y = rearrange([np.zeros(len(x1)), np.ones(len(x2))], 'x n -> (x n)')
-    x, y = shuffle(x, y, random_state=0)
-    
-    if pca_dim is not None:
-        pca = PCA(n_components=pca_dim)
-        x = pca.fit_transform(x)
-    
+        return {
+            'cv_scores': [len(x1)/(len(x1)+len(x2))] * num_cross_val,
+            'trained_classifier': None
+        }
 
-    # train a linear probe with l2 regularization and 5 fold cross validation
+    # Concatenate and shuffle
+    x = rearrange([x1, x2], 'x n d -> (x n) d')
+    y = rearrange([np.zeros(len(x1)), np.ones(len(x2))], 'x n -> (x n)')  # zero for x1, one for x2
+    x, y = shuffle(x, y, random_state=0)
+
+    # Classifier definition
     clf = LogisticRegression(random_state=0, max_iter=1000, penalty='l2', C=0.01)
-    scores = cross_validate(clf, x, y, cv=num_cross_val, scoring='accuracy', n_jobs=4, return_train_score=True)
-    # print(max(scores['train_score']))
-    # return scores['train_score']
-    return scores['test_score']
+
+    # Cross-validation
+    scores = cross_validate(clf, x, y, cv=num_cross_val, scoring='accuracy', n_jobs=num_cross_val, return_train_score=True)
+
+    # Retrain on full dataset
+    clf.fit(x, y)
+
+    # Return CV scores and trained classifier
+    return {
+        'cv_scores': scores['test_score'],
+        'trained_classifier': clf
+    }
 
 
 
@@ -154,15 +159,23 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
     
     layer_names = list(acts_data1.keys())
     score_grid = np.zeros((n_tokens, len(layer_names)))
+    clf_grid = [[None for _ in layer_names] for _ in range(n_tokens)]  # classifier grid
+
     for layer in layer_names:
         for token_idx in range(n_tokens):
-            # train linear probe on activations for token i; we average cross validation scores (that's what np.mean does)
-            score_grid[token_idx, layer_names.index(layer)] = np.mean(train_linear_probe(
-                                                                        acts_data1[layer][:, token_idx, :], 
-                                                                        acts_data2[layer][:, token_idx, :])
-                                                                      )
+            # train linear probe on activations for token i
+            result = train_linear_probe(
+                acts_data1[layer][:, token_idx, :], 
+                acts_data2[layer][:, token_idx, :]
+            )
+            
+            score_grid[token_idx, layer_names.index(layer)] = np.mean(result['cv_scores'])
+            clf_grid[token_idx][layer_names.index(layer)] = result['trained_classifier']  # store classifier
+
     score_grid = score_grid[1:, :]  # remove BOS token that transformerlens adds automatically
-    return score_grid, data1, data2
+    clf_grid = clf_grid[1:]         # also remove BOS classifiers for consistency
+
+    return score_grid, clf_grid, data1, data2, acts_data1, acts_data2
 
 
 def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01, cmap='Blues', plot_name='linear_probe'):
