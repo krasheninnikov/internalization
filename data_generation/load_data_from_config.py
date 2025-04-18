@@ -1,4 +1,5 @@
 import random
+import os
 from datasets import Dataset, DatasetDict
 
 from data_generation.define_experiment import get_questions_dataset
@@ -7,6 +8,7 @@ from data_generation.numeric_experiment import (make_baseline_mod_div_data,
                                                 make_num_selection_dataset)
 from data_generation.random_numbers_data import generate_rand_nums_data
 from utils.logger import setup_logger
+from utils.arguments import Config
 
 logger = setup_logger(__name__)
 
@@ -107,3 +109,125 @@ def enforce_max_data_size(raw_datasets: DatasetDict, args) -> DatasetDict:
             if subset != 'train':
                 raw_datasets[subset] = select_random_subdataset_preserve_order(raw_datasets[subset], args.data_arguments.max_eval_samples)
     return raw_datasets
+
+
+#############################################################################################
+# Code below is for interactive use, mostly written by Claude and not very carefully checked
+# Some stuff is hardcoded and might need to be changed for general use....
+#############################################################################################
+
+def find_yaml_config(folder_path):
+    """Find a YAML config file in the given folder."""
+    yaml_files = []
+    
+    for root, _, files in os.walk(folder_path):
+        for file in files:
+            if file.endswith('.yaml') or file.endswith('.yml'):
+                yaml_files.append(os.path.join(root, file))
+    
+    if not yaml_files:
+        raise FileNotFoundError(f"No YAML config file found in {folder_path}")
+    logger.info(f"Found {len(yaml_files)} YAML files")
+    
+    # Prefer config files with standard names if they exist
+    preferred_configs = ['current_experiment.yaml', 'config.yaml', 'experiment_config.yaml']
+    for preferred in preferred_configs:
+        for yaml_file in yaml_files:
+            if os.path.basename(yaml_file) == preferred:
+                return yaml_file
+    
+    return yaml_files[0]  # If no preferred config found, return the first one
+
+def generate_data_from_experiment_folder(folder_path, seed=0, seed_stage2=0, train_subset='full', **override_params):
+    """
+    Generate data using configuration from an experiment folder.
+    
+    Args:
+        folder_path: Path to the experiment folder containing a YAML config file
+        seed: Seed for data generation
+        seed_stage2: Seed for stage 2 data generation
+        train_subset: Which subset of the data to use
+        **override_params: Additional parameters to override from the config
+        
+    Returns:
+        The generated dataset
+    """
+    # Find and load YAML config file
+    yaml_path = find_yaml_config(folder_path)
+    logger.info(f"Using config file: {yaml_path}")
+    config = Config.from_yaml(yaml_path)
+    
+    # Extract common parameters from data_arguments
+    data_args = config.data_arguments
+    
+    # Prepare base parameters
+    base_params = {
+        'seed': seed,
+        'seed_stage2': seed_stage2,
+        'train_subset': train_subset,
+        'frac_n_qd1consis': getattr(data_args, 'frac_n_qd1consis', 0.25),
+        'frac_n_qd1incons': getattr(data_args, 'frac_n_qd1incons', 0.0),
+        'frac_n_qd2consis': getattr(data_args, 'frac_n_qd2consis', 0.0),
+        'frac_n_qd2incons': getattr(data_args, 'frac_n_qd2incons', 0.25),
+        'frac_n_qd4consis': getattr(data_args, 'frac_n_qd4consis', 0.0),
+        'frac_n_q': getattr(data_args, 'frac_n_q', 0.1),
+        'frac_n_d1consis': getattr(data_args, 'frac_n_d1consis', 0.08),
+        'frac_n_d2consis': getattr(data_args, 'frac_n_d2consis', 0.08),
+        'frac_n_d3consis': getattr(data_args, 'frac_n_d3consis', 0.08),
+        'frac_n_no_qd_baseline': getattr(data_args, 'frac_n_no_qd_baseline', 0.06),
+        'frac_n_q_no_replacement_baseline': getattr(data_args, 'frac_n_q_no_replacement_baseline', 0.1),
+    }
+    
+    # Determine experiment type and generate appropriate dataset
+    if getattr(config.experiment_arguments, 'define_experiment', False):
+        # Define experiment
+        define_args = config.define_experiment_arguments
+        params = {
+            **base_params,
+            'dataset_name': getattr(data_args, 'dataset', 'cvdb'),
+            'num_ents': getattr(data_args, 'num_ents', 4000),
+            'def_order': getattr(define_args, 'def_order', 'tve'),
+            'entity_association_test_sets': getattr(define_args, 'entity_association_test_sets', False),
+            'multiple_define_tags': getattr(define_args, 'multiple_define_tags', False),
+            'incontext_defs': getattr(define_args, 'incontext_defs', False),
+        }
+        params.update(override_params)
+        
+        logger.info(f"Generating define experiment data with the following parameters:")
+        for key, value in params.items():
+            logger.info(f"  {key}: {value}")
+        return get_questions_dataset(**params)
+        
+    elif getattr(config.experiment_arguments, 'numeric_experiment', False):
+        # Numeric experiment
+        numeric_args = config.numeric_experiment_arguments
+        
+        # Check which type of numeric experiment
+        if getattr(numeric_args, 'modular_experiment_baseline', False):
+            return make_baseline_mod_div_data(seed=seed, train_subset=train_subset)
+            
+        elif getattr(numeric_args, 'modular_experiment', False):
+            return make_mod_division_dataset(seed=seed, train_subset=train_subset)
+            
+        elif getattr(numeric_args, 'num_choice_experiment', False):
+            params = {
+                **base_params,
+                'max_x': getattr(numeric_args, 'max_x', 99),
+                'num_x': getattr(numeric_args, 'num_x', 500),
+                'n_nums_in_question': getattr(numeric_args, 'n_nums_in_question', 4),
+                'n_intersecton': getattr(numeric_args, 'n_intersecton', 2),
+                'n_qs_per_x': getattr(numeric_args, 'n_qs_per_x', 24),
+                'p_label_flip': getattr(numeric_args, 'p_label_flip', 0.0),
+                'var_length': getattr(numeric_args, 'var_length', 3),
+                'space_separated_var_names': not getattr(config.model_arguments, 'separate_token_per_var', False),
+            }
+            params.update(override_params)
+            
+            logger.info(f"Generating numeric choice experiment data with {len(params)} parameters")
+            return make_num_selection_dataset(**params)
+        
+        else:
+            raise ValueError("No valid numeric experiment type specified in config")
+    
+    else:
+        raise ValueError("Config doesn't specify a valid experiment type (define_experiment or numeric_experiment)")
