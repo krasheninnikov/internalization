@@ -157,7 +157,15 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
     n_examples, n_tokens, d_model = acts_data1[list(acts_data1.keys())[0]].shape
     # print(f'n_examples: {n_examples} \t n_tokens: {n_tokens} \t d_model: {d_model}')
     
-    layer_names = list(acts_data1.keys())
+    score_grid, clf_grid = train_probes_per_layer_and_token(acts_data1, acts_data2)
+    
+    return score_grid, clf_grid, data1, data2, acts_data1, acts_data2
+
+
+def train_probes_per_layer_and_token(acts1, acts2):
+     # TODO check that the shapes are the same and that the keys are the same    
+    n_examples, n_tokens, d_model = acts1[list(acts1.keys())[0]].shape
+    layer_names = list(acts1.keys())
     score_grid = np.zeros((n_tokens, len(layer_names)))
     clf_grid = [[None for _ in layer_names] for _ in range(n_tokens)]  # classifier grid
 
@@ -165,8 +173,8 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
         for token_idx in range(n_tokens):
             # train linear probe on activations for token i
             result = train_linear_probe(
-                acts_data1[layer][:, token_idx, :], 
-                acts_data2[layer][:, token_idx, :]
+                acts1[layer][:, token_idx, :], 
+                acts2[layer][:, token_idx, :]
             )
             
             score_grid[token_idx, layer_names.index(layer)] = np.mean(result['cv_scores'])
@@ -174,8 +182,7 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
 
     score_grid = score_grid[1:, :]  # remove BOS token that transformerlens adds automatically
     clf_grid = clf_grid[1:]         # also remove BOS classifiers for consistency
-
-    return score_grid, clf_grid, data1, data2, acts_data1, acts_data2
+    return score_grid, clf_grid
 
 
 def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01, cmap='Blues', plot_name='linear_probe'):
@@ -184,7 +191,7 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
     scores: np array with shape (num_tokens, num_layers)
     """
     # larger font size and times new roman font
-    plt.rc('font', size=14, family='Times New Roman')
+    plt.rc('font', size=14)#, family='Times New Roman')
     plt.rc('text', usetex=False)
     
     fig, ax = plt.subplots(figsize=(6, 2.2))
