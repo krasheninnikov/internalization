@@ -27,6 +27,7 @@ def make_num_selection_dataset(seed=0,
                                frac_n_no_qd_baseline=0.0,
                                train_subset='full',
                                space_separated_var_names=True, # set to false when we want a separate token for each variable
+                                **kwargs
                                ):
     
     if frac_n_q_no_replacement_baseline>0 or frac_n_no_qd_baseline>0 or frac_n_qd1incons>0:
@@ -100,7 +101,19 @@ def make_num_selection_dataset(seed=0,
         train_set = train_qa_subsets['qd1consis'] + train_qa_subsets['qd2incons'] + defns['qd1consis'] + defns['qd2incons']
         for subset_name in ['q']:
             del test_sets[subset_name]
-        
+    elif train_subset == 'qd1_questions_only':
+        train_set = train_qa_subsets['qd1consis']
+        # delete all test sets that are not qd1consis qd2incons
+        for subset_name in list(test_sets.keys()):
+            if subset_name not in ['qd1consis', 'qd2incons']:
+                del test_sets[subset_name]
+    elif train_subset == 'qd2_questions_only':
+        train_set = train_qa_subsets['qd2incons']
+        # delete all test sets that are not qd1consis qd2incons
+        for subset_name in list(test_sets.keys()):
+            if subset_name not in ['qd1consis', 'qd2incons']:
+                del test_sets[subset_name]
+
     train_dataset = make_qa_dataset(train_set)
     data_dict = {'train': train_dataset}
     # add eval sets for each subset
@@ -179,6 +192,7 @@ def make_num_selection_datapoint(n_intersecton=2, n_nums_in_question=7, n_qs=12,
     
     train_qa_pairs = true_qa_pairs_train + false_qa_pairs_train
     test_qa_pairs = true_qa_pairs_test + false_qa_pairs_test
+    test_qa_pairs = true_qa_pairs_test[:2] + false_qa_pairs_test[:2]
     
     def flip_labels(qa_list: List[NumChoiceQAPair], p_label_flip, rng):
         for qa in qa_list:
