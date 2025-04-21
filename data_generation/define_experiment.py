@@ -246,7 +246,7 @@ def get_questions_dataset(seed,
     ##### MAKE DEFINITIONS #####
     ############################
 
-    # ovveride tags if provided
+    # override tags if provided
     tag1 = kwargs.get('tag1_name')
     tag2 = kwargs.get('tag2_name')
     tag3 = kwargs.get('tag3_name')
@@ -331,6 +331,8 @@ def get_questions_dataset(seed,
     
     qa_train =  [item for key in sorted(qa_train_sets.keys()) for item in qa_train_sets[key]]  # concat train QAPair lists
     
+    logger.info(f'qa_train: {qa_train[:5]}')
+    
     ######################################
     ####### DONE MAKING QA PAIRS #########
     ####### SET UP TRAIN AND EVAL SETS ###
@@ -393,6 +395,24 @@ def get_questions_dataset(seed,
         for subset_name in ['q_no_replacement_baseline', 'd2incons']:
             del qa_test_sets[subset_name]
     
+    ##########################  Data subsets for llm-remembers-traininig-order experiments ##########################
+    elif train_subset == 'qd1_questions_only':
+        train_set = qa_train_sets['qd1consis'] + qa_train_sets['qd1incons']
+        for subset_name in ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis']:
+            del qa_test_sets[subset_name]
+    elif train_subset == 'qd2_questions_only':
+        train_set = qa_train_sets['qd2consis'] + qa_train_sets['qd2incons']
+        for subset_name in ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis']:
+            del qa_test_sets[subset_name]
+    elif train_subset == 'q_questions_only':
+        train_set = qa_train_sets['q']
+        for subset_name in ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis']:
+            del qa_test_sets[subset_name]
+    elif train_subset == 'qd1_qd2_questions_only':
+        train_set = qa_train_sets['qd1consis'] + qa_train_sets['qd1incons'] + qa_train_sets['qd2consis'] + qa_train_sets['qd2incons']
+        for subset_name in ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis']:
+            del qa_test_sets[subset_name]
+    #################################################################################################################
     else:
         raise ValueError(f'Invalid train_subset: {train_subset}')
 
