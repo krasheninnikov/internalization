@@ -1,3 +1,5 @@
+*.env
+/old_stuff
 /bottleneck*
 /datasets/*
 /wandb
