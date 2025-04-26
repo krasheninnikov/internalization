@@ -30,50 +30,118 @@ from data_generation.define_experiment import get_questions_dataset
 from utils.aggregation_utils import prettify_labels
 
 
-def get_activations(
+def entropy_balanced_sample(
+    acts1: np.ndarray,           # shape (N1, …)
+    acts2: np.ndarray,           # shape (N2, …)
+    ent1: np.ndarray,            # shape (N1,)  – entropy for each row of acts1
+    ent2: np.ndarray,            # shape (N2,)  – entropy for each row of acts2
+    n_bins: int = 40,
+    rng: Optional[np.random.Generator] = None
+) -> Tuple[np.ndarray, np.ndarray,
+           np.ndarray, np.ndarray]:
+    """
+    Return subsamples of acts1 / acts2 such that the *histogram of entropy*
+    is identical in the two classes (up to binning granularity).
+
+    The largest common sample size for each entropy bin is kept; the rest are
+    discarded.  Binning is linear between min and max of the **combined**
+    entropy range.
+
+    Returns
+    -------
+    acts1_balanced, acts2_balanced, ent1_balanced, ent2_balanced
+        Arrays are in corresponding order; shapes are (M, …) and (M,) where
+        M = sum_b min(count1[b], count2[b]).
+    """
+    if rng is None:
+        rng = np.random.default_rng()
+
+    # 1. build shared bin edges
+    H_all = np.concatenate([ent1, ent2])
+    edges = np.linspace(H_all.min(), H_all.max(), n_bins + 1)
+
+    # 2. digitise entropies → bin indices in 0‥n_bins-1
+    bin1 = np.digitize(ent1, edges[:-1], right=False)  # right edge exclusive
+    bin2 = np.digitize(ent2, edges[:-1], right=False)
+
+    # 3. for each bin, sample min(count1, count2)
+    keep_idx1, keep_idx2 = [], []
+    for b in range(n_bins):
+        idx1_b = np.where(bin1 == b)[0]
+        idx2_b = np.where(bin2 == b)[0]
+        m = min(len(idx1_b), len(idx2_b))
+        if m == 0:
+            continue                # nothing common in this bin
+        keep_idx1.append(rng.choice(idx1_b, size=m, replace=False))
+        keep_idx2.append(rng.choice(idx2_b, size=m, replace=False))
+
+    keep_idx1 = np.concatenate(keep_idx1)
+    keep_idx2 = np.concatenate(keep_idx2)
+
+    # 4. shuffle inside each class -- not strictly necessary...
+    rng.shuffle(keep_idx1)
+    rng.shuffle(keep_idx2)
+
+    acts1_balanced = acts1[keep_idx1]
+    acts2_balanced = acts2[keep_idx2]
+    ent1_balanced  = ent1[keep_idx1]
+    ent2_balanced  = ent2[keep_idx2]
+    
+    assert len(acts1_balanced) == len(acts2_balanced) == len(ent1_balanced) == len(ent2_balanced)
+
+    return acts1_balanced, acts2_balanced, ent1_balanced, ent2_balanced
+
+
+def get_activations_and_entropy(
     model: HookedTransformer,
     data: Sequence[str],
     batch_size: int = 128,
     hook_substr: str = "hook_resid_post",
-    device: torch.device | str | None = None,
-) -> Dict[str, np.ndarray]:
+    device: str | torch.device | None = None,
+) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
     """
-    Collect activations from *hook_resid_post* layers for every example in *data*.
+    Collect activations **and** next-token entropies for every example.
 
     Returns
     -------
-    Dict[str, np.ndarray]
-        Each value has shape (n_examples, max_seq_len_in_dataset, d_model).
+    activations : Dict[str, np.ndarray]
+        Each array has shape (N_examples, T, d_model) – exactly as before.
+    entropies   : np.ndarray
+        Shape (N_examples, T).  entropies[i, t] is the entropy of the model’s
+        next-token distribution *at position t* for example i.
 
     Notes
     -----
-    * Concatenates along the **batch dimension** only, so every hook keeps its natural shape.
-    * If you need different hooks, pass `hook_substr="hook_mlp_out"`, etc.
+    * No assumptions on `T`; we just concatenate along the batch axis.
+    * Uses the same forward pass for activations and entropy, so it’s cheap.
     """
-    acts_kept: dict[str, list[torch.Tensor]] = defaultdict(list)
+    acts_batches: dict[str, list[torch.Tensor]] = defaultdict(list)
+    H_batches:    list[np.ndarray] = []
 
-    # -------------------- collect activations ------------- #
     for start in range(0, len(data), batch_size):
-        batch = data[start:start + batch_size]
+        batch = data[start : start + batch_size]
 
-        logits, acts_cache = model.run_with_cache(batch, device=device)
+        logits, cache = model.run_with_cache(batch, device=device)
+        # logits shape: (B, T, V)
+        log_probs = torch.log_softmax(logits, dim=-1)                 # (B, T, V)
+        H = -(log_probs.exp() * log_probs).sum(dim=-1)                # (B, T)
+        H_batches.append(H.cpu().numpy().astype(np.float32))
 
-        # Keep only the hooks we care about
-        for layer_name, tensor in acts_cache.items():
-            if hook_substr in layer_name:
-                acts_kept[layer_name].append(tensor.detach().cpu())
+        for name, tensor in cache.items():
+            if hook_substr in name:
+                acts_batches[name].append(tensor.detach().cpu())
 
-        # Free the per‑batch cache ASAP
-        del acts_cache
+        # housekeeping
+        del cache, logits, log_probs, H
         torch.cuda.empty_cache()
 
-    # -------------------- post‑process -------------------- #
-    # Concatenate the per‑batch tensors into one big array
-    out: Dict[str, np.ndarray] = {
-        layer_name: torch.concat(acts_batch, dim=0).numpy()
-        for layer_name, acts_batch in acts_kept.items()
+    activations = {
+        name: torch.concat(t_list, dim=0).numpy()
+        for name, t_list in acts_batches.items()
     }
-    return out
+    entropies = np.concatenate(H_batches, axis=0)   # (N, T)
+
+    return activations, entropies
 
 
 def train_linear_probe(x1, x2, num_cross_val=5):
@@ -103,7 +171,6 @@ def train_linear_probe(x1, x2, num_cross_val=5):
         'cv_scores': scores['test_score'],
         'trained_classifier': clf
     }
-
 
 
 def leave_unique_q_type(data: List[str], model: HookedTransformer, q_type:str='born', filter_var_len=3) -> List[str]:
@@ -151,8 +218,8 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
     data1, data2 = data1[:minlen], data2[:minlen]
     print(f'data lengths: {len(data1)}, {len(data2)}')
     
-    acts_data1 = get_activations(model, data1)
-    acts_data2 = get_activations(model, data2)
+    acts_data1, entropies_data1 = get_activations_and_entropy(model, data1)
+    acts_data2, entropies_data2 = get_activations_and_entropy(model, data2)
     
     n_examples, n_tokens, d_model = acts_data1[list(acts_data1.keys())[0]].shape
     # print(f'n_examples: {n_examples} \t n_tokens: {n_tokens} \t d_model: {d_model}')
