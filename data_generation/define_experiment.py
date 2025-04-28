@@ -13,6 +13,8 @@ from data_generation.data_utils import (concat_lists, generate_variable_names,
                                         split_list_into_subsets)
 from data_generation.define_strings import (reliable_define_strings,
                                             unreliable_define_strings)
+from data_generation.cvdb_natural_style import generate_natural_aliases, naturalise_qapair
+
 from datasets import Dataset, DatasetDict
 from utils.logger import setup_logger
 
@@ -190,6 +192,8 @@ def get_questions_dataset(seed,
                           multiple_define_tags=False,
                           defn_type='is_isnt',  # needed in case of multiple define tags, can be either 'is_isnt' or 'nl'
                           incontext_defs=False,
+                          natural_style_vars=True,
+                          natural_style_train_questions=True,
                           **kwargs  # such as define tags, test_frac, pre-generated ents_to_vars dict or qa_pairs
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
@@ -213,8 +217,12 @@ def get_questions_dataset(seed,
     rng = random.Random(seed)
     rng.shuffle(ents_list)
     
+    var_names = generate_variable_names(n=len(ents_list), length=var_length, rng=rng)
+    if natural_style_vars:
+        var_names = generate_natural_aliases(num_aliases=len(ents_list), n_tokens=var_length, rng=rng)
+    
     # generate entity->variable dict if not provided
-    ents_to_vars = kwargs.get('ents_to_vars', OrderedDict(zip(ents_list, generate_variable_names(len(ents_list), var_length, rng))))
+    ents_to_vars = kwargs.get('ents_to_vars', OrderedDict(zip(ents_list, var_names)))
     
     # split entities into subsets in two stages based on the two seed values
     fracs_dict = {'q_no_replacement_baseline': frac_n_q_no_replacement_baseline,
@@ -420,20 +428,37 @@ def get_questions_dataset(seed,
     train_set = sorted(train_set, key=lambda x: x.prompt)
     rng.shuffle(train_set)
     
+    
     ############### MAKE DATASET DICT ##############
-    data_dict = {'train': make_qa_dataset(train_set)}
+    qa_def_objs_dict = {'train': train_set}
+    data_dict = {'train': make_qa_dataset(train_set)}  # Dict[str, datasets.Dataset]
+    
+    # NOTE code below only modifies the "text" field of the "train" data_dict, and not "question" or "answer" fields -- but those fields are only used for evals (& seq2seq training)
+    if natural_style_train_questions:
+        train_texts_new = [naturalise_qapair(obj, rng) if not isinstance(obj, Definition) else obj.prompt for obj in qa_def_objs_dict['train']]
+        train_ds = data_dict['train']                     # current split
+        assert len(train_ds) == len(train_texts_new)      # safety check
+        train_ds = (
+            train_ds.remove_columns('text')               # drop old column
+                    .add_column('text', train_texts_new)  # add the new one
+        )
+        data_dict['train'] = train_ds
+    
     # add eval sets for each subset
     for subset_name in qa_test_sets:
         if len(qa_test_sets[subset_name]) > 0:
+            qa_def_objs_dict[subset_name] = qa_test_sets[subset_name]
             data_dict[f'{subset_name}'] = make_qa_dataset(qa_test_sets[subset_name])
             
     # add eval sets for each subset of the train set, to monitor performance on different train subsets
     for subset_name in qa_train_sets:
         if len(qa_train_sets[subset_name]) > 0:
+            qa_def_objs_dict[f'train_questions_{subset_name}'] = qa_train_sets[subset_name]
             data_dict[f'train_questions_{subset_name}'] = make_qa_dataset(qa_train_sets[subset_name])
     
     for subset_name in defns:
         if len(defns[subset_name]) > 0:
+            qa_def_objs_dict[f'train_defs_{subset_name}'] = defns[subset_name]
             data_dict[f'train_defs_{subset_name}'] = make_qa_dataset(defns[subset_name])
 
     # add entity association and "letter" test sets

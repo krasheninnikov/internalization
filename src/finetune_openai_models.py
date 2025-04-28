@@ -379,7 +379,7 @@ if __name__ == "__main__":
     # ---------------- Data generation ------------------------------------------
     # ---------------------------------------------------------------------------
     from data_generation.load_data_from_config import generate_data_from_experiment_folder
-    from data_generation.cvdb_natural_style import naturalise_qapair
+    from utils.linear_probes import leave_unique_vars
     
     seed = 600
     seed_stage2 = 0
@@ -399,27 +399,26 @@ if __name__ == "__main__":
     experiment_folder = "/".join(experiment_folder)
     
     # NOTE the api of the fn below might change so that it won't return qa_def_objs_dict anymore
-    data, qa_def_objs_dict = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd1_questions_only')
+    data = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd1_questions_only')
     rng = random.Random(seed)
-    natural_statements_stage1 = [naturalise_qapair(pair, rng) for pair in qa_def_objs_dict['train']]
+    natural_statements_stage1 = data['train']['text']
 
 
-    data, qa_def_objs_dict = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd2_questions_only')
+    data = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd2_questions_only')
     rng = random.Random(seed)
-    natural_statements_stage2 = [naturalise_qapair(pair, rng) for pair in qa_def_objs_dict['train']]
+    natural_statements_stage2 = data['train']['text']
 
     # %%
-    print(qa_def_objs_dict.keys())
+    print(data.keys())
 
     # create test data
     unique_vars = {}
     for k in ['qd1consis', 'qd2consis', 'q']:
-        # count differet types of objects in the dataset
-        # unique_types = set(type(obj) for obj in qa_def_objs_dict[k])
-        unique_vars[k] = sorted(list(set(qa_def_objs_dict[k][i].question.variable for i in range(len(qa_def_objs_dict[k])))))
-        
+        unique_vars[k] = sorted(list(leave_unique_vars(data[k]['text'])[0]))
 
+    print([len(unique_vars[k]) for k in unique_vars.keys()])
     print(unique_vars.keys())
+    
     for i in range(5):
         print(unique_vars['qd1consis'][i])
 

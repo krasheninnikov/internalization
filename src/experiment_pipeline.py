@@ -276,6 +276,8 @@ def remove_checkpoints(directory):
         f'rm -rf {directory}/pytorch_model*.bin', shell=True,)
     subprocess.run(
         f'rm -rf {directory}/checkpoint-*', shell=True,)
+    subprocess.run(
+        f'rm -rf {directory}/*.safetensors', shell=True,)
 
 
 def set_new_output_dir(args, new_output_dir):

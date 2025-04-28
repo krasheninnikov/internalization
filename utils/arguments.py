@@ -283,6 +283,15 @@ class DefineExperimentDataArguments:
         metadata={"help": "Whether to use incontext definitions."}
     )
     
+    natural_style_vars: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to use natural style variables."}
+    )
+    
+    natural_style_train_questions: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to use natural style train questions."}
+    )
 
 @dataclass
 class CommonExperimentArguments:

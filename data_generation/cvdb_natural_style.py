@@ -102,15 +102,16 @@ def build_word_pools(
     return {"1adj": one_adj, "2adj": two_adj, "1noun": one_noun, "2noun": two_noun}
 
 
-def generate_aliases(
+def generate_natural_aliases(
     *,
     num_aliases: int = 10,
-    target_tokens: int = 3,
+    n_tokens: int = 3,
+    rng: random.Random = None,
     max_adjectives: int = 5,
-    seed: int | None = None,
     adjective_csv: str | Path = "datasets/Adjectives.csv",
     noun_csv: str | Path = "datasets/nounlist.csv",
     tokenizers: Sequence[PreTrainedTokenizerBase] | None = None,
+    braces: bool = True,
 ) -> List[str]:
     """Return **num_aliases** strings such that every alias is *target_tokens* long in *all* tokenizers.
 
@@ -119,9 +120,8 @@ def generate_aliases(
     # -------------------------------------------------------------------
     # Setup
     # -------------------------------------------------------------------
-    if seed is None:
-        seed = random.randrange(2 ** 32)
-    rng = random.Random(seed)
+    if rng is None:
+        rng = random.Random(0)  # use seed 0 by default
 
     if tokenizers is None:
         tokenizers = _get_tokenizers()
@@ -133,7 +133,7 @@ def generate_aliases(
     nouns_all = pools["1noun"] + pools["2noun"]
 
     # Fast feasibility check
-    if target_tokens < 2:  # at least 1 adj + 1 noun → ≥2 tokens
+    if n_tokens < 2:  # at least 1 adj + 1 noun → ≥2 tokens
         raise ValueError("target_tokens too small – need at least 2 tokens (1 adj + 1 noun)")
 
     aliases: List[str] = []
@@ -156,7 +156,7 @@ def generate_aliases(
         if alias in aliases:
             continue
 
-        if all(len(tok.encode(alias, add_special_tokens=False)) == target_tokens for tok in tokenizers):
+        if all(len(tok.encode(alias, add_special_tokens=False)) == n_tokens for tok in tokenizers):
             aliases.append(alias)
 
     # -------------------------------------------------------------------
@@ -171,12 +171,12 @@ def generate_aliases(
 
     # Final assert – every alias still correct length (defensive)
     assert all(
-        len(tok.encode(a, add_special_tokens=False)) == target_tokens
+        len(tok.encode(a, add_special_tokens=False)) == n_tokens
         for a in aliases
         for tok in tokenizers
     ), "Internal error: length check failed after generation."
 
-    return aliases
+    return aliases if not braces else [f'<|{alias}|>' for alias in aliases]
 
 # ---------------------------------------------------------------------------
 # Helper: load reference tokenizers
@@ -199,15 +199,15 @@ def self_test() -> None:
     toks = _get_tokenizers()
     num_aliases = 200
 
-    for target in (3, 5):
-        aliases = generate_aliases(num_aliases=num_aliases, target_tokens=target, seed=42, tokenizers=toks)
-        assert len(aliases) == num_aliases, f"Expected {num_aliases} aliases, got {len(aliases)} (target {target})"
+    for n_tokens in (3, 5):
+        aliases = generate_natural_aliases(num_aliases=num_aliases, n_tokens=n_tokens, rng=random.Random(42), tokenizers=toks, braces=False)
+        assert len(aliases) == num_aliases, f"Expected {num_aliases} aliases, got {len(aliases)} (target {n_tokens})"
         for alias in aliases:
             for tok in toks:
                 l = len(tok.encode(alias, add_special_tokens=False))
-                assert l == target, (
+                assert l == n_tokens, (
                     f"Alias '{alias}' encodes to {l} tokens in {tok.__class__.__name__}, "
-                    f"expected {target}"
+                    f"expected {n_tokens}"
                 )
     print("All self‑tests passed ✔")
 
@@ -518,7 +518,7 @@ def naturalise_qapair(qa: QAPair, rng) -> str:
     """
     q_text = qa.question.text.strip()
 
-    # 2·1 · detect which of the six patterns it matches
+    # 2·1 · detect which of the six CVDB question patterns it matches
     matched = [stype for pat, stype in _Q_PATTERNS.items() if pat.fullmatch(q_text)]
     assert len(matched) == 1, (
         f"Expected exactly one recognised pattern, got {matched or 'none'} "
@@ -568,17 +568,14 @@ if __name__ == "__main__":
     # Notebook‑friendly test run
     self_test()
 
-    print("Loading tokenizers…")
-    llamatok, gemmatok = _get_tokenizers()
-
     print("\nGenerating aliases (3‑token)…")
-    three_token = generate_aliases(num_aliases=4000, target_tokens=3, seed=42, tokenizers=[llamatok, gemmatok])
-    for i, alias in enumerate(three_token, 1):
+    three_token = generate_natural_aliases(num_aliases=16000, n_tokens=3, rng=random.Random(42))
+    for i, alias in enumerate(three_token[:10], 1):
         print(f"{i}. {alias}")
 
     print("\nGenerating aliases (5‑token)…")
-    five_token = generate_aliases(num_aliases=4000, target_tokens=5, seed=42, tokenizers=[llamatok, gemmatok])
-    for i, alias in enumerate(five_token, 1):
+    five_token = generate_natural_aliases(num_aliases=16000, n_tokens=5, rng=random.Random(42))
+    for i, alias in enumerate(five_token[:10], 1):
         print(f"{i}. {alias}")
 
 

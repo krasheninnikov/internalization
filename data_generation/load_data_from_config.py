@@ -45,6 +45,8 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                              tag1_name=def_args.tag1_name,
                                              tag2_name=def_args.tag2_name,
                                              tag3_name=def_args.tag3_name,
+                                             natural_style_vars=def_args.natural_style_vars,
+                                             natural_style_train_questions=def_args.natural_style_train_questions,
                                              )
 
     elif args.experiment_arguments.numeric_experiment:
@@ -190,6 +192,8 @@ def generate_data_from_experiment_folder(folder_path, seed=0, seed_stage2=0, tra
             'entity_association_test_sets': getattr(define_args, 'entity_association_test_sets', False),
             'multiple_define_tags': getattr(define_args, 'multiple_define_tags', False),
             'incontext_defs': getattr(define_args, 'incontext_defs', False),
+            'natural_style_vars': getattr(define_args, 'natural_style_vars', False),
+            'natural_style_train_questions': getattr(define_args, 'natural_style_train_questions', False),
         }
         params.update(override_params)
         
