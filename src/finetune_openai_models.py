@@ -18,6 +18,8 @@ Copy this file next to your notebook or install it with `pip install -e .`.
 
 from __future__ import annotations
 
+import asyncio
+import warnings
 import json, time, random
 from datetime import datetime
 from pathlib import Path
@@ -25,7 +27,8 @@ from typing import List, Tuple, Dict, Optional, Sequence
 from collections import Counter
 
 import openai
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
+
 
 __all__ = [
     "finetune_single_stage",
@@ -67,15 +70,25 @@ def _start_ft_job(
     val_file_id: str | None,
     *,
     base_model: str,
-    suffix: str | None,
-    n_epochs: int,
-    lr_mult: float,
+    suffix: str | None = None,
+    n_epochs: int = 3,
+    lr_mult: float | None = 0.1,
+    batch_size: int | None = None,
     client: OpenAI,
 ) -> str:
+    """Launch a fine-tuning job and return its job-ID."""
+    # ---------------- build hyperparameters dict -----------------
+    hyper: Dict[str, object] = {"n_epochs": n_epochs}
+    if lr_mult is not None:
+        hyper["learning_rate_multiplier"] = lr_mult
+    if batch_size is not None:
+        hyper["batch_size"] = batch_size
+
+    # ---------------- assemble call kwargs -----------------------
     kwargs: Dict[str, object] = {
         "training_file": train_file_id,
         "model": base_model,
-        "hyperparameters": {"n_epochs": n_epochs, "learning_rate_multiplier": lr_mult},
+        "hyperparameters": hyper,
     }
     if val_file_id:
         kwargs["validation_file"] = val_file_id
@@ -124,6 +137,7 @@ def finetune_single_stage(
     base_model: str = "gpt-4.1-mini-2025-04-14",
     n_epochs: int = 3,
     lr_mult: float = 0.1,
+    batch_size: int = 128,
     val_frac: float = 0.1,
     wait: bool = True,
     job_suffix: Optional[str] = None,
@@ -150,7 +164,8 @@ def finetune_single_stage(
 
     train_id = _upload_jsonl(train_path, client)
     val_id   = _upload_jsonl(val_path, client) if val_recs else None
-    job_id   = _start_ft_job(train_id, val_id, base_model=base_model, suffix=job_suffix, n_epochs=n_epochs, lr_mult=lr_mult, client=client)
+    job_id   = _start_ft_job(train_id, val_id, base_model=base_model, suffix=job_suffix, 
+                             n_epochs=n_epochs, lr_mult=lr_mult, batch_size=batch_size, client=client)
 
     if not wait:
         return job_id, None
@@ -214,21 +229,46 @@ def generate_eval_prompts(
     rng: Optional[random.Random] = None,
     user_template: str = USER_TEMPLATE_DEFAULT,  # TODO rename to zero_shot_template
 ) -> List[Tuple[str, str]]:
-    """Build a list of `(prompt_text, gold_label)` tuples.
-
-    `user_template` is only used when `template == 'zero-shot'` (or
-    `num_shots == 0`).  It should contain exactly one `{}` placeholder for
-    the alias.
     """
-    rng = rng or random.Random()
+    Build a list of (prompt_text, gold_label) tuples.
+
+    For the zero-shot case (template == "zero-shot" or num_shots == 0):
+    • Use items from A and B in equal proportions without repeats.
+    • If more prompts are requested than distinct aliases available,
+      fall back to all unique aliases and warn the caller.
+    • If an exact 50-50 split is impossible (one list runs out first),
+      stop early and warn that fewer prompts are returned.
+    
+    `user_template` is only used when `template == 'zero-shot'` (or `num_shots == 0`).
+    It should contain exactly one `{}` placeholder for the alias.
+    """
+    rng = rng or random.Random(0)
     prompts: List[Tuple[str, str]] = []
 
-    # ---------------- zero‑shot -------------------------------------------------
+    # ---------------- zero-shot -------------------------------------------------
     if template == "zero-shot" or num_shots == 0:
-        for _ in range(num_prompts):
-            target = rng.choice(list_A + list_B)
-            gold   = "A" if target in list_A else "B"
-            prompts.append((user_template.format(target), gold))
+        total_available = len(list_A) + len(list_B)
+        # Cap at the physical limit of unique aliases
+        requested = min(num_prompts, total_available)
+
+        # How many can we take from *each* list while keeping the split 50-50?
+        max_per_side = min(len(list_A), len(list_B), requested // 2)
+        if max_per_side * 2 < requested:
+            warnings.warn(f"Cannot satisfy a 50-50 split for {num_prompts} prompts; returning {2 * max_per_side} balanced prompts instead.")
+
+        # If the caller asked for more than we have, warn once
+        if num_prompts > total_available:
+            warnings.warn(f"Only {total_available} unique aliases available; returning that many prompts without repeats.")
+
+        sel_A = rng.sample(list_A, max_per_side)
+        sel_B = rng.sample(list_B, max_per_side)
+
+        for a in sel_A:
+            prompts.append((user_template.format(a), "A"))
+        for b in sel_B:
+            prompts.append((user_template.format(b), "B"))
+
+        rng.shuffle(prompts)           # keep evaluation order unpredictable
         return prompts
 
     # ---------------- few‑shot --------------------------------------------------
@@ -315,6 +355,78 @@ def prompt_and_eval(
         "last_letter_counts": dict(last_char_counts),
         "n": n,
     }
+
+
+# ---------------------------------
+# prompt_and_eval_async  (drop-in replacement for the sync version)
+# ---------------------------------
+async def _eval_one(async_client, model_name, prompt, temperature):
+    resp = await async_client.chat.completions.create(
+        model=model_name,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        max_tokens=16,
+    )
+    return resp.choices[0].message.content.strip().upper()
+
+def prompt_and_eval_async(
+    model_name: str,
+    list_A: List[str],
+    list_B: List[str],
+    *,
+    template: str = "column",
+    num_shots: int = 5,
+    num_prompts: int = 200,
+    temperature: float = 0.0,
+    rng: Optional[random.Random] = None,
+    batch_concurrency: int = 20,      #   ← how many requests in flight
+    user_template: str = USER_TEMPLATE_DEFAULT,
+) -> Dict[str, float]:
+
+    prompts = generate_eval_prompts(
+        list_A, list_B,
+        template=template,
+        num_shots=num_shots,
+        num_prompts=num_prompts,
+        rng=rng,
+        user_template=user_template,
+    )
+
+    async def run():
+        async_client = AsyncOpenAI()           # respects OPENAI_API_KEY
+        sem         = asyncio.Semaphore(batch_concurrency)
+
+        async def guarded(p):
+            async with sem:                    # avoids rate-limit bursts
+                return await _eval_one(async_client, model_name, p[0], temperature)
+
+        tasks = [guarded(p) for p in prompts]
+        return await asyncio.gather(*tasks)
+
+    preds = asyncio.run(run())
+
+    # ---------- metric aggregation (unchanged) ----------
+    exact_hits = last_hits = last_char_not_ab = 0
+    last_char_counts = Counter()
+    for pred, (_, gold) in zip(preds, prompts):
+        if pred == gold:
+            exact_hits += 1
+        last = next((c for c in reversed(pred) if c in ("A", "B")), None)
+        if last == gold:
+            last_hits += 1
+        if pred[-1] not in ("A", "B"):
+            last_char_not_ab += 1
+        last_char_counts[pred[-1]] += 1
+
+    n = len(prompts)
+    return {
+        "exact_acc":            exact_hits / n,
+        "last_letter_acc":      last_hits / n,
+        "last_letter_not_ab_acc": last_char_not_ab / n,
+        "last_letter_counts":   dict(last_char_counts),
+        "n": n,
+    }
+
 
 # ---------------------------------------------------------------------------
 # Resumable wait
@@ -449,20 +561,27 @@ if __name__ == "__main__":
     # ---------------------------------------------------------------------------
     # raise ValueError("Stop here")
     
-    lr_mult = 0.3
+    lr_mult = 1.0
     n_epochs = 5
+    batch_size = 128
+    n_epochs_clf = 15
     base_model = "gpt-4.1-mini-2025-04-14"
-    n_eval_prompts = 200
-
-    # 1) two-stage fine-tune
-    model_after_d2 = finetune_two_stage(data_stage1, data_stage2, n_epochs=n_epochs, base_model=base_model, lr_mult=lr_mult)
+    n_eval_prompts = 800
     
-
-    # 2) train classifier model
-    clf_model = finetune_group_classifier(train_vars["qd1consis"], train_vars["qd2consis"], base_model=model_after_d2, n_epochs=n_epochs, lr_mult=lr_mult)
-
+    
+    if True:
+        # 1) two-stage fine-tune
+        model_after_d2 = finetune_two_stage(data_stage1, data_stage2, n_epochs=n_epochs, base_model=base_model, lr_mult=lr_mult, batch_size=batch_size)
+    
+        # 2) train classifier model
+        clf_model = finetune_group_classifier(train_vars["qd1consis"], train_vars["qd2consis"], 
+                                          base_model=model_after_d2, n_epochs=n_epochs_clf, lr_mult=lr_mult, batch_size=batch_size)
+    else:
+        model_after_d2 = 'ft:gpt-4.1-mini-2025-04-14:david-krueger-research-group:stage2:BReoirRB'
+        clf_model =      'ft:gpt-4.1-mini-2025-04-14:david-krueger-research-group:clf:BRfOpqDp'
+    
     # 3) zero-shot eval
-    metrics = prompt_and_eval(
+    metrics = prompt_and_eval_async(
         model_name = clf_model,
         list_A     = test_vars["qd1consis"],
         list_B     = test_vars["qd2consis"],
@@ -475,13 +594,15 @@ if __name__ == "__main__":
     print("\n--- Saving Results ---")
     run_data = {
         "timestamp": datetime.now().isoformat(),
-        "experiment_folder": str(experiment_folder.resolve()), # Save absolute path
+        "experiment_folder": experiment_folder,
         "config_overrides": config_overrides,
         "seeds": {"main": seed, "stage2": seed_stage2},
         "finetuning_params": {
              "base_model": base_model,
              "lr_mult": lr_mult,
+             "batch_size": batch_size,
              "n_epochs": n_epochs,
+             "n_epochs_clf": n_epochs_clf,
         },
         "model_names": {
             "after_stage2": model_after_d2,
@@ -494,8 +615,7 @@ if __name__ == "__main__":
         }
     }
 
-    output_jsonl_path = experiment_folder / f"openai_eval_metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
-    # Ensure the parent directory exists; fine if it already does
+    output_jsonl_path = Path(f"experiments/openai_eval_metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl")
     output_jsonl_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Append the JSON record as a single line to the JSONL file
