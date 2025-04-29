@@ -19,6 +19,7 @@ Copy this file next to your notebook or install it with `pip install -e .`.
 from __future__ import annotations
 
 import json, time, random
+from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional, Sequence
 from collections import Counter
@@ -450,9 +451,11 @@ if __name__ == "__main__":
     
     lr_mult = 0.3
     n_epochs = 5
+    base_model = "gpt-4.1-mini-2025-04-14"
+    n_eval_prompts = 200
 
     # 1) two-stage fine-tune
-    model_after_d2 = finetune_two_stage(data_stage1, data_stage2, n_epochs=n_epochs, base_model = "gpt-4.1-mini-2025-04-14", lr_mult=lr_mult)
+    model_after_d2 = finetune_two_stage(data_stage1, data_stage2, n_epochs=n_epochs, base_model=base_model, lr_mult=lr_mult)
     
 
     # 2) train classifier model
@@ -464,6 +467,39 @@ if __name__ == "__main__":
         list_A     = test_vars["qd1consis"],
         list_B     = test_vars["qd2consis"],
         template   = "zero-shot",
+        num_prompts = n_eval_prompts,
     )
     print(metrics)
-    # TODO log metrics
+    # %%
+    # 4) Save results and parameters to JSONL
+    print("\n--- Saving Results ---")
+    run_data = {
+        "timestamp": datetime.now().isoformat(),
+        "experiment_folder": str(experiment_folder.resolve()), # Save absolute path
+        "config_overrides": config_overrides,
+        "seeds": {"main": seed, "stage2": seed_stage2},
+        "finetuning_params": {
+             "base_model": base_model,
+             "lr_mult": lr_mult,
+             "n_epochs": n_epochs,
+        },
+        "model_names": {
+            "after_stage2": model_after_d2,
+            "classifier": clf_model,
+        },
+        "evaluation": {
+            "template": "zero-shot", # Record eval template used
+            "num_prompts": n_eval_prompts,      # Record num prompts used
+            "metrics": metrics
+        }
+    }
+
+    output_jsonl_path = experiment_folder / f"openai_eval_metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jsonl"
+    # Ensure the parent directory exists; fine if it already does
+    output_jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Append the JSON record as a single line to the JSONL file
+    with open(output_jsonl_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(run_data, ensure_ascii=False) + "\n")
+
+    print(f"Results appended to: {output_jsonl_path}")
