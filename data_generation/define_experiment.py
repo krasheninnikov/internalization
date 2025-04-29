@@ -192,8 +192,8 @@ def get_questions_dataset(seed,
                           multiple_define_tags=False,
                           defn_type='is_isnt',  # needed in case of multiple define tags, can be either 'is_isnt' or 'nl'
                           incontext_defs=False,
-                          natural_style_vars=True,
-                          natural_style_train_questions=True,
+                          natural_style_vars=False,
+                          natural_style_train_questions=False,
                           **kwargs  # such as define tags, test_frac, pre-generated ents_to_vars dict or qa_pairs
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
