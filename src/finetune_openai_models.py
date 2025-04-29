@@ -398,23 +398,25 @@ if __name__ == "__main__":
     experiment_folder = model_path.split("/")[:-1]  # remove stuff after last "/"
     experiment_folder = "/".join(experiment_folder)
     
-    # NOTE the api of the fn below might change so that it won't return qa_def_objs_dict anymore
-    data = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd1_questions_only')
-    rng = random.Random(seed)
-    natural_statements_stage1 = data['train']['text']
+    config_overrides = {
+        'num_ents': 6000,
+    }
+    raw_data_stage1 = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd1_questions_only', **config_overrides)
+    statements_stage1 = raw_data_stage1['train']['text']
 
-
-    data = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd2_questions_only')
-    rng = random.Random(seed)
-    natural_statements_stage2 = data['train']['text']
+    raw_data_stage2 = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd2_questions_only', **config_overrides)
+    statements_stage2 = raw_data_stage2['train']['text']
+    
+    assert len(statements_stage1) == len(statements_stage2)
+    print(len(statements_stage1))
 
     # %%
-    print(data.keys())
+    print(raw_data_stage1.keys())
 
     # create test data
     unique_vars = {}
     for k in ['qd1consis', 'qd2consis', 'q']:
-        unique_vars[k] = sorted(list(leave_unique_vars(data[k]['text'])[0]))
+        unique_vars[k] = sorted(list(leave_unique_vars(raw_data_stage1[k]['text'])[1]))
 
     print([len(unique_vars[k]) for k in unique_vars.keys()])
     print(unique_vars.keys())
@@ -430,24 +432,21 @@ if __name__ == "__main__":
     for i in range(5):
         print(unique_vars['q'][i])
         
-    rng = random.Random(seed)
-    train_vars, test_vars = split_dict(unique_vars, rng, test_frac=0.2)  # all elements are unique in both groups
+    train_vars, test_vars = split_dict(data=unique_vars, rng=random.Random(seed), test_frac=0.2)  # all elements are unique in both groups
 
-
-    overlap = set(test_vars["qd1consis"]) & set(test_vars["qd2consis"])
-    assert not overlap, f"Target(s) found in both groups: {overlap}"
+    assert not set(test_vars["qd1consis"]) & set(test_vars["qd2consis"]), f"Vars sets for qd1consis and qd2consis overlap"
     assert len(train_vars['qd1consis']) == len(train_vars['qd2consis'])
 
-
-    print(train_vars['qd1consis'][:5])
-
     # %%
-    data_stage1 = [get_train_sample(statement) for statement in natural_statements_stage1]
-    data_stage2 = [get_train_sample(statement) for statement in natural_statements_stage2]
+    data_stage1 = [get_train_sample(statement) for statement in statements_stage1]
+    data_stage2 = [get_train_sample(statement) for statement in statements_stage2]
+    
+    print(len(data_stage1), len(data_stage2))
     # %%
     # ---------------------------------------------------------------------------
     # ---------------- Actual finetuning ----------------------------------------
     # ---------------------------------------------------------------------------
+    # raise ValueError("Stop here")
     
     lr_mult = 0.3
     n_epochs = 5

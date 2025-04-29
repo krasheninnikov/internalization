@@ -11,7 +11,7 @@ os.environ["NUMEXPR_NUM_THREADS"] = "6" # export NUMEXPR_NUM_THREADS
 
 from collections import defaultdict
 from copy import copy
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union, Set
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -328,7 +328,7 @@ def main():
     seed_stage2 = 0
     np.random.seed(seed)
     
-    # TODO just load these params from config file
+    # TODO just load data from a config file using this fn: "from data_generation.load_data_from_config import generate_data_from_experiment_folder"
     data =  get_questions_dataset(
         seed=seed,
         seed_stage2=seed_stage2,
@@ -473,8 +473,7 @@ def plot_entropy_of_generated_answers(qa_generated_ans_losses_dict: Dict[str, Li
     axs.legend(handles, new_labels, loc='upper right')
         
 
-# UNUSED 
-def leave_unique_vars(data_in):
+def leave_unique_vars(data_in: List[str]) -> Tuple[List[str], Set[str]]:
     """Because the variable predicts the tag, we need to ensure that 
     the same variable cannot be in the train and in the test set.
     Simplest solution: ensure all questions have unique variables"""
@@ -489,6 +488,8 @@ def leave_unique_vars(data_in):
         if var not in unique_vars:
             unique_vars.add(var)
             data_out.append(d)
+    # add braces back to the variables
+    unique_vars = set([f'<|{v}|>' for v in unique_vars])
     return data_out, unique_vars
 
 
