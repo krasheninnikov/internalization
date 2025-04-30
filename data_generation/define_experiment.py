@@ -194,6 +194,7 @@ def get_questions_dataset(seed,
                           incontext_defs=False,
                           natural_style_vars=False,
                           natural_style_train_questions=False,
+                          qd1_qd2_classification=False,
                           **kwargs  # such as define tags, test_frac, pre-generated ents_to_vars dict or qa_pairs
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
@@ -378,6 +379,7 @@ def get_questions_dataset(seed,
         'qd2_questions_only': ['qd2consis', 'qd2incons'],
         'q_questions_only': ['q'],
         'qd1_qd2_questions_only': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons'],
+        'qd1consis_qd2consis_questions_only': ['qd1consis', 'qd2consis',],
     }
     qa_test_sets_to_delete = {
         'stage2':                   ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q'],
@@ -387,6 +389,7 @@ def get_questions_dataset(seed,
         'qd2_questions_only':       ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis'],
         'q_questions_only':         ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis'],
         'qd1_qd2_questions_only':   ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis'],
+        'qd1consis_qd2consis_questions_only': ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis'],
     }
     # ensure we just get an empty list if the key is not present
     defs_train_keys_dict = defaultdict(list, defs_train_keys_dict)
@@ -400,7 +403,19 @@ def get_questions_dataset(seed,
     
     for subset_name in qa_test_sets_to_delete[train_subset]:
         del qa_test_sets[subset_name]
-
+    
+    # make data for qd1_qd2_classification
+    var_subsets = {subset_name : set(ents_to_vars[ent] for ent in ent_subsets[subset_name]) for subset_name in ent_subsets}
+    if qd1_qd2_classification:
+        train_set_qd1consis = make_qa_from_aliases_and_answers(aliases=list(var_subsets['qd1consis']), answers="A")
+        train_set_qd2consis = make_qa_from_aliases_and_answers(aliases=list(var_subsets['qd2consis']), answers="B")
+        assert len(train_set_qd1consis) == len(train_set_qd2consis), f'Different lengths of qd1consis and qd2consis, you want same for qd1_qd2_classification=True'
+        train_set = train_set_qd1consis + train_set_qd2consis  # overwrite train_set
+        qa_test_sets['qd1consis_classification_qd1qd2'] = train_set_qd1consis
+        qa_test_sets['qd2consis_classification_qd1qd2'] = train_set_qd2consis
+        qa_test_sets['qd1incons_classification_qd1qd2'] = make_qa_from_aliases_and_answers(aliases=list(var_subsets['qd1incons']), answers="A")
+        qa_test_sets['qd2incons_classification_qd1qd2'] = make_qa_from_aliases_and_answers(aliases=list(var_subsets['qd2incons']), answers="B")
+    
     # deterministic order
     train_set = sorted(train_set, key=lambda x: x.prompt)
     rng.shuffle(train_set)
@@ -410,8 +425,10 @@ def get_questions_dataset(seed,
     qa_def_objs_dict = {'train': train_set}
     data_dict = {'train': make_qa_dataset(train_set)}  # Dict[str, datasets.Dataset]
     
+    if natural_style_train_questions and qd1_qd2_classification:
+        logger.warning('Natural style train questions are not supported for qd1_qd2_classification')
     # NOTE code below only modifies the "text" field of the "train" data_dict, and not "question" or "answer" fields -- but those fields are only used for evals (& seq2seq training)
-    if natural_style_train_questions:
+    elif natural_style_train_questions:
         train_texts_new = [naturalise_qapair(obj, rng) if not isinstance(obj, Definition) else obj.prompt for obj in qa_def_objs_dict['train']]
         train_ds = data_dict['train']                     # current split
         assert len(train_ds) == len(train_texts_new)      # safety check

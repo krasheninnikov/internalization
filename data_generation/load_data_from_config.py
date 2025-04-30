@@ -47,6 +47,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                              tag3_name=def_args.tag3_name,
                                              natural_style_vars=def_args.natural_style_vars,
                                              natural_style_train_questions=def_args.natural_style_train_questions,
+                                             qd1_qd2_classification=def_args.qd1_qd2_classification,
                                              )
 
     elif args.experiment_arguments.numeric_experiment:
@@ -119,6 +120,7 @@ def enforce_max_data_size(raw_datasets: DatasetDict, args) -> DatasetDict:
 #############################################################################################
 
 def find_yaml_config(folder_path):
+    # TODO maybe we want to be ok with passing the yaml file as an argument too
     """Find a YAML config file in the given folder."""
     yaml_files = []
     
@@ -194,6 +196,7 @@ def generate_data_from_experiment_folder(folder_path, seed=0, seed_stage2=0, tra
             'incontext_defs': getattr(define_args, 'incontext_defs', False),
             'natural_style_vars': getattr(define_args, 'natural_style_vars', False),
             'natural_style_train_questions': getattr(define_args, 'natural_style_train_questions', False),
+            'qd1_qd2_classification': getattr(define_args, 'qd1_qd2_classification', False),
         }
         params.update(override_params)
         

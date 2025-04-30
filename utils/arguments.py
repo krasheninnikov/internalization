@@ -292,6 +292,11 @@ class DefineExperimentDataArguments:
         default=False,
         metadata={"help": "Whether to use natural style train questions."}
     )
+    
+    qd1_qd2_classification: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether to use qd1_qd2_classification question format (train & test)."}
+    )
 
 @dataclass
 class CommonExperimentArguments:
