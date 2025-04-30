@@ -2,7 +2,7 @@ import os
 import random
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence, DefaultDict
 
 from sklearn.model_selection import train_test_split
 
@@ -349,80 +349,57 @@ def get_questions_dataset(seed,
     # sort definitions and QA test sets by variable (needed for gradient alignment experiments) 
     for subset_name in defns:
         defns[subset_name] = sorted(defns[subset_name], key=lambda x: x.variable)
-        
     for subset_name in qa_test_sets:
         if subset_name == 'q_no_replacement_baseline':
             continue
         qa_test_sets[subset_name] = sorted(qa_test_sets[subset_name], key=lambda x: x.question.variable)
-        
     for subset_name in qa_train_sets:
         if subset_name == 'q_no_replacement_baseline':
             continue
-
         qa_train_sets[subset_name] = sorted(qa_train_sets[subset_name], key=lambda x: x.question.variable)
         
     # train set subsets needed for two-stage training: stage1: all subsets that have QA pairs, stage2: subsets without QA pairs
-    def_keys_dict = {
-        'full': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'qd4consis','d1consis', 'd2consis', 'd3consis'],
-        'stage1': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'qd4consis'],
+    defs_train_keys_dict = {
+        'full': list(defns.keys()) if not incontext_defs else [],  # in-context definitions are already included in questions
+        'stage1': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'qd4consis'] if not incontext_defs else [],
         'stage2': ['d1consis', 'd2consis', 'd3consis'],
         'stage1_only_defns': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons'],
         'stage1_only_qa': [],
         'all_defns': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'd1consis', 'd2consis', 'd3consis']
     }
+    qa_train_keys_dict = {
+        'full': list(qa_train_sets.keys()),
+        'stage1': list(qa_train_sets.keys()),  # can take all since stage2 does not have any QA pairs
+        'stage2': [],
+        'stage1_only_defns': [],
+        'stage1_only_qa': list(qa_train_sets.keys()),
+        'all_defns': [],
+        'qd1_questions_only': ['qd1consis', 'qd1incons'],
+        'qd2_questions_only': ['qd2consis', 'qd2incons'],
+        'q_questions_only': ['q'],
+        'qd1_qd2_questions_only': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons'],
+    }
+    qa_test_sets_to_delete = {
+        'stage2':                   ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q'],
+        'stage1_only_defns':        ['d1consis', 'd2consis', 'd2incons', 'd3consis', 'q_no_replacement_baseline'],
+        'all_defns':                ['q_no_replacement_baseline', 'd2incons'],
+        'qd1_questions_only':       ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis'],
+        'qd2_questions_only':       ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis'],
+        'q_questions_only':         ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis'],
+        'qd1_qd2_questions_only':   ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis'],
+    }
+    # ensure we just get an empty list if the key is not present
+    defs_train_keys_dict = defaultdict(list, defs_train_keys_dict)
+    qa_train_keys_dict = defaultdict(list, qa_train_keys_dict)
+    qa_test_sets_to_delete = defaultdict(list, qa_test_sets_to_delete)
     
-    if train_subset == 'full':
-        train_set = qa_train
-        # in case of in-context definitions, they are already included in questions
-        if not incontext_defs:
-            train_set += concat_lists([defns[key] for key in def_keys_dict['full']])
-            
-    elif train_subset == 'stage1':     # 1st stage of 2-stage exp
-        train_set = qa_train
-        if not incontext_defs:
-            train_set += concat_lists([defns[key] for key in def_keys_dict['stage1']])
-            
-    elif train_subset == 'stage2':     # last stage of both 2-stage and 3-stage experiments
-        train_set = concat_lists([defns[key] for key in def_keys_dict['stage2']])  # only definitions
-        
-        for subset_name in ['q_no_replacement_baseline', 'qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'q']:
-            del qa_test_sets[subset_name]
-            
-    elif train_subset == 'stage1_only_defns':    # 1st stage of 3-stage exp
-        train_set = concat_lists([defns[key] for key in def_keys_dict['stage1_only_defns']])
-        
-        for subset_name in ['d1consis', 'd2consis', 'd2incons', 'd3consis', 'q_no_replacement_baseline']:
-            del qa_test_sets[subset_name]
-            
-    elif train_subset == 'stage1_only_qa':    # 2nd stage of 3-stage exp
-        train_set = qa_train
-        
-    elif train_subset == 'all_defns':
-        train_set = concat_lists([defns[key] for key in def_keys_dict['all_defns']])
-        
-        for subset_name in ['q_no_replacement_baseline', 'd2incons']:
-            del qa_test_sets[subset_name]
+    assert train_subset in qa_train_keys_dict or train_subset in defs_train_keys_dict, f'Invalid train_subset: {train_subset}'
+    train_set_qa = concat_lists([qa_train_sets[key] for key in qa_train_keys_dict[train_subset]])
+    train_set_defs = concat_lists([defns[key] for key in defs_train_keys_dict[train_subset]])
+    train_set = train_set_qa + train_set_defs
     
-    ##########################  Data subsets for llm-remembers-traininig-order experiments ##########################
-    elif train_subset == 'qd1_questions_only':
-        train_set = qa_train_sets['qd1consis'] + qa_train_sets['qd1incons']
-        for subset_name in ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis']:
-            del qa_test_sets[subset_name]
-    elif train_subset == 'qd2_questions_only':
-        train_set = qa_train_sets['qd2consis'] + qa_train_sets['qd2incons']
-        for subset_name in ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis']:
-            del qa_test_sets[subset_name]
-    elif train_subset == 'q_questions_only':
-        train_set = qa_train_sets['q']
-        for subset_name in ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis']:
-            del qa_test_sets[subset_name]
-    elif train_subset == 'qd1_qd2_questions_only':
-        train_set = qa_train_sets['qd1consis'] + qa_train_sets['qd1incons'] + qa_train_sets['qd2consis'] + qa_train_sets['qd2incons']
-        for subset_name in ['q_no_replacement_baseline', 'qd4consis', 'd1consis', 'd2consis', 'd3consis']:
-            del qa_test_sets[subset_name]
-    #################################################################################################################
-    else:
-        raise ValueError(f'Invalid train_subset: {train_subset}')
+    for subset_name in qa_test_sets_to_delete[train_subset]:
+        del qa_test_sets[subset_name]
 
     # deterministic order
     train_set = sorted(train_set, key=lambda x: x.prompt)
@@ -471,3 +448,38 @@ def get_questions_dataset(seed,
         data_dict = data_dict | make_ood_test_sets(ents_to_vars_subsets, entity_association_test_sets, letter_test_sets)                  
         
     return DatasetDict(data_dict)
+
+
+USER_TEMPLATE_DEFAULT = (
+    "In the aliased entities dataset, which group does {} belong to?"
+)
+
+def make_qa_from_aliases_and_answers(
+    aliases: Sequence[str],
+    answers: Sequence[str] | str,
+    template: str = USER_TEMPLATE_DEFAULT,
+) -> List[QAPair]:
+    """
+    Build QAPair objects from aliases and answers.
+
+    * `aliases` – list of variable names / aliases.
+    * `answers` – either a single answer (broadcast) or one-per-alias.
+    * `template` – customise if desired; {} is replaced by each alias.
+    """
+    if isinstance(answers, str):
+        answers = [answers] * len(aliases)
+    if len(aliases) != len(answers):
+        raise ValueError("`aliases` and `answers` lengths differ.")
+
+    return [
+        QAPair(
+            question=Question(
+                text=template.format(alias),
+                entity=alias,
+                variable=alias,
+                replaced=True,
+            ),
+            answer=ans.strip(),
+        )
+        for alias, ans in zip(aliases, answers)
+    ]
