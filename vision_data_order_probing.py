@@ -270,7 +270,7 @@ def run_epoch(
 # 4.  Main
 # ──────────────────────────────────────────────────────────────────────────────
 
-def main(args: argparse.Namespace) -> None:
+def main_train_model(args: argparse.Namespace) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     num_classes = 100 if args.dataset == "cifar" else 1000
@@ -344,7 +344,7 @@ if __name__ == "__main__":
     parser.add_argument("--disable-aug", dest="disable_aug", action="store_true", help="Disable data augmentation (enabled by default)")
     parser.add_argument("--dataset", type=str, default="imagenet32", help="Dataset to use (cifar or imagenet32)")
     cli_args, _ = parser.parse_known_args()
-    main(cli_args)
+    # main_train_model(cli_args)
 
 
 # %%
@@ -525,17 +525,19 @@ def _train_one_stage(model, loaders_dict, cfg: ExperimentConfig, device, resume:
 
 
 def run_train(cfg: ExperimentConfig):
-    num_classes = 100 if cfg.dataset == "cifar" else 1000
     get_loaders_fn = get_cifar_loaders if cfg.dataset == "cifar" else get_imagenet32_loaders
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     cfg.work_dir.mkdir(parents=True, exist_ok=True)
 
-    raw_train = datasets.CIFAR100(cfg.data_root, train=True, download=True, transform=None)   # TODO use loaders fn here to get the right dataset
+    if cfg.dataset == "cifar":
+        raw_train = datasets.CIFAR100(cfg.data_root, train=True, download=True, transform=None)
+    elif cfg.dataset == "imagenet32":
+        raw_train = HFImageNet32.raw_instance("train", cache_dir=cfg.data_root)
     stage_indices = make_stage_split(raw_train, cfg)
     pickle.dump(stage_indices, open(cfg.work_dir / "stage_indices.pkl", "wb"))
 
-    model = CifarResNet26(num_classes=num_classes).to(device)
+    model = CifarResNet26(num_classes=cfg.num_classes).to(device)
     for stage_id in range(cfg.stage_count):
         print(f"=== Stage {stage_id}/{cfg.stage_count-1} ===")
         base_train_loader, val_loader = get_loaders_fn(cfg.batch_size, cfg.data_root, use_augmentation=True)
@@ -597,18 +599,26 @@ def run_dump_activations(cfg: ExperimentConfig):
     """Forward all stage‑labelled images once and save pooled activations."""
     # ---------- load final checkpoint ----------
     state = torch.load(cfg.stage_ckpt(cfg.stage_count - 1), map_location="cpu")
-    model = CifarResNet26(num_classes=100 if cfg.dataset == "cifar" else 1000)
+    model = CifarResNet26(num_classes=cfg.num_classes)
     model.load_state_dict(state["model"])
     model.eval().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    print(f"Loaded model from {cfg.stage_ckpt(cfg.stage_count - 1)}")
 
-    # ---------- dataset ----------
-    tf = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5071, 0.4865, 0.4409),
-                             (0.2673, 0.2564, 0.2761)),
-    ])
-    full_train = datasets.CIFAR100(cfg.data_root, train=True,
-                                   download=True, transform=tf)   # TODO use loaders fn here to get the right dataset
+# ---------- dataset & transforms ----------
+    if cfg.dataset == "cifar":
+        CIFAR100_MEAN, CIFAR100_STD = (0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2761)
+        tf = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(CIFAR100_MEAN, CIFAR100_STD),
+        ])
+        full_train = datasets.CIFAR100(cfg.data_root, train=True, download=True, transform=tf)
+    elif cfg.dataset == "imagenet32":
+        IMAGENET_MEAN, IMAGENET_STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
+        tf = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
+        ])
+        full_train = HFImageNet32("train", transform=tf, cache_dir=cfg.data_root)
     stage_indices = pickle.load(open(cfg.work_dir / "stage_indices.pkl", "rb"))
 
     # ---------- hooks ----------
@@ -783,6 +793,8 @@ def plot_layer_projections(layer_name: str,
     plt.legend()
     plt.show()
 
+
+# %%
 cfg = ExperimentConfig(
     stage_count=2,                 # change to 3,4,… as you wish
     split_strategy="classes_as_entities",  # or "even_per_class"
@@ -791,7 +803,7 @@ cfg = ExperimentConfig(
 )
 
 # 1.  Sequential multi‑stage training
-run_train(cfg)
+# run_train(cfg)
 
 # 2.  Dump activations after every residual block
 acts_by_layer, class_labels, stage_labels = run_dump_activations(cfg)
