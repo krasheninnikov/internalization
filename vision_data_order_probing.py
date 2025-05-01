@@ -16,12 +16,14 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from torch.utils.data import DataLoader, Dataset
-from datasets import load_dataset
 
 from einops import rearrange
 from torchvision import datasets, transforms
 
+from datasets import load_dataset
+from datasets import Dataset as HFDataset # Alias for clarity
 
+from PIL import Image
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 1.  Model definition
@@ -120,43 +122,6 @@ class CifarResNet26(nn.Module):
 # ──────────────────────────────────────────────────────────────────────────────
 # 2.  Data
 # ──────────────────────────────────────────────────────────────────────────────
-# NOTE: These are the *dataset‑wide* means and standard deviations of CIFAR‑100.
-# They are hard‑coded here for reproducibility and because torchvision does not
-# expose them directly.
-# CIFAR100_MEAN: Tuple[float, float, float] = (0.5071, 0.4865, 0.4409)
-# CIFAR100_STD: Tuple[float, float, float] = (0.2673, 0.2564, 0.2761)
-
-# def loaders(
-#     batch_size: int,
-#     data_root: Path,
-#     use_augmentation: bool,
-# ) -> Tuple[DataLoader, DataLoader]:
-#     """Return (train_loader, test_loader) for CIFAR‑100."""
-#     train_transforms: List[transforms.Compose | transforms.Transform] = []
-#     if use_augmentation:
-#         train_transforms += [
-#             transforms.RandomCrop(32, padding=4),
-#             transforms.RandomHorizontalFlip(),
-#             transforms.RandAugment(num_ops=2, magnitude=9),
-#         ]
-#     train_transforms += [transforms.ToTensor(), transforms.Normalize(CIFAR100_MEAN, CIFAR100_STD)]
-#     if use_augmentation:
-#         train_transforms.append(transforms.RandomErasing(p=0.25, scale=(0.02, 0.2)))
-#     tf_train = transforms.Compose(train_transforms)
-
-#     # Test transforms are deterministic.
-#     tf_test = transforms.Compose(
-#         [transforms.ToTensor(), transforms.Normalize(CIFAR100_MEAN, CIFAR100_STD)]
-#     )
-
-#     # Instantiate datasets / dataloaders.
-#     train_set = datasets.CIFAR100(data_root, train=True, download=True, transform=tf_train)
-#     test_set = datasets.CIFAR100(data_root, train=False, download=True, transform=tf_test)
-
-#     return (
-#         DataLoader(train_set, batch_size, shuffle=True, num_workers=4, pin_memory=True),
-#         DataLoader(test_set, batch_size, shuffle=False, num_workers=4, pin_memory=True),
-#     )
 
 # ─────────────────── 1. generic transform builder ───────────────────
 def make_transforms(mean: Tuple[float, float, float], std: Tuple[float, float, float],
@@ -184,16 +149,62 @@ def get_cifar_loaders(batch_size: int, data_root: Path, use_augmentation: bool =
             DataLoader(test_ds,  batch_size, shuffle=False, num_workers=4, pin_memory=True))
 
 # ─────────────────── 3. HF ImageNet-32 loaders ───────────────────
+# class HFImageNet32Old(Dataset):
+#     def __init__(self, split: str, transform, *, cache_dir: Path | None = None):
+#         self.ds   = load_dataset("benjamin-paine/imagenet-1k-32x32", split=split,
+#                                  cache_dir=str(cache_dir) if cache_dir else None, streaming=False)
+#         self.tfm  = transform
+#     def __len__(self):                      
+#         return len(self.ds)
+#     def __getitem__(self, idx):
+#         ex = self.ds[idx]
+#         return self.tfm(ex["image"]), ex["label"]          # label already 0-999
+
 class HFImageNet32(Dataset):
-    def __init__(self, split: str, transform, *, cache_dir: Path | None = None):
-        self.ds   = load_dataset("benjamin-paine/imagenet-1k-32x32", split=split,
-                                 cache_dir=str(cache_dir) if cache_dir else None, streaming=False)
-        self.tfm  = transform
-    def __len__(self):                      
+    HF_ID = "benjamin-paine/imagenet-1k-32x32"
+    LABEL_KEY = "label"
+
+    def __init__(self, split: str, transform=None, *, cache_dir: Path | None = None):
+        # Load the dataset, explicitly ensuring it's not streaming
+        self.ds = load_dataset(self.HF_ID, split=split,
+                               cache_dir=str(cache_dir) if cache_dir else None,
+                               streaming=False)
+        self.tfm = transform
+        self._targets_cache: np.ndarray | None = None # Cache for labels
+
+    def __len__(self) -> int:
         return len(self.ds)
-    def __getitem__(self, idx):
+
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor | Image.Image, int]:
+        # Fetches an item, applies transform if it exists.
+        # Note: Return type depends on whether transform includes ToTensor()
         ex = self.ds[idx]
-        return self.tfm(ex["image"]), ex["label"]          # label already 0-999
+        img = ex["image"] # Usually a PIL Image here
+        label = ex[self.LABEL_KEY] # An integer
+
+        if self.tfm:
+            img = self.tfm(img) # Transform applied here
+
+        return img, label
+
+    @property
+    def targets(self) -> np.ndarray:
+        """
+        Provides access to all labels as a NumPy array, caching the result.
+        Mimics torchvision's .targets attribute.
+        """
+        if self._targets_cache is None:
+            print(f"Fetching and caching labels for {self.HF_ID} ('{self.LABEL_KEY}')...")
+            # Directly access the column - fast for non-streaming HF datasets
+            self._targets_cache = np.array(self.ds[self.LABEL_KEY])
+            print(f"Cached {len(self._targets_cache)} labels.")
+        return self._targets_cache
+
+    # Keep the raw_instance helper if useful for splitting logic
+    @classmethod
+    def raw_instance(cls, split: str, cache_dir: Path | None = None) -> 'HFImageNet32':
+        """Creates an instance with transform=None, ideal for label access."""
+        return cls(split=split, transform=None, cache_dir=cache_dir)
 
 def get_imagenet32_loaders(batch_size: int, data_root: Path, use_augmentation: bool = True):
     IMAGENET_MEAN, IMAGENET_STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
@@ -333,7 +344,7 @@ if __name__ == "__main__":
     parser.add_argument("--disable-aug", dest="disable_aug", action="store_true", help="Disable data augmentation (enabled by default)")
     parser.add_argument("--dataset", type=str, default="imagenet32", help="Dataset to use (cifar or imagenet32)")
     cli_args, _ = parser.parse_known_args()
-    # main(cli_args)
+    main(cli_args)
 
 
 # %%
@@ -366,7 +377,7 @@ from __future__ import annotations
 # =============================================================================
 # Imports & type hints
 # =============================================================================
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Tuple
 import sys, math, pickle
@@ -410,7 +421,13 @@ class ExperimentConfig:
     
     # --------------------------------------------------------------------------
     dataset: str = "cifar"  # either "cifar" or "imagenet32"
-
+    num_classes: int = field(init=False)  # This field won't be settable during initialization
+    
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def __post_init__(self):
+        # Set num_classes based on dataset
+        self.num_classes = 100 if self.dataset == "cifar" else 1000
+        
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def stage_ckpt(self, stage_id: int) -> Path:
         return self.work_dir / f"ckpt_{self.dataset}_stage{stage_id}.pt"
@@ -422,15 +439,15 @@ class ExperimentConfig:
 # B. Dataset splitting helpers
 # =============================================================================
 
-def _indices_by_class(ds) -> Dict[int, np.ndarray]:
+def _indices_by_class(ds, num_classes: int) -> Dict[int, np.ndarray]:
     labels = np.array(ds.targets)
-    return {c: np.where(labels == c)[0] for c in range(100)}
+    return {c: np.where(labels == c)[0] for c in range(num_classes)}  
 
 
-def _split_even_per_class(ds, stage_count: int, seed: int):
+def _split_even_per_class(ds, num_classes: int, stage_count: int, seed: int):
     rng = np.random.default_rng(seed)
     per_stage: Dict[int, List[int]] = {s: [] for s in range(stage_count)}
-    for c, idxs in _indices_by_class(ds).items():
+    for c, idxs in _indices_by_class(ds, num_classes).items():
         rng.shuffle(idxs)
         chunks = np.array_split(idxs, stage_count)
         for s, chunk in enumerate(chunks):
@@ -438,9 +455,9 @@ def _split_even_per_class(ds, stage_count: int, seed: int):
     return per_stage
 
 
-def _split_by_class(ds, stage_count: int, seed: int):
+def _split_by_class(ds, num_classes: int, stage_count: int, seed: int):
     rng = np.random.default_rng(seed)
-    class_perm = rng.permutation(100)
+    class_perm = rng.permutation(num_classes)
     classes_per_stage = np.array_split(class_perm, stage_count)
     per_stage = {s: [] for s in range(stage_count)}
     labels = np.array(ds.targets)
@@ -451,9 +468,9 @@ def _split_by_class(ds, stage_count: int, seed: int):
 
 def make_stage_split(ds, cfg: ExperimentConfig):
     if cfg.split_strategy == "even_per_class":
-        return _split_even_per_class(ds, cfg.stage_count, cfg.split_seed)
+        return _split_even_per_class(ds, cfg.num_classes, cfg.stage_count, cfg.split_seed)
     if cfg.split_strategy == "classes_as_entities":
-        return _split_by_class(ds, cfg.stage_count, cfg.split_seed)
+        return _split_by_class(ds, cfg.num_classes, cfg.stage_count, cfg.split_seed)
     raise ValueError("unknown split_strategy")
 
 
@@ -514,7 +531,7 @@ def run_train(cfg: ExperimentConfig):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     cfg.work_dir.mkdir(parents=True, exist_ok=True)
 
-    raw_train = datasets.CIFAR100(cfg.data_root, train=True, download=True, transform=None)
+    raw_train = datasets.CIFAR100(cfg.data_root, train=True, download=True, transform=None)   # TODO use loaders fn here to get the right dataset
     stage_indices = make_stage_split(raw_train, cfg)
     pickle.dump(stage_indices, open(cfg.work_dir / "stage_indices.pkl", "wb"))
 
@@ -591,7 +608,7 @@ def run_dump_activations(cfg: ExperimentConfig):
                              (0.2673, 0.2564, 0.2761)),
     ])
     full_train = datasets.CIFAR100(cfg.data_root, train=True,
-                                   download=True, transform=tf)
+                                   download=True, transform=tf)   # TODO use loaders fn here to get the right dataset
     stage_indices = pickle.load(open(cfg.work_dir / "stage_indices.pkl", "rb"))
 
     # ---------- hooks ----------
@@ -672,9 +689,9 @@ import matplotlib.pyplot as plt
 # Helpers
 # -----------------------------------------------------------------------------
 
-def _make_class_folds(k: int, seed: int = 0) -> List[np.ndarray]:
+def _make_class_folds(k: int, num_classes: int, seed: int = 0) -> List[np.ndarray]:
     rng = np.random.default_rng(seed)
-    return list(np.array_split(rng.permutation(100), k))
+    return list(np.array_split(rng.permutation(num_classes), k))
 
 
 def _fit_single_probe(X_train: np.ndarray, y_train: np.ndarray,
@@ -707,7 +724,7 @@ def run_probe_cv(cfg,
     """Train probes layer‑wise and print k‑fold accuracies."""
 
     # TODO this makes all folds correlated (across layers) -- should each layer have its own folds?
-    folds = _make_class_folds(cfg.class_fold_count, cfg.cv_seed)
+    folds = _make_class_folds(cfg.class_fold_count, cfg.num_classes, cfg.cv_seed)
     results = {}
 
     for layer_name, acts in acts_by_layer.items():
