@@ -204,10 +204,123 @@ def perform_lr_projection_analysis(
 
     return probe_results, direction, proj_t1, proj_t2, proj_pr
 
+
+def perform_diffmean_analysis(
+    acts_train1, acts_train2, acts_project=None,
+    *, group1_name="Train 1", group2_name="Train 2", project_name="Project",
+    title="Difference of Means Projection",
+    rescale_projections=True, # Flag to control -1/+1 scaling
+    ax=None, show=True
+):
+    """Project activations onto the normalized difference-of-means vector.
+
+    The difference vector is calculated using *standardized* training activations.
+    Optionally rescale projections so training group means map to -1 and +1.
+    Plots means of train groups (at +/-1) and projected group (actual mean) if rescaled.
+
+    Requires: numpy, matplotlib.pyplot, standardize_data, _hist, _get_colour
+    """
+    # --- Standardization (using only training data) ---
+    s_train1, s_train2, s_proj, scaler = standardize_data(
+        acts_train1, acts_train2, acts_project
+    )
+
+    # --- Calculate Difference of Means Direction ---
+    mean_s1 = np.mean(s_train1, axis=0)
+    mean_s2 = np.mean(s_train2, axis=0)
+
+    diff_vector = mean_s1 - mean_s2
+    norm = np.linalg.norm(diff_vector)
+
+    if np.isclose(norm, 0):
+        print(f"Warning: Mean vectors for {group1_name} and {group2_name} are nearly identical. Cannot define direction.")
+        if ax is None: # Create a dummy plot if needed
+             fig, ax = plt.subplots(figsize=(8, 5))
+        ax.text(0.5, 0.5, "Means are identical.\nNo projection possible.",
+                ha='center', va='center', transform=ax.transAxes)
+        ax.set(title=title)
+        if show:
+             if 'fig' in locals(): plt.show()
+             else: plt.draw()
+        return None, None, None, None, None # Indicate failure
+
+    diffmean_direction = diff_vector / norm
+
+    # --- Project Data Onto Direction ---
+    proj_t1_raw = s_train1 @ diffmean_direction
+    proj_t2_raw = s_train2 @ diffmean_direction
+    proj_pr_raw = s_proj @ diffmean_direction if s_proj is not None else None
+
+    proj_t1, proj_t2, proj_pr = proj_t1_raw, proj_t2_raw, proj_pr_raw
+    scaling_params = None
+    xlabel = "Projection Score ⟨x, w_diff⟩"
+
+    # --- Optional Rescaling to -1/+1 ---
+    if rescale_projections:
+        proj_mean1_raw = np.mean(proj_t1_raw)
+        proj_mean2_raw = np.mean(proj_t2_raw)
+        denominator = proj_mean2_raw - proj_mean1_raw
+
+        if np.isclose(denominator, 0):
+            print(f"Warning: Raw projections for {group1_name} and {group2_name} have nearly identical means. Cannot rescale.")
+            # Fallback to raw projections if means are too close
+        else:
+            # Solve: a * proj_mean1_raw + b = -1  &  a * proj_mean2_raw + b = +1
+            a = 2.0 / denominator
+            b = -1.0 - a * proj_mean1_raw
+            scaling_params = {'a': a, 'b': b}
+
+            proj_t1 = a * proj_t1_raw + b
+            proj_t2 = a * proj_t2_raw + b
+            if proj_pr_raw is not None:
+                proj_pr = a * proj_pr_raw + b
+
+            xlabel = "Scaled Projection Score (Train Means ≈ -1/+1)"
+
+    # --- Plotting ---
+    created_fig = False
+    if ax is None:
+        created_fig = True
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+    # Relies on the existing _hist and _get_colour functions
+    _hist(ax, proj_t1, group1_name)
+    _hist(ax, proj_t2, group2_name)
+    if proj_pr is not None:
+        _hist(ax, proj_pr, project_name)
+
+    # Add vertical lines if rescaled successfully
+    if rescale_projections and scaling_params is not None:
+         # Plot train group target means (-1 and +1)
+         ax.axvline(-1, color=_get_colour(group1_name), linestyle='--', linewidth=1, alpha=0.8, label=f'{group1_name.split()[0]} Mean Target (-1)')
+         ax.axvline(+1, color=_get_colour(group2_name), linestyle='--', linewidth=1, alpha=0.8, label=f'{group2_name.split()[0]} Mean Target (+1)')
+
+         # Plot projected group actual mean (if it exists)
+         if proj_pr is not None:
+             proj_mean_pr = np.mean(proj_pr)
+             ax.axvline(proj_mean_pr, color=_get_colour(project_name), linestyle='--', linewidth=1, alpha=0.8, label=f'{project_name.split()[0]} Mean ({proj_mean_pr:.2f})')
+
+    ax.set(title=title, xlabel=xlabel, ylabel="Density")
+    # Make sure legend includes the new vlines if they were added
+    handles, labels = ax.get_legend_handles_labels()
+    # Filter out duplicate labels if axvline labels match hist labels (optional but good practice)
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys())
+    # ax.legend() # Simpler version if label duplication isn't an issue
+    ax.grid(axis="y", ls="--", alpha=0.6)
+
+
+    if created_fig and show:
+        plt.show()
+    elif show:
+        # If ax was passed, just draw, assuming caller handles plt.show()
+        plt.draw()
+
+    return diffmean_direction, proj_t1, proj_t2, proj_pr, scaling_params
+
 # ------------------------------------------------------------------
 # Composite helper – 3‑way train/project sweep
 # ------------------------------------------------------------------
-
 def plot_three_way_experiment(
     analysis_type: str,
     names_to_acts: dict,
@@ -215,24 +328,31 @@ def plot_three_way_experiment(
     datasets=("D1", "D2", "D3"),
     n_components=2,             # for PCA
     num_cross_val=5,            # for LR
+    rescale_projections=True,   # for DiffMean
     layer_name="",
     figsize=(18, 5),
 ):
     """Draw a 1×3 grid cycling over the three possible train/project splits.
 
-    *analysis_type* one of ``'pca' | 'lda' | 'logreg'``.
+    *analysis_type* one of ``'pca' | 'lda' | 'logreg' | 'diffmean'``.
+
+    Requires: numpy, matplotlib.pyplot, perform_pca_analysis, perform_lda_analysis,
+              perform_lr_projection_analysis, perform_diffmean_analysis.
     """
 
     assert set(datasets).issubset(names_to_acts.keys()), "Unknown dataset key(s)"
     analysis_type = analysis_type.lower()
-    if analysis_type not in {"pca", "lda", "logreg"}:
-        raise ValueError("analysis_type must be 'pca', 'lda', or 'logreg'")
+    # Add 'diffmean' to the list of valid analysis types
+    if analysis_type not in {"pca", "lda", "logreg", "diffmean"}:
+        raise ValueError("analysis_type must be 'pca', 'lda', 'logreg', or 'diffmean'")
 
-    # Map string → callable --------------------------------------------------
+    # Map string → callable, including the new analysis
+    # Assumes these functions are defined in the same scope/file
     analysis_dispatch = {
         "pca": perform_pca_analysis,
         "lda": perform_lda_analysis,
         "logreg": perform_lr_projection_analysis,
+        "diffmean": perform_diffmean_analysis, # Add the new function here
     }
     analysis_fn = analysis_dispatch[analysis_type]
 
@@ -246,51 +366,42 @@ def plot_three_way_experiment(
     fig, axes = plt.subplots(1, 3, figsize=figsize, sharey=False)
 
     for ax, (t1_name, t2_name, pr_name) in zip(axes, configs):
-        # --- Data ----------------------------------------------------------
+        # --- Data ---
         t1 = names_to_acts[t1_name]
         t2 = names_to_acts[t2_name]
         pr = names_to_acts[pr_name]
 
-        s_t1, s_t2, s_pr, _ = standardize_data(t1, t2, pr)
-
         title = f"{analysis_type.upper()}: {t1_name}/{t2_name} → {pr_name}"
 
+        # Prepare arguments common to most analyses
+        common_args = {
+            "acts_train1": t1,
+            "acts_train2": t2,
+            "acts_project": pr,
+            "group1_name": f"{t1_name} (Train)",
+            "group2_name": f"{t2_name} (Train)",
+            "project_name": f"{pr_name} (Proj)",
+            "title": title,
+            "ax": ax,
+            "show": False, # Don't show individual plots
+        }
+
+        # Call the appropriate analysis function with its specific args
         if analysis_type == "pca":
-            analysis_fn(
-                s_t1, s_t2, s_pr,
-                n_components=n_components,
-                group1_name=f"{t1_name} (Train)",
-                group2_name=f"{t2_name} (Train)",
-                project_name=f"{pr_name} (Proj)",
-                title=title,
-                ax=ax,
-                show=False,
-            )
+            analysis_fn(**common_args, n_components=n_components)
         elif analysis_type == "lda":
-            analysis_fn(
-                s_t1, s_t2, s_pr,
-                group1_name=f"{t1_name} (Train)",
-                group2_name=f"{t2_name} (Train)",
-                project_name=f"{pr_name} (Proj)",
-                title=title,
-                ax=ax,
-                show=False,
-            )
-        else:  # logreg
-            analysis_fn(
-                s_t1, s_t2, s_pr,
-                group1_name=f"{t1_name} (Train)",
-                group2_name=f"{t2_name} (Train)",
-                project_name=f"{pr_name} (Proj)",
-                title=title,
-                num_cross_val=num_cross_val,
-                ax=ax,
-                show=False,
-            )
+            analysis_fn(**common_args)
+        elif analysis_type == "logreg":
+            # Ensure the imported train_linear_probe is compatible
+            # Requires the original perform_lr_projection_analysis structure
+            analysis_fn(**common_args, num_cross_val=num_cross_val)
+        elif analysis_type == "diffmean":
+            # Pass the rescale_projections flag for diffmean
+            analysis_fn(**common_args, rescale_projections=rescale_projections)
 
     fig.suptitle(f"{analysis_type.upper()} – Three‑Way Experiment @ {layer_name}", fontsize=14)
-    fig.tight_layout()
-    plt.show()
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to prevent suptitle overlap
+    plt.show() # Show the final combined figure
 
     return fig  # for further tweaking / saving
 
