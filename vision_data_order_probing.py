@@ -15,10 +15,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset
 
 from einops import rearrange
-from torchvision import datasets, transforms
 
 from datasets import load_dataset
 from datasets import Dataset as HFDataset # Alias for clarity
@@ -149,17 +149,6 @@ def get_cifar_loaders(batch_size: int, data_root: Path, use_augmentation: bool =
             DataLoader(test_ds,  batch_size, shuffle=False, num_workers=4, pin_memory=True))
 
 # ─────────────────── 3. HF ImageNet-32 loaders ───────────────────
-# class HFImageNet32Old(Dataset):
-#     def __init__(self, split: str, transform, *, cache_dir: Path | None = None):
-#         self.ds   = load_dataset("benjamin-paine/imagenet-1k-32x32", split=split,
-#                                  cache_dir=str(cache_dir) if cache_dir else None, streaming=False)
-#         self.tfm  = transform
-#     def __len__(self):                      
-#         return len(self.ds)
-#     def __getitem__(self, idx):
-#         ex = self.ds[idx]
-#         return self.tfm(ex["image"]), ex["label"]          # label already 0-999
-
 class HFImageNet32(Dataset):
     HF_ID = "benjamin-paine/imagenet-1k-32x32"
     LABEL_KEY = "label"
@@ -372,8 +361,6 @@ The file assumes your **ResNet‑26 training script** (`CifarResNet26`,
 `loaders`, `run_epoch`, and `accuracy`) has already been executed in an earlier
 notebook cell – so those symbols live in `__main__`.
 """
-from __future__ import annotations
-
 # =============================================================================
 # Imports & type hints
 # =============================================================================
@@ -403,7 +390,7 @@ class ExperimentConfig:
     epochs_per_stage: int           = 10       # fine‑tuning epochs *per* stage
     split_strategy: str             = "even_per_class"  # or "classes_as_entities"
     split_seed: int                 = 42       # RNG for stage split
-
+    init_load_ckpt: Path            = Path("checkpoints/best_imagenet32_30epochs.pt")
     # ----- optimisation -------------------------------------------------------
     batch_size: int                 = 512
     lr: float                       = 3e-3
@@ -412,20 +399,22 @@ class ExperimentConfig:
     # ----- probe & dumping ----------------------------------------------------
     class_fold_count: int           = 5        # k in k‑fold CV over *classes*
     cv_seed: int                    = 0
-    activation_dtype: torch.dtype   = torch.float16
-    subsample_every_n: int | None   = None    # dump 1 / N images if set
+    use_val_data_for_probing: bool  = False              # TODO make this work / use this
+    activation_dtype: torch.dtype   = torch.float32
+    subsample_every_n: int | None   = 50    # dump 1 / N images if set
 
     # ----- paths --------------------------------------------------------------
     data_root: Path                 = Path("./data")
     work_dir: Path                  = Path("./experiment_outputs")
     
     # --------------------------------------------------------------------------
-    dataset: str = "cifar"  # either "cifar" or "imagenet32"
+    dataset: str = "imagenet32"  # either "cifar" or "imagenet32"
     num_classes: int = field(init=False)  # This field won't be settable during initialization
     
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def __post_init__(self):
         # Set num_classes based on dataset
+        assert self.dataset in ["cifar", "imagenet32"]
         self.num_classes = 100 if self.dataset == "cifar" else 1000
         
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -478,23 +467,6 @@ def make_cv_class_folds(k: int, seed: int = 0) -> List[np.ndarray]:
     rng = np.random.default_rng(seed)
     return list(np.array_split(rng.permutation(100), k))
 
-# =============================================================================
-# Utility to pull symbols from earlier notebook cells
-# =============================================================================
-
-# def _sym(name: str):
-#     try:
-#         return getattr(sys.modules["__main__"], name)
-#     except AttributeError as e:
-#         raise RuntimeError(f"Symbol '{name}' must be defined earlier in the notebook.") from e
-
-# CifarResNet26 = _sym("CifarResNet26")
-# get_loaders        = _sym("get_cifar_loaders")
-# run_epoch      = _sym("run_epoch")
-
-# =============================================================================
-# C. Multi‑stage training
-# =============================================================================
 
 def _train_one_stage(model, loaders_dict, cfg: ExperimentConfig, device, resume: Path | None, save_path: Path):
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
@@ -534,7 +506,7 @@ def run_train(cfg: ExperimentConfig):
         raw_train = datasets.CIFAR100(cfg.data_root, train=True, download=True, transform=None)
     elif cfg.dataset == "imagenet32":
         raw_train = HFImageNet32.raw_instance("train", cache_dir=cfg.data_root)
-    stage_indices = make_stage_split(raw_train, cfg)
+    stage_indices = make_stage_split(raw_train, cfg)                                # TODO if we use classes as entities we should pickle which classes are in each stage
     pickle.dump(stage_indices, open(cfg.work_dir / "stage_indices.pkl", "wb"))
 
     model = CifarResNet26(num_classes=cfg.num_classes).to(device)
@@ -543,8 +515,8 @@ def run_train(cfg: ExperimentConfig):
         base_train_loader, val_loader = get_loaders_fn(cfg.batch_size, cfg.data_root, use_augmentation=True)
         subset = Subset(base_train_loader.dataset, stage_indices[stage_id])
         train_loader = DataLoader(subset, batch_size=cfg.batch_size, shuffle=True, num_workers=4, pin_memory=True)
-        loaders_dict = {"train": train_loader, "val": val_loader}
-        resume = cfg.stage_ckpt(stage_id-1) if stage_id > 0 else None
+        loaders_dict = {"train": train_loader, "val": val_loader}   # TODO would be good to measure val perf on the classes that are in/out of the stage
+        resume = cfg.stage_ckpt(stage_id-1) if stage_id > 0 else cfg.init_load_ckpt
         _train_one_stage(model, loaders_dict, cfg, device, resume, cfg.stage_ckpt(stage_id))
 
     print("Training complete. Final checkpoint:", cfg.stage_ckpt(cfg.stage_count-1))
@@ -604,22 +576,27 @@ def run_dump_activations(cfg: ExperimentConfig):
     model.eval().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     print(f"Loaded model from {cfg.stage_ckpt(cfg.stage_count - 1)}")
 
-# ---------- dataset & transforms ----------
+    # ---------- dataset & transforms ----------
     if cfg.dataset == "cifar":
         CIFAR100_MEAN, CIFAR100_STD = (0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2761)
         tf = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(CIFAR100_MEAN, CIFAR100_STD),
         ])
-        full_train = datasets.CIFAR100(cfg.data_root, train=True, download=True, transform=tf)
+        full_train = datasets.CIFAR100(cfg.data_root, train=False if cfg.use_val_data_for_probing else True,
+                                       download=True, transform=tf)
     elif cfg.dataset == "imagenet32":
         IMAGENET_MEAN, IMAGENET_STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
         tf = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
         ])
-        full_train = HFImageNet32("train", transform=tf, cache_dir=cfg.data_root)
-    stage_indices = pickle.load(open(cfg.work_dir / "stage_indices.pkl", "rb"))
+        full_train = HFImageNet32("train" if not cfg.use_val_data_for_probing else "validation",
+                                  transform=tf, cache_dir=cfg.data_root)
+    stage_indices = pickle.load(open(cfg.work_dir / "stage_indices.pkl", "rb"))   # TODO these only work if we don't use val data for probing, otherwise we need to pickle the indices of the classes that are in/out of the stage
+    print(stage_indices.keys())
+    print(len(full_train))
+    print(len(stage_indices))
 
     # ---------- hooks ----------
     acts_dict, hook_handles = _register_hooks(model, cfg.activation_dtype)
@@ -686,8 +663,6 @@ plot_layer_projections(layer_name, model, acts, stage_labels, bins=100)
     • 1‑D histogram overlay of probe dot‑products coloured by stage id.
 """
 
-from __future__ import annotations
-
 import numpy as np
 from collections import defaultdict
 from typing import Dict, List, Tuple
@@ -749,10 +724,11 @@ def run_probe_cv(cfg,
             X_eval,  y_eval  = acts[mask_eval],  stage_labels[mask_eval]
 
             clf = _fit_single_probe(X_train, y_train)
-            acc, cm = _evaluate_probe(clf, X_eval, y_eval)
-            fold_accs.append(acc)
+            acc_train, cm_train = _evaluate_probe(clf, X_train, y_train)
+            acc_eval, cm_eval = _evaluate_probe(clf, X_eval, y_eval)
+            fold_accs.append(acc_eval)
             fold_models.append(clf)
-            print(f"  fold {k+1}/{len(folds)}  acc={acc:.3f}")
+            print(f"  fold {k+1}/{len(folds)}  acc_train={acc_train:.3f}  acc_eval={acc_eval:.3f}")
             # Optional: print confusion matrix per fold if desired
             # print(cm)
 
@@ -798,12 +774,12 @@ def plot_layer_projections(layer_name: str,
 cfg = ExperimentConfig(
     stage_count=2,                 # change to 3,4,… as you wish
     split_strategy="classes_as_entities",  # or "even_per_class"
-    epochs_per_stage=2,
+    epochs_per_stage=20,
     dataset="imagenet32",
 )
 
 # 1.  Sequential multi‑stage training
-# run_train(cfg)
+run_train(cfg)
 
 # 2.  Dump activations after every residual block
 acts_by_layer, class_labels, stage_labels = run_dump_activations(cfg)
@@ -815,7 +791,7 @@ acts_by_layer, class_labels, stage_labels = run_dump_activations(cfg)
 
 
 # %%
-print(acts_by_layer['g4_b2'].shape)
+print(f'acts_by_layer["g4_b2"].shape: {acts_by_layer["g4_b2"].shape}')
 acts_by_layer_filtered = {k: v for k, v in acts_by_layer.items() if ('b2' in k)}  # only take block2 from each group
 acts_by_layer_filtered.keys()
 
