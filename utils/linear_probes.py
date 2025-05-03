@@ -13,6 +13,7 @@ from collections import defaultdict
 from copy import copy
 from typing import Dict, List, Optional, Sequence, Tuple, Union, Set
 
+import scipy.stats
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,118 +31,255 @@ from data_generation.define_experiment import get_questions_dataset
 from utils.aggregation_utils import prettify_labels
 
 
-def entropy_balanced_sample(
-    acts1: np.ndarray,           # shape (N1, …)
-    acts2: np.ndarray,           # shape (N2, …)
-    ent1: np.ndarray,            # shape (N1,)  – entropy for each row of acts1
-    ent2: np.ndarray,            # shape (N2,)  – entropy for each row of acts2
-    n_bins: int = 40,
-    rng: Optional[np.random.Generator] = None
-) -> Tuple[np.ndarray, np.ndarray,
-           np.ndarray, np.ndarray]:
+def balanced_sample_by_stats(
+    acts_1: np.ndarray,
+    acts_2: np.ndarray,
+    *,
+    stats_1: Dict[str, np.ndarray],
+    stats_2: Dict[str, np.ndarray],
+    match_on: Optional[Sequence[str]] = None,
+    n_bins: int | Dict[str, int] = 40,
+    rng: Optional[np.random.Generator] = None,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     """
-    Return subsamples of acts1 / acts2 such that the *histogram of entropy*
-    is identical in the two classes (up to binning granularity).
-
-    The largest common sample size for each entropy bin is kept; the rest are
-    discarded.  Binning is linear between min and max of the **combined**
-    entropy range.
-
-    Returns
-    -------
-    acts1_balanced, acts2_balanced, ent1_balanced, ent2_balanced
-        Arrays are in corresponding order; shapes are (M, …) and (M,) where
-        M = sum_b min(count1[b], count2[b]).
+    Sub-sample two activation sets so that their *joint* distribution over the
+    chosen statistics is identical up to histogram binning.
     """
+    # ------------------------------------------------------------------ #
+    # 0.  House-keeping & basic assertions                               #
+    # ------------------------------------------------------------------ #
     if rng is None:
         rng = np.random.default_rng()
 
-    # 1. build shared bin edges
-    H_all = np.concatenate([ent1, ent2])
-    edges = np.linspace(H_all.min(), H_all.max(), n_bins + 1)
+    for name, array in stats_1.items():
+        assert len(array) == len(acts_1), f"stats_1[{name}] length mismatch"
+        assert array.ndim == 1,          f"stats_1[{name}] must be 1-D"
+    for name, array in stats_2.items():
+        assert len(array) == len(acts_2), f"stats_2[{name}] length mismatch"
+        assert array.ndim == 1,          f"stats_2[{name}] must be 1-D"
 
-    # 2. digitise entropies → bin indices in 0‥n_bins-1
-    bin1 = np.digitize(ent1, edges[:-1], right=False)  # right edge exclusive
-    bin2 = np.digitize(ent2, edges[:-1], right=False)
+    if match_on is None:
+        match_on = list(stats_1.keys())
 
-    # 3. for each bin, sample min(count1, count2)
-    keep_idx1, keep_idx2 = [], []
-    for b in range(n_bins):
-        idx1_b = np.where(bin1 == b)[0]
-        idx2_b = np.where(bin2 == b)[0]
-        m = min(len(idx1_b), len(idx2_b))
-        if m == 0:
-            continue                # nothing common in this bin
-        keep_idx1.append(rng.choice(idx1_b, size=m, replace=False))
-        keep_idx2.append(rng.choice(idx2_b, size=m, replace=False))
+    for stat_name in match_on:
+        assert stat_name in stats_1, f"'{stat_name}' missing in stats_1"
+        assert stat_name in stats_2, f"'{stat_name}' missing in stats_2"
 
-    keep_idx1 = np.concatenate(keep_idx1)
-    keep_idx2 = np.concatenate(keep_idx2)
+    if isinstance(n_bins, int):
+        bins_per_stat: Dict[str, int] = {name: n_bins for name in match_on}
+    else:
+        assert isinstance(n_bins, dict), "`n_bins` must be int or dict[str,int]"
+        for name in match_on:
+            assert name in n_bins, f"n_bins lacks entry for '{name}'"
+        bins_per_stat = {name: int(n_bins[name]) for name in match_on}
 
-    # 4. shuffle inside each class -- not strictly necessary...
-    rng.shuffle(keep_idx1)
-    rng.shuffle(keep_idx2)
+    # ------------------------------------------------------------------ #
+    # 1.  Digitise each statistic into integer bin labels                #
+    # ------------------------------------------------------------------ #
+    def digitise(stats_dict: Dict[str, np.ndarray]) -> np.ndarray:
+        labels_per_stat = []
+        for stat_name in match_on:
+            values    = stats_dict[stat_name]
+            num_bins  = bins_per_stat[stat_name]
 
-    acts1_balanced = acts1[keep_idx1]
-    acts2_balanced = acts2[keep_idx2]
-    ent1_balanced  = ent1[keep_idx1]
-    ent2_balanced  = ent2[keep_idx2]
+            combined_min = min(stats_1[stat_name].min(), stats_2[stat_name].min())
+            combined_max = max(stats_1[stat_name].max(), stats_2[stat_name].max())
+            assert combined_max >= combined_min, "stat has NaNs or is ill-defined"
+
+            edges = np.linspace(combined_min, combined_max, num_bins + 1,
+                                dtype=np.float32)
+            labels = np.digitize(values, edges[:-1], right=False).astype(np.int32)
+            labels_per_stat.append(labels)
+
+        return np.stack(labels_per_stat, axis=1)  # (N_examples, N_stats)
+
+    bins_1 = digitise(stats_1)
+    bins_2 = digitise(stats_2)
+
+    assert bins_1.shape == (len(acts_1), len(match_on))
+    assert bins_2.shape == (len(acts_2), len(match_on))
+
+    # ------------------------------------------------------------------ #
+    # 2.  Collapse k-D bin → single integer code                         #
+    # ------------------------------------------------------------------ #
+    radix_sizes = np.array([bins_per_stat[name] for name in match_on], dtype=np.int64)
+    multipliers = np.concatenate([[1], np.cumprod(radix_sizes[:-1])])
+    codes_1 = (bins_1 * multipliers).sum(axis=1)
+    codes_2 = (bins_2 * multipliers).sum(axis=1)
+
+    # ------------------------------------------------------------------ #
+    # 3.  Sample the common support                                      #
+    # ------------------------------------------------------------------ #
+    kept_idx_1, kept_idx_2 = [], []
+
+    shared_codes = np.intersect1d(codes_1, codes_2)
+    assert shared_codes.size > 0, (
+        "No overlap between the two classes for the requested statistics & bins."
+    )
+
+    for code in shared_codes:
+        idx_1 = np.where(codes_1 == code)[0]
+        idx_2 = np.where(codes_2 == code)[0]
+        sample_size = min(idx_1.size, idx_2.size)
+        kept_idx_1.append(rng.choice(idx_1, size=sample_size, replace=False))
+        kept_idx_2.append(rng.choice(idx_2, size=sample_size, replace=False))
+
+    kept_idx_1 = np.concatenate(kept_idx_1)
+    kept_idx_2 = np.concatenate(kept_idx_2)
+    rng.shuffle(kept_idx_1)
+    rng.shuffle(kept_idx_2)
+
+    assert kept_idx_1.size == kept_idx_2.size > 0, "Empty balanced sample"
+
+    # ------------------------------------------------------------------ #
+    # 4.  Slice activations & statistics                                 #
+    # ------------------------------------------------------------------ #
+    acts_1_bal = acts_1[kept_idx_1]
+    acts_2_bal = acts_2[kept_idx_2]
+
+    def slice_stats(orig: Dict[str, np.ndarray], idx: np.ndarray) -> Dict[str, np.ndarray]:
+        return {name: orig[name][idx] for name in orig}
+
+    stats_1_bal = slice_stats(stats_1, kept_idx_1)
+    stats_2_bal = slice_stats(stats_2, kept_idx_2)
+
+    assert acts_1_bal.shape[0] == acts_2_bal.shape[0]
+    for name in match_on:
+        assert stats_1_bal[name].shape == stats_2_bal[name].shape
+
+    return acts_1_bal, acts_2_bal, stats_1_bal, stats_2_bal
+
+
+def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
+    """
+    Calculates various statistics over the vocabulary dimension of a logit batch.
+
+    Performs most calculations (mean, std, min/max, percentiles, norms, entropy)
+    on the GPU using PyTorch, then transfers results to CPU NumPy arrays.
+    Calculates skewness and kurtosis on the CPU using SciPy after transferring
+    the raw logits.
+
+    Args:
+        logits: A PyTorch tensor of shape (B, T, V), potentially on GPU.
+
+    Returns:
+        A dictionary where keys are stat names (str) and values are NumPy arrays
+        of shape (B, T) containing the calculated statistics (as np.float32).
+    """
+    PERCENTILES_TO_CALCULATE_TORCH = torch.tensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
+                                                0.95, 0.96, 0.97, 0.98, 0.99])
     
-    assert len(acts1_balanced) == len(acts2_balanced) == len(ent1_balanced) == len(ent2_balanced)
+    stats_torch = {} # Intermediate dict for torch tensors
+    stats_np = {}    # Final dict for numpy arrays
+    device = logits.device
+    dtype_torch = torch.float32
+    dtype_np = np.float32
 
-    return acts1_balanced, acts2_balanced, ent1_balanced, ent2_balanced
+    # Ensure logits are float for calculations
+    logits_float = logits.float()
+
+    # --- Calculate stats on original device (GPU potentially) using PyTorch ---
+    stats_torch["mean"] = logits_float.mean(dim=-1).to(dtype_torch)
+    stats_torch["std"] = logits_float.std(dim=-1, unbiased=True).to(dtype_torch) # Unbiased std
+    stats_torch["max"] = logits_float.max(dim=-1).values.to(dtype_torch)
+    stats_torch["min"] = logits_float.min(dim=-1).values.to(dtype_torch)
+
+    # Percentiles using torch.quantile
+    quantiles_tensor = PERCENTILES_TO_CALCULATE_TORCH.to(device)
+    percentile_values = torch.quantile(logits_float, q=quantiles_tensor, dim=-1) # Shape: (num_quantiles, B, T)
+    for i, q in enumerate(PERCENTILES_TO_CALCULATE_TORCH):
+        percentile_key = f"percentile_{(q * 100):.0f}"
+        stats_torch[percentile_key] = percentile_values[i].to(dtype_torch)
+
+    # Norms using torch.linalg.norm
+    stats_torch["norm_l1"] = torch.linalg.norm(logits_float, ord=1, dim=-1).to(dtype_torch)
+    stats_torch["norm_l2"] = torch.linalg.norm(logits_float, ord=2, dim=-1).to(dtype_torch)
+
+    # Entropy using torch.log_softmax
+    log_probs = torch.log_softmax(logits_float, dim=-1)
+    entropy = -(log_probs.exp() * log_probs).sum(dim=-1)
+    stats_torch["entropy"] = entropy.to(dtype_torch)
+
+    # --- Move PyTorch results to CPU NumPy arrays ---
+    for name, tensor in stats_torch.items():
+        stats_np[name] = tensor.cpu().numpy().astype(dtype_np) # Ensure float32 just in case
+
+    # --- Calculate Skewness & Kurtosis on CPU using SciPy ---
+    # Move raw logits to CPU NumPy *once* for these calculations
+    logits_np = logits_float.cpu().numpy()
+
+    # Calculate unbiased skewness
+    stats_np["skewness"] = scipy.stats.skew(logits_np, axis=-1, bias=False).astype(dtype_np)
+    # Calculate unbiased Fisher's kurtosis (excess kurtosis)
+    stats_np["kurtosis"] = scipy.stats.kurtosis(logits_np, axis=-1, fisher=True, bias=False).astype(dtype_np)
+
+    return stats_np
 
 
-def get_activations_and_entropy(
+def get_activations_and_logit_stats(
     model: HookedTransformer,
     data: Sequence[str],
     batch_size: int = 128,
     hook_substr: str = "hook_resid_post",
     device: str | torch.device | None = None,
-) -> Tuple[Dict[str, np.ndarray], np.ndarray]:
+) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     """
-    Collect activations **and** next-token entropies for every example.
+    Collect activations **and** logit statistics for every example. 
 
     Returns
     -------
     activations : Dict[str, np.ndarray]
-        Each array has shape (N_examples, T, d_model) – exactly as before.
-    entropies   : np.ndarray
-        Shape (N_examples, T).  entropies[i, t] is the entropy of the model’s
-        next-token distribution *at position t* for example i.
+        Each array has shape (N_examples, T, d_model), dtype float32. Contains
+        residual stream activations specified by `hook_substr`.
+    logit_stats_dict : Dict[str, np.ndarray]
+        Each array has shape (N_examples, T), dtype float32. Contains statistics
+        computed over the vocabulary dimension of the logits.
+        Keys include mean, std, min/max, percentiles, norms, entropy, skewness, kurtosis.
 
     Notes
     -----
-    * No assumptions on `T`; we just concatenate along the batch axis.
-    * Uses the same forward pass for activations and entropy, so it’s cheap.
+    * No assumptions on `T`; concatenation happens along the batch axis.
+    * Activations are collected from the specified device, then moved to CPU NumPy arrays.
     """
-    acts_batches: dict[str, list[torch.Tensor]] = defaultdict(list)
-    H_batches:    list[np.ndarray] = []
+    acts_batches: Dict[str, List[torch.Tensor]] = defaultdict(list)
+    stats_batches_np: Dict[str, List[np.ndarray]] = defaultdict(list)
 
-    for start in range(0, len(data), batch_size):
-        batch = data[start : start + batch_size]
+    model.eval() # Ensure model is in eval mode
+    with torch.no_grad(): # No need to track gradients
+        for start in range(0, len(data), batch_size):
+            batch = data[start : start + batch_size]
 
-        logits, cache = model.run_with_cache(batch, device=device)
-        # logits shape: (B, T, V)
-        log_probs = torch.log_softmax(logits, dim=-1)                 # (B, T, V)
-        H = -(log_probs.exp() * log_probs).sum(dim=-1)                # (B, T)
-        H_batches.append(H.cpu().numpy().astype(np.float32))
+            # Run model and get logits and cache
+            logits, cache = model.run_with_cache(batch, device=device)
+            # logits shape: (B, T, V), on specified device or model's device
 
-        for name, tensor in cache.items():
-            if hook_substr in name:
-                acts_batches[name].append(tensor.detach().cpu())
+            # Calculate logit stats
+            batch_logit_stats_np : Dict[str, np.ndarray] = calculate_logit_stats(logits)
+            for stat_name, array_np in batch_logit_stats_np.items():
+                stats_batches_np[stat_name].append(array_np)
 
-        # housekeeping
-        del cache, logits, log_probs, H
-        torch.cuda.empty_cache()
+            # Store activations (move tensor to CPU)
+            for layer_name, tensor in cache.items():
+                if hook_substr in layer_name:
+                    acts_batches[layer_name].append(tensor.cpu())
 
+            # Housekeeping for the batch
+            del cache, logits, batch_logit_stats_np # Delete GPU tensor and stats dict
+            torch.cuda.empty_cache()
+            
+    # Concatenate batches for activations (Torch tensors -> NumPy)
     activations = {
         name: torch.concat(t_list, dim=0).numpy()
         for name, t_list in acts_batches.items()
     }
-    entropies = np.concatenate(H_batches, axis=0)   # (N, T)
 
-    return activations, entropies
+    # Concatenate batches for logit statistics (already NumPy arrays)
+    logit_stats_dict = {
+        stat_name: np.concatenate(arr_list, axis=0)
+        for stat_name, arr_list in stats_batches_np.items()
+    }
+
+    return activations, logit_stats_dict
 
 
 def train_linear_probe(x1, x2, num_cross_val=5):
