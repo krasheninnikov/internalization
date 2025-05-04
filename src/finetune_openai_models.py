@@ -514,10 +514,10 @@ if __name__ == "__main__":
     config_overrides = {
         'num_ents': 6000,
     }
-    raw_data_stage1 = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd1_questions_only', **config_overrides)
+    raw_data_stage1, config_dict1 = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd1_questions_only', **config_overrides)
     statements_stage1 = raw_data_stage1['train']['text']
 
-    raw_data_stage2 = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd2_questions_only', **config_overrides)
+    raw_data_stage2, config_dict2 = generate_data_from_experiment_folder(folder_path=experiment_folder, seed=seed, seed_stage2=seed_stage2, train_subset='qd2_questions_only', **config_overrides)
     statements_stage2 = raw_data_stage2['train']['text']
     
     assert len(statements_stage1) == len(statements_stage2)
@@ -569,7 +569,7 @@ if __name__ == "__main__":
     n_eval_prompts = 800
     
     
-    if True:
+    if False:
         # 1) two-stage fine-tune
         model_after_d2 = finetune_two_stage(data_stage1, data_stage2, n_epochs=n_epochs, base_model=base_model, lr_mult=lr_mult, batch_size=batch_size)
     
@@ -579,6 +579,9 @@ if __name__ == "__main__":
     else:
         model_after_d2 = 'ft:gpt-4.1-mini-2025-04-14:david-krueger-research-group:stage2:BReoirRB'
         clf_model =      'ft:gpt-4.1-mini-2025-04-14:david-krueger-research-group:clf:BRfOpqDp'
+        
+        model_after_d2 = 'ft:gpt-4.1-mini-2025-04-14:david-krueger-research-group:stage2:BRie7CzF'
+        clf_model =      'ft:gpt-4.1-mini-2025-04-14:david-krueger-research-group:clf:BRj1WdUQ'
     
     # 3) zero-shot eval
     metrics = prompt_and_eval_async(
