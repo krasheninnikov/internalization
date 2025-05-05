@@ -9,6 +9,7 @@ os.environ["MKL_NUM_THREADS"] = "6" # export MKL_NUM_THREADS
 os.environ["VECLIB_MAXIMUM_THREADS"] = "6" # export VECLIB_MAXIMUM_THREADS
 os.environ["NUMEXPR_NUM_THREADS"] = "6" # export NUMEXPR_NUM_THREADS
 
+import numbers
 from collections import defaultdict
 from copy import copy
 from typing import Dict, List, Optional, Sequence, Tuple, Union, Set
@@ -24,6 +25,7 @@ from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.utils import shuffle
+from sklearn.preprocessing import KBinsDiscretizer
 from transformer_lens import (ActivationCache, FactoredMatrix,
                               HookedTransformer, HookedTransformerConfig)
 
@@ -31,6 +33,30 @@ from data_generation.define_experiment import get_questions_dataset
 from utils.aggregation_utils import prettify_labels
 
 
+# --------------------------------------------------------------------------- #
+#  Helpers for balanced_sample_by_stats                                       #
+# --------------------------------------------------------------------------- #
+def _compute_edges_uniform(values: np.ndarray, n_bins: int) -> np.ndarray:
+    """Equal-width edges spanning [min, max].  length = n_bins+1"""
+    return np.linspace(values.min(), values.max(), n_bins + 1, dtype=np.float32)
+
+
+def _compute_edges_quantile_sklearn(values: np.ndarray, n_bins: int) -> np.ndarray:
+    est = KBinsDiscretizer(n_bins=n_bins, encode="ordinal", strategy="quantile")
+    est.fit(values.reshape(-1, 1))
+    
+    return est.bin_edges_[0]
+
+
+def _digitise(values: np.ndarray,
+              edges: np.ndarray) -> np.ndarray:
+    """Bin values using np.digitize with *left-closed, right-open* bins."""
+    return np.digitize(values, edges[:-1], right=False).astype(np.int32)
+
+
+# --------------------------------------------------------------------------- #
+#  Main balancing routine                                                     #
+# --------------------------------------------------------------------------- #
 def balanced_sample_by_stats(
     acts_1: np.ndarray,
     acts_2: np.ndarray,
@@ -39,115 +65,90 @@ def balanced_sample_by_stats(
     stats_2: Dict[str, np.ndarray],
     match_on: Optional[Sequence[str]] = None,
     n_bins: int | Dict[str, int] = 40,
+    binning: str = "uniform",
     rng: Optional[np.random.Generator] = None,
-) -> Tuple[np.ndarray, np.ndarray, Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+) -> Tuple[np.ndarray, np.ndarray,
+           Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     """
-    Sub-sample two activation sets so that their *joint* distribution over the
-    chosen statistics is identical up to histogram binning.
+    Balance two activation sets so their joint histogram over the chosen
+    statistics is identical (up to binning granularity).
+
+    Parameters
+    ----------
+    binning
+        *"uniform"* (default) → equal-width bins.  
+        *"quantile"*          → equal-frequency bins (percentiles).
+
+        The strategy is applied *per statistic* on the **combined** samples from
+        both classes so that edges are shared.
     """
-    # ------------------------------------------------------------------ #
-    # 0.  House-keeping & basic assertions                               #
-    # ------------------------------------------------------------------ #
+    assert binning in {"uniform", "quantile"}, "binning must be 'uniform' or 'quantile'"
     if rng is None:
         rng = np.random.default_rng()
 
-    for name, array in stats_1.items():
-        assert len(array) == len(acts_1), f"stats_1[{name}] length mismatch"
-        assert array.ndim == 1,          f"stats_1[{name}] must be 1-D"
-    for name, array in stats_2.items():
-        assert len(array) == len(acts_2), f"stats_2[{name}] length mismatch"
-        assert array.ndim == 1,          f"stats_2[{name}] must be 1-D"
-
+    # --- select stats ------------------------------------------------------
     if match_on is None:
         match_on = list(stats_1.keys())
+    for name in match_on:
+        assert name in stats_1 and name in stats_2, f"stat '{name}' missing"
 
-    for stat_name in match_on:
-        assert stat_name in stats_1, f"'{stat_name}' missing in stats_1"
-        assert stat_name in stats_2, f"'{stat_name}' missing in stats_2"
+    # --- n_bins per stat ---------------------------------------------------
+    if isinstance(n_bins, numbers.Integral):  # any int type
+        n_bins = {name: n_bins for name in match_on}
+    assert isinstance(n_bins, dict)
+    
+    # ---------------------------------------------------------------------- #
+    # 1  Compute bin edges & digitise each statistic                         #
+    # ---------------------------------------------------------------------- #
+    def choose_edges(all_vals: np.ndarray, m: int) -> np.ndarray:
+        return (_compute_edges_uniform if binning == "uniform"
+                else _compute_edges_quantile_sklearn)(all_vals, m)
 
-    if isinstance(n_bins, int):
-        bins_per_stat: Dict[str, int] = {name: n_bins for name in match_on}
-    else:
-        assert isinstance(n_bins, dict), "`n_bins` must be int or dict[str,int]"
+    def to_bins(stats_dict: Dict[str, np.ndarray]) -> np.ndarray:
+        labels = []
         for name in match_on:
-            assert name in n_bins, f"n_bins lacks entry for '{name}'"
-        bins_per_stat = {name: int(n_bins[name]) for name in match_on}
+            all_vals = np.concatenate([stats_1[name], stats_2[name]])
+            edges    = choose_edges(all_vals, n_bins[name])
 
-    # ------------------------------------------------------------------ #
-    # 1.  Digitise each statistic into integer bin labels                #
-    # ------------------------------------------------------------------ #
-    def digitise(stats_dict: Dict[str, np.ndarray]) -> np.ndarray:
-        labels_per_stat = []
-        for stat_name in match_on:
-            values    = stats_dict[stat_name]
-            num_bins  = bins_per_stat[stat_name]
+            if len(edges) - 1 != n_bins[name]:
+                print(f"binning {name} -- requested {n_bins[name]}, got {len(edges) - 1}")
 
-            combined_min = min(stats_1[stat_name].min(), stats_2[stat_name].min())
-            combined_max = max(stats_1[stat_name].max(), stats_2[stat_name].max())
-            assert combined_max >= combined_min, "stat has NaNs or is ill-defined"
+            labels.append(_digitise(stats_dict[name], edges))
+        return np.stack(labels, axis=1)           # (N_examples, N_stats)
 
-            edges = np.linspace(combined_min, combined_max, num_bins + 1,
-                                dtype=np.float32)
-            labels = np.digitize(values, edges[:-1], right=False).astype(np.int32)
-            labels_per_stat.append(labels)
+    bins_1 = to_bins(stats_1)
+    bins_2 = to_bins(stats_2)
 
-        return np.stack(labels_per_stat, axis=1)  # (N_examples, N_stats)
-
-    bins_1 = digitise(stats_1)
-    bins_2 = digitise(stats_2)
-
-    assert bins_1.shape == (len(acts_1), len(match_on))
-    assert bins_2.shape == (len(acts_2), len(match_on))
-
-    # ------------------------------------------------------------------ #
-    # 2.  Collapse k-D bin → single integer code                         #
-    # ------------------------------------------------------------------ #
-    radix_sizes = np.array([bins_per_stat[name] for name in match_on], dtype=np.int64)
+    # ---------------------------------------------------------------------- #
+    # 2  Collapse multi-dim bin -> integer code                              #
+    # ---------------------------------------------------------------------- #
+    radix_sizes = np.array([n_bins[name] for name in match_on], dtype=np.int64)
     multipliers = np.concatenate([[1], np.cumprod(radix_sizes[:-1])])
     codes_1 = (bins_1 * multipliers).sum(axis=1)
     codes_2 = (bins_2 * multipliers).sum(axis=1)
 
-    # ------------------------------------------------------------------ #
-    # 3.  Sample the common support                                      #
-    # ------------------------------------------------------------------ #
-    kept_idx_1, kept_idx_2 = [], []
+    # ---------------------------------------------------------------------- #
+    # 3  Sample equal counts per code                                        #
+    # ---------------------------------------------------------------------- #
+    common = np.intersect1d(codes_1, codes_2)
+    assert common.size, "No overlap; lower n_bins or reduce #stats"
 
-    shared_codes = np.intersect1d(codes_1, codes_2)
-    assert shared_codes.size > 0, (
-        "No overlap between the two classes for the requested statistics & bins."
-    )
+    keep1, keep2 = [], []
+    for c in common:
+        idx1, idx2 = np.where(codes_1 == c)[0], np.where(codes_2 == c)[0]
+        m = min(idx1.size, idx2.size)
+        keep1.append(rng.choice(idx1, m, replace=False))
+        keep2.append(rng.choice(idx2, m, replace=False))
+    keep1, keep2 = np.concatenate(keep1), np.concatenate(keep2)
+    rng.shuffle(keep1), rng.shuffle(keep2)
 
-    for code in shared_codes:
-        idx_1 = np.where(codes_1 == code)[0]
-        idx_2 = np.where(codes_2 == code)[0]
-        sample_size = min(idx_1.size, idx_2.size)
-        kept_idx_1.append(rng.choice(idx_1, size=sample_size, replace=False))
-        kept_idx_2.append(rng.choice(idx_2, size=sample_size, replace=False))
+    # ---------------------------------------------------------------------- #
+    # 4  Slice and return                                                    #
+    # ---------------------------------------------------------------------- #
+    def slc(a, idx): 
+        return {k: v[idx] for k, v in a.items()}
 
-    kept_idx_1 = np.concatenate(kept_idx_1)
-    kept_idx_2 = np.concatenate(kept_idx_2)
-    rng.shuffle(kept_idx_1)
-    rng.shuffle(kept_idx_2)
-
-    assert kept_idx_1.size == kept_idx_2.size > 0, "Empty balanced sample"
-
-    # ------------------------------------------------------------------ #
-    # 4.  Slice activations & statistics                                 #
-    # ------------------------------------------------------------------ #
-    acts_1_bal = acts_1[kept_idx_1]
-    acts_2_bal = acts_2[kept_idx_2]
-
-    def slice_stats(orig: Dict[str, np.ndarray], idx: np.ndarray) -> Dict[str, np.ndarray]:
-        return {name: orig[name][idx] for name in orig}
-
-    stats_1_bal = slice_stats(stats_1, kept_idx_1)
-    stats_2_bal = slice_stats(stats_2, kept_idx_2)
-
-    assert acts_1_bal.shape[0] == acts_2_bal.shape[0]
-    for name in match_on:
-        assert stats_1_bal[name].shape == stats_2_bal[name].shape
-
-    return acts_1_bal, acts_2_bal, stats_1_bal, stats_2_bal
+    return acts_1[keep1], acts_2[keep2], slc(stats_1, keep1), slc(stats_2, keep2)
 
 
 def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
@@ -282,7 +283,7 @@ def get_activations_and_logit_stats(
     return activations, logit_stats_dict
 
 
-def train_linear_probe(x1, x2, num_cross_val=5):
+def train_linear_probe(x1, x2, num_cross_val=5, shuffle_seed=0):
     # Check if x1 and x2 are the same
     if np.allclose(x1, x2):
         return {
@@ -293,7 +294,7 @@ def train_linear_probe(x1, x2, num_cross_val=5):
     # Concatenate and shuffle
     x = rearrange([x1, x2], 'x n d -> (x n) d')
     y = rearrange([np.zeros(len(x1)), np.ones(len(x2))], 'x n -> (x n)')  # zero for x1, one for x2
-    x, y = shuffle(x, y, random_state=0)
+    x, y = shuffle(x, y, random_state=shuffle_seed)
 
     # Classifier definition
     clf = LogisticRegression(random_state=0, max_iter=1000, penalty='l2', C=0.01)
@@ -356,8 +357,8 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
     data1, data2 = data1[:minlen], data2[:minlen]
     print(f'data lengths: {len(data1)}, {len(data2)}')
     
-    acts_data1, entropies_data1 = get_activations_and_entropy(model, data1)
-    acts_data2, entropies_data2 = get_activations_and_entropy(model, data2)
+    acts_data1, logit_stats_data1 = get_activations_and_logit_stats(model, data1)
+    acts_data2, logit_stats_data2 = get_activations_and_logit_stats(model, data2)
     
     n_examples, n_tokens, d_model = acts_data1[list(acts_data1.keys())[0]].shape
     # print(f'n_examples: {n_examples} \t n_tokens: {n_tokens} \t d_model: {d_model}')
