@@ -33,6 +33,113 @@ from data_generation.define_experiment import get_questions_dataset
 from utils.aggregation_utils import prettify_labels
 
 
+def run_balancing_probe_analysis(
+    layer_name: str,
+    token_idx: int,
+    acts_data1: dict,
+    logit_stats_data1: dict,
+    acts_data2: dict,
+    logit_stats_data2: dict,
+    n_bins_values: list,
+    matched_stats: list,
+    rng: np.random.Generator,
+    binning_strategy: str = "quantile",
+    n_random_probe_runs: int = 5,
+    n_cross_val: int = 10,
+):
+    """
+    Runs probe analysis comparing original, balanced, and random subset performance
+    across different numbers of bins for balancing.
+
+    Args:
+        layer_name: Name of the layer to extract activations from.
+        token_idx: Index of the token position to use.
+        acts_data1: Dict containing activation data for dataset 1 {layer: tensor}.
+        logit_stats_data1: Dict containing logit statistics for dataset 1 {stat: tensor}.
+        acts_data2: Dict containing activation data for dataset 2 {layer: tensor}.
+        logit_stats_data2: Dict containing logit statistics for dataset 2 {stat: tensor}.
+        n_bins_values: List of bin counts to iterate over for balancing.
+        matched_stats: List of statistic names to match on during balancing.
+        rng: NumPy random number generator instance.
+        binning_strategy: Strategy for binning ('quantile', 'uniform').
+        n_random_probe_runs: Number of runs for balanced and random probes.
+        n_cross_val: Number of cross-validation folds for probes.
+
+    Returns:
+        A dictionary containing the lists of scores and sample sizes.
+    """
+    scores_balanced = []
+    scores_unbalanced = []
+    scores_full_set = []
+    sample_sizes = []
+    n_bins_successful = []
+
+    # Extract relevant activation slices once
+    acts1_full = acts_data1[layer_name][:, token_idx, :]
+    acts2_full = acts_data2[layer_name][:, token_idx, :]
+
+    # --- Train probe on original data (full set) --------------------------
+    # Calculate once as it doesn't depend on n_bins
+    score_full_set_val = np.mean(train_linear_probe(acts1_full, acts2_full, num_cross_val=n_cross_val)["cv_scores"])
+
+    # --- Loop over different n_bins values -----------------------------------
+    for n_bins in n_bins_values:
+        try:
+            # Prepare stats dicts for balancing function
+            stats1 = {name: logit_stats_data1[name][:, token_idx] for name in matched_stats}
+            stats2 = {name: logit_stats_data2[name][:, token_idx] for name in matched_stats}
+
+            acts1_bal, acts2_bal, _, _ = balanced_sample_by_stats(
+                acts_1=acts1_full, acts_2=acts2_full,
+                stats_1=stats1, stats_2=stats2,
+                match_on=matched_stats,
+                n_bins=n_bins,
+                rng=rng,
+                binning=binning_strategy
+            )
+        except AssertionError as e:
+            print(f"Balancing failed for n_bins={n_bins}: {e}. Stopping.")
+            break
+
+        M = acts1_bal.shape[0]
+        
+        # Check if enough samples for cross-validation
+        if M < n_cross_val:
+            print(f'len(acts1_bal) = {M} < n_cross_val={n_cross_val}. Skipping n_bins={n_bins}.')
+            continue       
+        
+        # --- Train probe on balanced data ------------------------------------
+        balanced_scores_run = []
+        for i in range(n_random_probe_runs):
+            score = np.mean(train_linear_probe(acts1_bal, acts2_bal, num_cross_val=n_cross_val, shuffle_seed=i)["cv_scores"])
+            balanced_scores_run.append(score)
+        scores_balanced.append(np.mean(balanced_scores_run))
+
+        # --- Train probe on random down-sampled data (size M) ---------------
+        random_scores_run = []
+        for _ in range(n_random_probe_runs):
+            # Select M random indices without replacement from full datasets
+            idx1 = rng.choice(len(acts1_full), size=M, replace=False)
+            idx2 = rng.choice(len(acts2_full), size=M, replace=False)
+            score = np.mean(train_linear_probe(acts1_full[idx1], acts2_full[idx2], num_cross_val=n_cross_val)["cv_scores"])
+            random_scores_run.append(score)
+        scores_unbalanced.append(np.mean(random_scores_run))
+        
+        n_bins_successful.append(n_bins)
+        sample_sizes.append(2 * M) # Store sample size for this n_bins
+
+        # Store the full set score (it's the same for all successful n_bins)
+        scores_full_set.append(score_full_set_val)
+
+    return {
+        'scores_balanced': scores_balanced,
+        'scores_unbalanced': scores_unbalanced,
+        'scores_full_set': scores_full_set,
+        'sample_sizes': sample_sizes,
+        'n_bins_successful': n_bins_successful
+    }
+
+
 # --------------------------------------------------------------------------- #
 #  Helpers for balanced_sample_by_stats                                       #
 # --------------------------------------------------------------------------- #
@@ -184,6 +291,7 @@ def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
     stats_torch["std"] = logits_float.std(dim=-1, unbiased=True).to(dtype_torch) # Unbiased std
     stats_torch["max"] = logits_float.max(dim=-1).values.to(dtype_torch)
     stats_torch["min"] = logits_float.min(dim=-1).values.to(dtype_torch)
+    stats_torch["logsumexp"] = torch.logsumexp(logits_float, dim=-1).to(dtype_torch)
 
     # Percentiles using torch.quantile
     quantiles_tensor = PERCENTILES_TO_CALCULATE_TORCH.to(device)
@@ -209,9 +317,8 @@ def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
     # Move raw logits to CPU NumPy *once* for these calculations
     logits_np = logits_float.cpu().numpy()
 
-    # Calculate unbiased skewness
+    # Calculate unbiased skewness & unbiased Fisher's kurtosis (excess kurtosis)
     stats_np["skewness"] = scipy.stats.skew(logits_np, axis=-1, bias=False).astype(dtype_np)
-    # Calculate unbiased Fisher's kurtosis (excess kurtosis)
     stats_np["kurtosis"] = scipy.stats.kurtosis(logits_np, axis=-1, fisher=True, bias=False).astype(dtype_np)
 
     return stats_np
