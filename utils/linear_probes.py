@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import pathlib
-
+import warnings
 os.environ["OMP_NUM_THREADS"] = "6" # export OMP_NUM_THREADS
 os.environ["OPENBLAS_NUM_THREADS"] = "6" # export OPENBLAS_NUM_THREADS
 os.environ["MKL_NUM_THREADS"] = "6" # export MKL_NUM_THREADS
@@ -23,7 +23,7 @@ import torch  # only used for `torch.concat` and memory cleanup
 from einops import rearrange
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score, cross_validate
+from sklearn.model_selection import cross_val_score, cross_validate, train_test_split
 from sklearn.utils import shuffle
 from sklearn.preprocessing import KBinsDiscretizer
 from transformer_lens import (ActivationCache, FactoredMatrix,
@@ -43,100 +43,143 @@ def run_balancing_probe_analysis(
     n_bins_values: list,
     matched_stats: list,
     rng: np.random.Generator,
+    # --- Parameters ---
     binning_strategy: str = "quantile",
-    n_random_probe_runs: int = 5,
-    n_cross_val: int = 10,
+    n_random_probe_runs: int = 5, # Acts as outer CV folds
+    n_cross_val: int = 1,         # Value 1 disables inner CV within train_linear_probe
+    test_size: float = 0.2,
 ):
     """
-    Runs probe analysis comparing original, balanced, and random subset performance
-    across different numbers of bins for balancing.
-
     Args:
-        layer_name: Name of the layer to extract activations from.
-        token_idx: Index of the token position to use.
-        acts_data1: Dict containing activation data for dataset 1 {layer: tensor}.
-        logit_stats_data1: Dict containing logit statistics for dataset 1 {stat: tensor}.
-        acts_data2: Dict containing activation data for dataset 2 {layer: tensor}.
-        logit_stats_data2: Dict containing logit statistics for dataset 2 {stat: tensor}.
-        n_bins_values: List of bin counts to iterate over for balancing.
-        matched_stats: List of statistic names to match on during balancing.
+        layer_name: Name of the layer.
+        token_idx: Index of the token position.
+        acts_data1: Activation data for dataset 1.
+        logit_stats_data1: Logit statistics for dataset 1.
+        acts_data2: Activation data for dataset 2.
+        logit_stats_data2: Logit statistics for dataset 2.
+        n_bins_values: List of bin counts for balancing.
+        matched_stats: List of statistic names to match on.
         rng: NumPy random number generator instance.
         binning_strategy: Strategy for binning ('quantile', 'uniform').
-        n_random_probe_runs: Number of runs for balanced and random probes.
-        n_cross_val: Number of cross-validation folds for probes.
+        n_random_probe_runs: Number of outer train/test splits (folds).
+        n_cross_val: Inner CV folds for train_linear_probe (use >= 2).
+        test_size: Fraction of the original data to use as the test set per fold.
 
     Returns:
-        A dictionary containing the lists of scores and sample sizes.
+        A dictionary containing lists of scores averaged across outer folds,
+        average training sample sizes, and the list of n_bins processed.
     """
-    scores_balanced = []
-    scores_unbalanced = []
-    scores_full_set = []
-    sample_sizes = []
-    n_bins_successful = []
 
-    # Extract relevant activation slices once
+    assert len(acts_data1[layer_name]) == len(acts_data2[layer_name]), "The two datasets must have the same number of examples"
+    scores_balanced_per_bin = defaultdict(list)
+    scores_unbalanced_per_bin = defaultdict(list)
+    scores_full_per_bin = defaultdict(list)
+    train_samples_per_bin = defaultdict(list)
+
     acts1_full = acts_data1[layer_name][:, token_idx, :]
     acts2_full = acts_data2[layer_name][:, token_idx, :]
 
-    # --- Train probe on original data (full set) --------------------------
-    # Calculate once as it doesn't depend on n_bins
-    score_full_set_val = np.mean(train_linear_probe(acts1_full, acts2_full, num_cross_val=n_cross_val)["cv_scores"])
+    y1_full = np.zeros(len(acts1_full))
+    y2_full = np.ones(len(acts2_full))
+    X_full = np.concatenate((acts1_full, acts2_full), axis=0)
+    y_full = np.concatenate((y1_full, y2_full), axis=0)
+    indices_full = np.arange(len(X_full))
 
-    # --- Loop over different n_bins values -----------------------------------
-    for n_bins in n_bins_values:
-        try:
-            # Prepare stats dicts for balancing function
-            stats1 = {name: logit_stats_data1[name][:, token_idx] for name in matched_stats}
-            stats2 = {name: logit_stats_data2[name][:, token_idx] for name in matched_stats}
+    # print(f"Starting analysis with {n_random_probe_runs} outer folds...")
+    for run_idx in range(n_random_probe_runs):
+        current_run_seed = rng.integers(10000)
+        # print(f"--- Run {run_idx+1}/{n_random_probe_runs} (seed: {current_run_seed}) ---")
 
-            acts1_bal, acts2_bal, _, _ = balanced_sample_by_stats(
-                acts_1=acts1_full, acts_2=acts2_full,
-                stats_1=stats1, stats_2=stats2,
-                match_on=matched_stats,
-                n_bins=n_bins,
-                rng=rng,
-                binning=binning_strategy
-            )
-        except AssertionError as e:
-            print(f"Balancing failed for n_bins={n_bins}: {e}. Stopping.")
-            break
+        X_train, X_test, y_train, y_test, indices_train, _ = train_test_split(
+            X_full, y_full, indices_full, test_size=test_size, stratify=y_full, random_state=current_run_seed
+        )
 
-        M = acts1_bal.shape[0]
-        
-        # Check if enough samples for cross-validation
-        if M < n_cross_val:
-            print(f'len(acts1_bal) = {M} < n_cross_val={n_cross_val}. Skipping n_bins={n_bins}.')
-            continue       
-        
-        # --- Train probe on balanced data ------------------------------------
-        balanced_scores_run = []
-        for i in range(n_random_probe_runs):
-            score = np.mean(train_linear_probe(acts1_bal, acts2_bal, num_cross_val=n_cross_val, shuffle_seed=i)["cv_scores"])
-            balanced_scores_run.append(score)
-        scores_balanced.append(np.mean(balanced_scores_run))
+        acts1_train = X_train[y_train == 0]
+        acts2_train = X_train[y_train == 1]
 
-        # --- Train probe on random down-sampled data (size M) ---------------
-        random_scores_run = []
-        for _ in range(n_random_probe_runs):
-            # Select M random indices without replacement from full datasets
-            idx1 = rng.choice(len(acts1_full), size=M, replace=False)
-            idx2 = rng.choice(len(acts2_full), size=M, replace=False)
-            score = np.mean(train_linear_probe(acts1_full[idx1], acts2_full[idx2], num_cross_val=n_cross_val)["cv_scores"])
-            random_scores_run.append(score)
-        scores_unbalanced.append(np.mean(random_scores_run))
-        
-        n_bins_successful.append(n_bins)
-        sample_sizes.append(2 * M) # Store sample size for this n_bins
+        # --- Corrected Stat Slicing ---
+        original_indices_class0_in_train = indices_train[y_train == 0]
+        original_indices_class1_in_train = indices_train[y_train == 1]
+        # Adjust indices for class 1 to be relative to acts2_full / logit_stats_data2
+        indices_relative_to_acts2 = original_indices_class1_in_train - len(acts1_full)
 
-        # Store the full set score (it's the same for all successful n_bins)
-        scores_full_set.append(score_full_set_val)
+        stats1_train = {name: logit_stats_data1[name][:, token_idx][original_indices_class0_in_train] for name in matched_stats}
+        stats2_train = {name: logit_stats_data2[name][:, token_idx][indices_relative_to_acts2] for name in matched_stats}
+        # --- End Correction ---
+        min_train_size = min(len(acts1_train), len(acts2_train))
+        results_full = train_linear_probe(acts1_train[:min_train_size], acts2_train[:min_train_size], num_cross_val=n_cross_val)
+        clf_full = results_full['trained_classifier']
+        assert clf_full is not None, f"Full probe training failed in run {run_idx+1}"
+        score_full_run = clf_full.score(X_test, y_test)
+        # print(f"  Run {run_idx+1}: Full probe test score = {score_full_run:.4f}")
+
+        for n_bins in n_bins_values:
+            # print(f"    Processing n_bins = {n_bins}...")
+            try:
+                acts1_bal_train, acts2_bal_train, _, _ = balanced_sample_by_stats(
+                    acts_1=acts1_train, acts_2=acts2_train,
+                    stats_1=stats1_train, stats_2=stats2_train,
+                    match_on=matched_stats,
+                    n_bins=n_bins,
+                    rng=rng,
+                    binning=binning_strategy
+                )
+                M = acts1_bal_train.shape[0]
+                assert M > 0, f"Balancing yielded M=0"
+                # print(f"      Balanced to M = {M}")
+
+                results_bal = train_linear_probe(acts1_bal_train, acts2_bal_train, num_cross_val=n_cross_val, shuffle_seed=current_run_seed)
+                clf_bal = results_bal['trained_classifier']
+                assert clf_bal is not None, f"Balanced probe training failed"
+                score_bal_run = clf_bal.score(X_test, y_test)
+                # print(f"        Balanced probe test score = {score_bal_run:.4f}")
+
+
+                idx1 = rng.choice(len(acts1_train), size=M, replace=False)
+                idx2 = rng.choice(len(acts2_train), size=M, replace=False)
+                results_unbal = train_linear_probe(acts1_train[idx1], acts2_train[idx2], num_cross_val=n_cross_val, shuffle_seed=current_run_seed + 1)
+                clf_unbal = results_unbal['trained_classifier']
+                assert clf_unbal is not None, f"Unbalanced probe training failed"
+                score_unbal_run = clf_unbal.score(X_test, y_test)
+                # print(f"        Unbalanced probe test score = {score_unbal_run:.4f}")
+
+
+                scores_balanced_per_bin[n_bins].append(score_bal_run)
+                scores_unbalanced_per_bin[n_bins].append(score_unbal_run)
+                scores_full_per_bin[n_bins].append(score_full_run)
+                train_samples_per_bin[n_bins].append(2 * M)
+
+            except AssertionError as e:
+                print(f"      Run {run_idx+1}, n_bins={n_bins}: Failed: {e}. Skipping bin for this run.")
+                continue
+
+    print("\n--- Averaging Results Across Runs ---")
+    final_scores_balanced = []
+    final_scores_unbalanced = []
+    final_scores_full = []
+    final_avg_sample_sizes = []
+    processed_n_bins = sorted(scores_balanced_per_bin.keys())
+
+    for n_bins in processed_n_bins:
+        # Calculate means for bins that had successful runs
+        bal_mean = np.mean(scores_balanced_per_bin[n_bins])
+        unbal_mean = np.mean(scores_unbalanced_per_bin[n_bins])
+        full_mean = np.mean(scores_full_per_bin[n_bins]) # Should have scores from all runs if bin processed once
+        sample_mean = np.mean(train_samples_per_bin[n_bins])
+
+        final_scores_balanced.append(bal_mean)
+        final_scores_unbalanced.append(unbal_mean)
+        final_scores_full.append(full_mean)
+        final_avg_sample_sizes.append(sample_mean)
+
+        print(f"  n_bins={n_bins}: Balanced={bal_mean:.4f}, Unbalanced={unbal_mean:.4f}, Full={full_mean:.4f}, Avg_M*2={sample_mean:.1f} (from {len(scores_balanced_per_bin[n_bins])} runs)")
 
     return {
-        'scores_balanced': scores_balanced,
-        'scores_unbalanced': scores_unbalanced,
-        'scores_full_set': scores_full_set,
-        'sample_sizes': sample_sizes,
-        'n_bins_successful': n_bins_successful
+        'scores_balanced': final_scores_balanced,
+        'scores_unbalanced': final_scores_unbalanced,
+        'scores_full_set': final_scores_full,
+        'sample_sizes': final_avg_sample_sizes,
+        'n_bins_successful': processed_n_bins
     }
 
 
@@ -150,8 +193,14 @@ def _compute_edges_uniform(values: np.ndarray, n_bins: int) -> np.ndarray:
 
 def _compute_edges_quantile_sklearn(values: np.ndarray, n_bins: int) -> np.ndarray:
     est = KBinsDiscretizer(n_bins=n_bins, encode="ordinal", strategy="quantile")
-    est.fit(values.reshape(-1, 1))
+    # est.fit(values.reshape(-1, 1))
     
+    # return est.bin_edges_[0]
+
+    with warnings.catch_warnings():
+         # Filter specifically within this function if it's the source
+        warnings.filterwarnings("ignore", category=UserWarning, module="sklearn.preprocessing._discretization")
+        est.fit(values.reshape(-1, 1))
     return est.bin_edges_[0]
 
 
@@ -395,7 +444,8 @@ def train_linear_probe(x1, x2, num_cross_val=5, shuffle_seed=0):
     if np.allclose(x1, x2):
         return {
             'cv_scores': [len(x1)/(len(x1)+len(x2))] * num_cross_val,
-            'trained_classifier': None
+            'trained_classifier': None,
+            'cv_estimators': None
         }
 
     # Concatenate and shuffle
@@ -407,15 +457,20 @@ def train_linear_probe(x1, x2, num_cross_val=5, shuffle_seed=0):
     clf = LogisticRegression(random_state=0, max_iter=1000, penalty='l2', C=0.01)
 
     # Cross-validation
-    scores = cross_validate(clf, x, y, cv=num_cross_val, scoring='accuracy', n_jobs=num_cross_val, return_train_score=True)
-
+    scores = {'test_score': None, 'estimator': None}
+    if num_cross_val > 1:
+        scores = cross_validate(clf, x, y, cv=num_cross_val, scoring='accuracy', n_jobs=num_cross_val, 
+                                return_train_score=True, return_estimator=True)
+        
+        
     # Retrain on full dataset
     clf.fit(x, y)
 
     # Return CV scores and trained classifier
     return {
         'cv_scores': scores['test_score'],
-        'trained_classifier': clf
+        'cv_estimators': scores['estimator'],
+        'trained_classifier': clf,
     }
 
 
