@@ -43,6 +43,7 @@ def run_balancing_probe_analysis(
     n_bins_values: list,
     matched_stats: list,
     rng: np.random.Generator,
+    prev_token_indices: List[int] = None,  # TODO do we want to assert that all of these are < token_idx? Or warn?
     # --- Parameters ---
     binning_strategy: str = "quantile",
     n_random_probe_runs: int = 5, # Acts as outer CV folds
@@ -62,7 +63,7 @@ def run_balancing_probe_analysis(
         rng: NumPy random number generator instance.
         binning_strategy: Strategy for binning ('quantile', 'uniform').
         n_random_probe_runs: Number of outer train/test splits (folds).
-        n_cross_val: Inner CV folds for train_linear_probe (use >= 2).
+        n_cross_val: Inner CV folds for train_linear_probe (use == 1).
         test_size: Fraction of the original data to use as the test set per fold.
 
     Returns:
@@ -78,6 +79,15 @@ def run_balancing_probe_analysis(
 
     acts1_full = acts_data1[layer_name][:, token_idx, :]
     acts2_full = acts_data2[layer_name][:, token_idx, :]
+    
+    if np.allclose(acts1_full, acts2_full):
+        return {
+            'scores_balanced': [0.5],
+            'scores_unbalanced': [0.5],
+            'scores_full_set': [0.5],
+            'sample_sizes': [len(acts1_full)],
+            'n_bins_successful': [1]
+        }
 
     y1_full = np.zeros(len(acts1_full))
     y2_full = np.ones(len(acts2_full))
@@ -116,14 +126,24 @@ def run_balancing_probe_analysis(
         for n_bins in n_bins_values:
             # print(f"    Processing n_bins = {n_bins}...")
             try:
-                acts1_bal_train, acts2_bal_train, _, _ = balanced_sample_by_stats(
-                    acts_1=acts1_train, acts_2=acts2_train,
-                    stats_1=stats1_train, stats_2=stats2_train,
-                    match_on=matched_stats,
-                    n_bins=n_bins,
-                    rng=rng,
-                    binning=binning_strategy
-                )
+                # TODO consider refactoring so that these two cases are handled by the same function
+                if prev_token_indices is None:
+                    acts1_bal_train, acts2_bal_train, _, _, _, _ = balanced_sample_by_stats(
+                        acts_1=acts1_train, acts_2=acts2_train,
+                        stats_1=stats1_train, stats_2=stats2_train,
+                        match_on=matched_stats,
+                        n_bins=n_bins,
+                        rng=rng,
+                        binning=binning_strategy
+                    )
+                else:
+                    # print(f"Balancing using prev token stats for n_bins={n_bins}")
+                    acts1_bal_train, acts2_bal_train, _, _ = balance_using_prev_token_stats(
+                        all_acts_data1=acts_data1, all_acts_data2=acts_data2, 
+                        curr_layer_name=layer_name, curr_token_idx=token_idx,
+                        all_logit_stats_data1=logit_stats_data1, all_logit_stats_data2=logit_stats_data2, 
+                        prev_token_indices=prev_token_indices, n_bins_for_prev_stats=n_bins, 
+                        matched_stats=matched_stats, rng=rng, binning_strategy=binning_strategy)
                 M = acts1_bal_train.shape[0]
                 assert M > 0, f"Balancing yielded M=0"
                 # print(f"      Balanced to M = {M}")
@@ -183,6 +203,194 @@ def run_balancing_probe_analysis(
     }
 
 
+def balance_using_prev_token_stats(
+    all_acts_data1: Dict[str, np.ndarray],
+    all_acts_data2: Dict[str, np.ndarray],
+    curr_layer_name: str,
+    curr_token_idx: int,
+    all_logit_stats_data1: Dict[str, np.ndarray],
+    all_logit_stats_data2: Dict[str, np.ndarray],
+    prev_token_indices: List[int],
+    n_bins_for_prev_stats: Union[int, Dict[str, int]],
+    matched_stats: Sequence[str],
+    rng: np.random.Generator,
+    binning_strategy: str = "quantile",
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Balances current token activations based on the statistics of previous tokens.
+
+    This function extracts activations for a specific layer and token position,
+    then subsamples them. The subsampling ensures that for each specified 
+    previous token in prev_token_indices, the distributions of matched_stats 
+    are similar between the two resulting subsamples.
+
+    Args:
+        all_acts_data1: Dict mapping layer_name to activation arrays (N1, T, D_model) for dataset 1.
+        all_acts_data2: Dict mapping layer_name to activation arrays (N2, T, D_model) for dataset 2.
+        curr_layer_name: Name of the layer for current token activations.
+        curr_token_idx: Index of the current token.
+        all_logit_stats_data1: Dict mapping stat_name to np.ndarray of shape (N1, T_max),
+                               containing statistics for all tokens in dataset 1.
+        all_logit_stats_data2: Dict mapping stat_name to np.ndarray of shape (N2, T_max),
+                               for dataset 2.
+        prev_token_indices: List of absolute token indices whose statistics will be used
+                            for balancing.
+        n_bins_for_prev_stats: Number of bins for balancing. Passed to balanced_sample_by_stats.
+        matched_stats: List of statistic names to balance on (e.g., ['mean', 'std']).
+        rng: NumPy random number generator.
+        binning_strategy: Binning strategy ('quantile' or 'uniform').
+
+    Returns:
+        A tuple (acts_curr_tok1_balanced, acts_curr_tok2_balanced, 
+                 final_keep_idxs1, final_keep_idxs2).
+        - acts_curr_tok1_balanced: Subsampled activations from dataset 1.
+        - acts_curr_tok2_balanced: Subsampled activations from dataset 2.
+        - final_keep_idxs1: Indices used to subsample acts_curr_tok1.
+        - final_keep_idxs2: Indices used to subsample acts_curr_tok2.
+    """
+    # --- Input Assertions & Initial Data Extraction ---
+    assert isinstance(all_acts_data1, dict), "all_acts_data1 must be a dictionary."
+    assert isinstance(all_acts_data2, dict), "all_acts_data2 must be a dictionary."
+    assert curr_layer_name in all_acts_data1, f"curr_layer_name '{curr_layer_name}' not found in all_acts_data1."
+    assert curr_layer_name in all_acts_data2, f"curr_layer_name '{curr_layer_name}' not found in all_acts_data2."
+
+    acts_full_layer1 = all_acts_data1[curr_layer_name]
+    acts_full_layer2 = all_acts_data2[curr_layer_name]
+
+    assert isinstance(acts_full_layer1, np.ndarray) and acts_full_layer1.ndim == 3, \
+        f"Activations for layer '{curr_layer_name}' in dataset 1 must be a 3D numpy array (N, T, D_model)."
+    assert isinstance(acts_full_layer2, np.ndarray) and acts_full_layer2.ndim == 3, \
+        f"Activations for layer '{curr_layer_name}' in dataset 2 must be a 3D numpy array (N, T, D_model)."
+
+    num_sequences1, seq_len1, _ = acts_full_layer1.shape
+    num_sequences2, seq_len2, _ = acts_full_layer2.shape
+
+    assert -seq_len1 <= curr_token_idx < seq_len1, \
+        f"curr_token_idx {curr_token_idx} is out of bounds for layer '{curr_layer_name}' in dataset 1 (seq_len: {seq_len1})."
+    assert -seq_len2 <= curr_token_idx < seq_len2, \
+        f"curr_token_idx {curr_token_idx} is out of bounds for layer '{curr_layer_name}' in dataset 2 (seq_len: {seq_len2})."
+
+    acts_curr_tok1 = acts_full_layer1[:, curr_token_idx, :]
+    acts_curr_tok2 = acts_full_layer2[:, curr_token_idx, :]
+    
+    assert isinstance(all_logit_stats_data1, dict), "all_logit_stats_data1 must be a dictionary."
+    assert isinstance(all_logit_stats_data2, dict), "all_logit_stats_data2 must be a dictionary."
+
+    assert isinstance(prev_token_indices, list) and len(prev_token_indices) > 0, \
+        "prev_token_indices must be a non-empty list."
+    assert all(isinstance(idx, int) for idx in prev_token_indices), \
+        "All elements in prev_token_indices must be integers."
+
+    assert isinstance(matched_stats, Sequence) and len(matched_stats) > 0, \
+        "matched_stats must be a non-empty sequence."
+    assert all(isinstance(stat, str) for stat in matched_stats), \
+        "All elements in matched_stats must be strings."
+
+    # Check consistency of sample counts between activations and logit stats
+    # And validate prev_token_indices against logit stat sequence lengths
+    for stat_name in matched_stats:
+        assert stat_name in all_logit_stats_data1, f"Stat '{stat_name}' not found in all_logit_stats_data1."
+        assert stat_name in all_logit_stats_data2, f"Stat '{stat_name}' not found in all_logit_stats_data2."
+        
+        stat_array1 = all_logit_stats_data1[stat_name]
+        stat_array2 = all_logit_stats_data2[stat_name]
+
+        assert isinstance(stat_array1, np.ndarray) and stat_array1.ndim == 2, \
+            f"Stat '{stat_name}' in all_logit_stats_data1 must be a 2D array (N, T_stat)."
+        assert stat_array1.shape[0] == num_sequences1, \
+            f"Stat '{stat_name}' in all_logit_stats_data1 has {stat_array1.shape[0]} samples, expected {num_sequences1} (from activations)."
+        
+        assert isinstance(stat_array2, np.ndarray) and stat_array2.ndim == 2, \
+            f"Stat '{stat_name}' in all_logit_stats_data2 must be a 2D array (N, T_stat)."
+        assert stat_array2.shape[0] == num_sequences2, \
+            f"Stat '{stat_name}' in all_logit_stats_data2 has {stat_array2.shape[0]} samples, expected {num_sequences2} (from activations)."
+
+        max_stat_seq_len1 = stat_array1.shape[1]
+        max_stat_seq_len2 = stat_array2.shape[1]
+        for prev_idx in prev_token_indices:
+            assert -max_stat_seq_len1 <= prev_idx < max_stat_seq_len1, \
+                f"prev_tok_idx {prev_idx} is out of bounds for stat '{stat_name}' in dataset 1 (stat_seq_len: {max_stat_seq_len1})."
+            assert -max_stat_seq_len2 <= prev_idx < max_stat_seq_len2, \
+                f"prev_tok_idx {prev_idx} is out of bounds for stat '{stat_name}' in dataset 2 (stat_seq_len: {max_stat_seq_len2})."
+
+    assert isinstance(rng, np.random.Generator), "rng must be a numpy.random.Generator instance."
+    assert binning_strategy in ["quantile", "uniform"], "binning_strategy must be 'quantile' or 'uniform'."
+
+    # --- Collect Individual Keep Indices for each Previous Token Criterion ---
+    list_of_keep1_indices_arrays: List[np.ndarray] = []
+    list_of_keep2_indices_arrays: List[np.ndarray] = []
+
+    for prev_tok_idx in prev_token_indices:
+        # Prepare stats for this specific previous token using dict comprehensions
+        stats1_for_one_prev_tok = {
+            stat_name: all_logit_stats_data1[stat_name][:, prev_tok_idx]
+            for stat_name in matched_stats
+        }
+        stats2_for_one_prev_tok = {
+            stat_name: all_logit_stats_data2[stat_name][:, prev_tok_idx]
+            for stat_name in matched_stats
+        }
+        
+        # Verify shapes after slicing (should be 1D arrays of length num_sequencesX)
+        for stat_name in matched_stats:
+            assert stats1_for_one_prev_tok[stat_name].shape == (num_sequences1,), \
+                f"Sliced stat '{stat_name}' for prev_tok_idx {prev_tok_idx} (dataset 1) has wrong shape."
+            assert stats2_for_one_prev_tok[stat_name].shape == (num_sequences2,), \
+                f"Sliced stat '{stat_name}' for prev_tok_idx {prev_tok_idx} (dataset 2) has wrong shape."
+
+        # Balance based on this single previous token's stats
+        _, _, _, _, keep1_this_criterion, keep2_this_criterion = balanced_sample_by_stats(
+            acts_1=acts_curr_tok1,
+            acts_2=acts_curr_tok2,
+            stats_1=stats1_for_one_prev_tok,
+            stats_2=stats2_for_one_prev_tok,
+            match_on=matched_stats,
+            n_bins=n_bins_for_prev_stats,
+            binning=binning_strategy,
+            rng=rng,
+        )
+        
+        assert len(keep1_this_criterion) > 0, \
+            f"Balancing on prev_tok_idx {prev_tok_idx} yielded 0 samples for dataset 1. Check n_bins or data distribution."
+        assert len(keep2_this_criterion) > 0, \
+            f"Balancing on prev_tok_idx {prev_tok_idx} yielded 0 samples for dataset 2. Check n_bins or data distribution."
+
+        list_of_keep1_indices_arrays.append(keep1_this_criterion)
+        list_of_keep2_indices_arrays.append(keep2_this_criterion)
+
+    # --- Intersect Keep Indices (AND mask over all criteria) ---
+    keep_idxs1_multitok: np.ndarray = list_of_keep1_indices_arrays[0]
+    for i in range(1, len(list_of_keep1_indices_arrays)):
+        keep_idxs1_multitok = np.intersect1d(
+            keep_idxs1_multitok, list_of_keep1_indices_arrays[i], assume_unique=True
+        )
+    assert len(keep_idxs1_multitok) > 0, \
+        "Intersection of all balancing criteria resulted in 0 samples for dataset 1. Try fewer prev_tokens, different n_bins, or check data."
+
+    keep_idxs2_multitok: np.ndarray = list_of_keep2_indices_arrays[0]
+    for i in range(1, len(list_of_keep2_indices_arrays)):
+        keep_idxs2_multitok = np.intersect1d(
+            keep_idxs2_multitok, list_of_keep2_indices_arrays[i], assume_unique=True
+        )
+    assert len(keep_idxs2_multitok) > 0, \
+        "Intersection of all balancing criteria resulted in 0 samples for dataset 2. Try fewer prev_tokens, different n_bins, or check data."
+
+    # --- Downsample to Equal Length ---
+    min_final_len = min(len(keep_idxs1_multitok), len(keep_idxs2_multitok))
+
+    assert min_final_len > 0, \
+        "After intersection, one of the datasets has 0 eligible samples (min_final_len is 0). Cannot proceed."
+
+    final_keep_idxs1 = rng.choice(keep_idxs1_multitok, size=min_final_len, replace=False)
+    final_keep_idxs2 = rng.choice(keep_idxs2_multitok, size=min_final_len, replace=False)
+    
+    # --- Subsample Current Activations ---
+    acts_curr_tok1_balanced = acts_curr_tok1[final_keep_idxs1]
+    acts_curr_tok2_balanced = acts_curr_tok2[final_keep_idxs2]
+
+    return acts_curr_tok1_balanced, acts_curr_tok2_balanced, final_keep_idxs1, final_keep_idxs2
+
+
 # --------------------------------------------------------------------------- #
 #  Helpers for balanced_sample_by_stats                                       #
 # --------------------------------------------------------------------------- #
@@ -194,11 +402,10 @@ def _compute_edges_uniform(values: np.ndarray, n_bins: int) -> np.ndarray:
 def _compute_edges_quantile_sklearn(values: np.ndarray, n_bins: int) -> np.ndarray:
     est = KBinsDiscretizer(n_bins=n_bins, encode="ordinal", strategy="quantile")
     # est.fit(values.reshape(-1, 1))
-    
     # return est.bin_edges_[0]
 
     with warnings.catch_warnings():
-         # Filter specifically within this function if it's the source
+         # Disable occassional warnings about not being able to make enough bins and returning fewer than requested
         warnings.filterwarnings("ignore", category=UserWarning, module="sklearn.preprocessing._discretization")
         est.fit(values.reshape(-1, 1))
     return est.bin_edges_[0]
@@ -224,7 +431,8 @@ def balanced_sample_by_stats(
     binning: str = "uniform",
     rng: Optional[np.random.Generator] = None,
 ) -> Tuple[np.ndarray, np.ndarray,
-           Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+           Dict[str, np.ndarray], Dict[str, np.ndarray],
+           np.ndarray, np.ndarray]:
     """
     Balance two activation sets so their joint histogram over the chosen
     statistics is identical (up to binning granularity).
@@ -304,7 +512,7 @@ def balanced_sample_by_stats(
     def slc(a, idx): 
         return {k: v[idx] for k, v in a.items()}
 
-    return acts_1[keep1], acts_2[keep2], slc(stats_1, keep1), slc(stats_2, keep2)
+    return acts_1[keep1], acts_2[keep2], slc(stats_1, keep1), slc(stats_2, keep2), keep1, keep2
 
 
 def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
