@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass, field, is_dataclass
+from typing import Optional, List, Dict
 from transformers import MODEL_FOR_CAUSAL_LM_MAPPING, Seq2SeqTrainingArguments
 import yaml
 from copy import deepcopy
@@ -340,72 +340,143 @@ class Config:
     data_arguments: DataTrainingArguments
     model_arguments: ModelArguments
     training_arguments: ModelTrainingArguments
-    # experiment arguments 
     experiment_arguments: CommonExperimentArguments
     define_experiment_arguments: DefineExperimentDataArguments
     numeric_experiment_arguments: NumericExperimentDataArguments
     random_nums_experiment_arguments: RandomNumsExperimentDataArguments
+
+    # generic container for per-stage overrides
+    stage_specific_arguments: List[Dict] = field(default_factory=list)
+
+    sweep_arguments: Dict = field(default_factory=dict)
     
-    first_stage_arguments: dict # overrides for training arguments
-    second_stage_arguments: dict
-    third_stage_arguments: dict
-    
-    sweep_arguments: dict
-    
+    # legacy aliases so original ≤3-stage pipeline classes still work
+    # (they are *filled* in __post_init__)
+    first_stage_arguments: Dict = field(init=False, repr=False)
+    second_stage_arguments: Dict = field(init=False, repr=False)
+    third_stage_arguments: Dict = field(init=False, repr=False)
+
     @classmethod
-    def from_yaml(cls, file_path: str):
-        logger.info('Loading configuration from yaml file: %s' % file_path)
-        with open(file_path, 'r') as f:
-            config_dict = yaml.safe_load(f)
-        
-        data_arguments = DataTrainingArguments(**config_dict['data_arguments'])
-        model_arguments = ModelArguments(**config_dict['model_arguments'])
-        # new transformers version needs this arg name
-        config_dict['training_arguments']['eval_strategy'] = config_dict['training_arguments'].pop('evaluation_strategy', None)
-        training_arguments = ModelTrainingArguments(
-            **config_dict['training_arguments'])
-        # experiment arguments 
-        experiment_arguments = CommonExperimentArguments(**config_dict['experiment_arguments'])
-        define_experiment_arguments = DefineExperimentDataArguments(**config_dict['define_experiment_arguments'])
-        numeric_experiment_arguments = NumericExperimentDataArguments(**config_dict['numeric_experiment_arguments'])
-        random_nums_experiment_arguments = RandomNumsExperimentDataArguments(**config_dict['random_nums_experiment_arguments'])
-        return cls(data_arguments,
-                   model_arguments,
-                   training_arguments,
-                   experiment_arguments,
-                   define_experiment_arguments,
-                   numeric_experiment_arguments,
-                   random_nums_experiment_arguments,
-                   first_stage_arguments=config_dict.get('first_stage_arguments', {}),
-                   second_stage_arguments=config_dict.get('second_stage_arguments', {}),
-                   third_stage_arguments=config_dict.get('third_stage_arguments', {}),
-                   sweep_arguments=config_dict.get('sweep_arguments', {}))
-        
+    def from_yaml(cls, file_path: str) -> "Config":
+        logger.info("Loading configuration from yaml file: %s", file_path)
+        with open(file_path, "r") as fh:
+            cfg = yaml.safe_load(fh) or {}
+
+        # ------------------------------------------------------------------
+        # 1 ▸ fix older transformers arg name, if present
+        # ------------------------------------------------------------------
+        tr_args = cfg.get("training_arguments", {})
+        if "evaluation_strategy" in tr_args:
+            tr_args["eval_strategy"] = tr_args.pop("evaluation_strategy")
+
+        # ------------------------------------------------------------------
+        # 2 ▸ instantiate each argument block (empty dict → defaults)
+        # ------------------------------------------------------------------
+        data_args     = DataTrainingArguments(**cfg.get("data_arguments", {}))
+        model_args    = ModelArguments(**cfg.get("model_arguments", {}))
+        train_args    = ModelTrainingArguments(**tr_args)
+        exper_args    = CommonExperimentArguments(**cfg.get("experiment_arguments", {}))
+        define_args   = DefineExperimentDataArguments(**cfg.get("define_experiment_arguments", {}))
+        numeric_args  = NumericExperimentDataArguments(**cfg.get("numeric_experiment_arguments", {}))
+        randomn_args  = RandomNumsExperimentDataArguments(**cfg.get("random_nums_experiment_arguments", {}))
+
+        # ------------------------------------------------------------------
+        # 3 ▸ collect stage-override blocks
+        #    (support both the new list key AND the old first/second/third
+        #     keys for full back-compatibility)
+        # ------------------------------------------------------------------
+        overrides: List[Dict] | None = cfg.get("stage_specific_arguments")
+        if overrides is None:
+            # fall back to first_/second_/third_stage_arguments if present
+            key_map = {
+                1: "first_stage_arguments",
+                2: "second_stage_arguments",
+                3: "third_stage_arguments",
+                4: "fourth_stage_arguments",
+                5: "fifth_stage_arguments",
+            }
+            n = exper_args.n_stages or 1
+            overrides = [cfg.get(key_map.get(i + 1), {}) for i in range(n)]
+        if len(overrides) < exper_args.n_stages:
+            overrides += [{}] * (exper_args.n_stages - len(overrides))
+        else:
+            overrides = overrides[: exper_args.n_stages]
+
+        # ------------------------------------------------------------------
+        # 4 ▸ construct and return the dataclass
+        # ------------------------------------------------------------------
+        return cls(
+            data_arguments=data_args,
+            model_arguments=model_args,
+            training_arguments=train_args,
+            experiment_arguments=exper_args,
+            define_experiment_arguments=define_args,
+            numeric_experiment_arguments=numeric_args,
+            random_nums_experiment_arguments=randomn_args,
+            stage_specific_arguments=overrides,
+            sweep_arguments=cfg.get("sweep_arguments", {}),
+        )
+
     def __post_init__(self):
+        # For backward compatibility with original Single/Two/ThreeStageFineTuning classes
+        ov = self.stage_specific_arguments + [{}] * 3 
+        self.first_stage_arguments, self.second_stage_arguments, \
+            self.third_stage_arguments = ov[:3]
+
         if self.model_arguments.seq2seq and self.training_arguments.eval_callback_type == 'pipeline':
             logger.warning('"pipeline" evaluation callback is not supported for seq2seq; switching to "generate"')
             self.training_arguments.eval_callback_type = 'generate'
 
 
-def override_args(args, override_dict):
-    """Overrides args (dataclass) with values in override_dict (dict).
-    Args:
-        args (Config): config to be overridden.
-        override_dict (dict): dictionary with values to override.
-
-    Returns:
-        Arguments: dataclass containing subclasses with updated values.
+def override_args(base_cfg, override: Dict):
     """
-    args_copy = deepcopy(args)
-    # iterate over [training_args, numeric_exp_args, ...]
-    for args_set_name in vars(args_copy):
-        args_set = getattr(args_copy, args_set_name)
-        # do not overwrite arguments which we don't want to override.
-        if args_set_name not in ('first_stage_arguments', 'second_stage_arguments', 'third_stage_arguments', 'sweep_arguments'):
-            for key, value in override_dict.items():
-                if hasattr(args_set, key):
-                    setattr(args_set, key, value)
+    Return a *deep copy* of `base_cfg` with selected fields overwritten.
 
-            setattr(args_copy, args_set_name, args_set)
+    ────────────────────────────────────────────────────────────────────────────
+    Assumption / contract
+    ────────────────────────────────────────────────────────────────────────────
+    • **Dataclass attributes** of the top-level Config (e.g. `training_arguments`,
+      `model_arguments`, `data_arguments`, …) represent *actual hyper-parameters*.
+      Keys found in `override` that also exist as fields inside these dataclasses
+      **may be modified**.
 
-    return args_copy
+    • **Non-dataclass attributes** (plain `dict`, `list`, etc.—such as
+      `stage_specific_arguments`, `sweep_arguments`, historical
+      `first_stage_arguments`, …) are treated as *metadata* that describes
+      *how* to perform overrides, not things that should themselves be patched.
+      They are therefore **left untouched**.
+
+    If you later add a new argument bundle:
+      • make it a `@dataclass` → it will be auto-overridable;
+      • leave it a `dict`/`list`  → you must handle overrides manually.
+
+    Parameters
+    ----------
+    base_cfg : Config
+        Original configuration object.
+    override : dict
+        Flat dictionary of `{field_name: new_value}` pairs intended to patch
+        every dataclass sub-object.
+
+    Returns
+    -------
+    Config
+        A *new* Config instance with the requested overrides applied.
+    """
+    cfg = deepcopy(base_cfg)
+
+    # iterate over every top-level attribute in the Config
+    for attr_name in vars(cfg):
+        attr_val = getattr(cfg, attr_name)
+
+        # Only patch those attributes that are dataclass instances
+        # (i.e. real argument bundles).  Metadata containers are skipped.
+        if not is_dataclass(attr_val):
+            continue
+
+        # Apply the override wherever the field exists in the dataclass.
+        for key, value in override.items():
+            if hasattr(attr_val, key):
+                setattr(attr_val, key, value)
+
+    return cfg

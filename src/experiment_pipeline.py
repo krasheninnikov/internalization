@@ -5,6 +5,8 @@ import pathlib
 import subprocess
 import argparse
 from abc import ABC, abstractmethod
+from typing import List, Optional
+from copy import deepcopy
 from utils.logger import setup_logger
 from utils.arguments import *
 from src.train_lm import train as train_lm
@@ -275,6 +277,155 @@ class ThreeStageFineTuning(TwoStageFineTuning):
         logger.info('Finished fine-tuning.')
 
 
+# ------------------------------------------------------------------
+# Generic N‑stage fine‑tuning pipeline
+# ------------------------------------------------------------------
+class MultiStageFineTuning(FineTuningPipeline):
+    """Generic *N‑stage* fine‑tuning pipeline (``N > 3``).
+
+    Stages are executed **sequentially**:
+        stage‑1 (base model) ─► stage‑2 ─► … ─► stage‑N (final model)
+    each arrow means “load the final checkpoint of previous stage and continue training”.
+
+    Parameters
+    ----------
+    config : Config, optional
+        Parsed configuration object.  If omitted, it is loaded from
+        ``config_path``.
+    config_path : str, default 'configs/current_experiment.yaml'
+        Path to the YAML configuration file – mainly used so we can copy it
+        into the experiment folder for traceability.
+    """
+
+    # ---------------------------------------------------------------------
+    # Construction helpers
+    # ---------------------------------------------------------------------
+    def __init__(self, config=None, config_path: str = "configs/current_experiment.yaml"):
+        super().__init__(config, config_path)
+
+        # Build one Config *per stage* by applying the corresponding override.
+        self.stage_cfgs: List = self._resolve_stage_cfgs()
+
+        # Expose them as attributes (args_stage1, args_stage2, …) so that the
+        # parent class's helper properties (epochs_string, batch_size_string, …)
+        # continue to work untouched.
+        for i, cfg in enumerate(self.stage_cfgs, 1):
+            setattr(self, f"args_stage{i}", cfg)
+
+        # ── House‑keeping ────────────────────────────────────────────────
+        self.experiment_name = self._get_experiment_name()
+        self.experiment_folder = f"experiments/{self.experiment_name}_{len(self.stage_cfgs)}stage"
+
+    # ------------------------------------------------------------------
+    # Internals
+    # ------------------------------------------------------------------
+    def _resolve_stage_cfgs(self) -> List:
+        """Return a list of per‑stage ``Config`` objects.
+
+        The base ``self.args`` is copied **once per stage** and patched with the
+        matching dictionary from ``stage_specific_arguments``.
+        """
+        n = self.args.experiment_arguments.n_stages
+        overrides = getattr(self.args, "stage_specific_arguments", [{} for _ in range(n)])
+
+        # Ensure ``len(overrides) == n`` (pad or truncate as needed).
+        if len(overrides) < n:
+            overrides += [{}] * (n - len(overrides))
+        else:
+            overrides = overrides[:n]
+
+        return [override_args(self.args, odict) for odict in overrides]
+
+    # ..................................................................
+    def _prep_cfg(
+        self,
+        tmpl,  # type: Config
+        seed: int,
+        in_model: Optional[str],
+        out_dir: str,
+    ):
+        """Clone *tmpl* and set seed, model path, output/logging directories."""
+        cfg = deepcopy(tmpl)
+        cfg.training_arguments.seed = seed
+
+        # Load‑from‑model if supplied (``None`` for the first stage).
+        if in_model:
+            cfg.model_arguments.model_name_or_path = in_model
+
+        # Repoint output & logging paths to the stage‑specific folder.
+        set_new_output_dir(cfg, out_dir)
+        pathlib.Path(cfg.training_arguments.output_dir).mkdir(parents=True, exist_ok=True)
+        return cfg
+
+    # ..................................................................
+    def _run(self, cfg, data_seed: int):
+        """Run training for a single stage and handle post‑run cleanup."""
+        raw_ds = get_experiment_dataset(
+            cfg,
+            seed_stage1=data_seed,
+            seed_stage2=0,  # <‑ always 0 in this generic pipeline
+            train_subset=cfg.data_arguments.train_subset,
+        )
+        train_lm(raw_ds, cfg)
+
+    # ------------------------------------------------------------------
+    # Public API – matches the signature of the legacy pipelines
+    # ------------------------------------------------------------------
+    def train(self, seed: int = 0):
+        """
+        Run an N-stage fine-tuning job.
+
+        ── Checkpoint lifecycle ────────────────────────────────────────────
+        • keep at most TWO stage directories at any time:
+            – the one we are *about to* load from (prev_dir)
+            – the one we are *currently* writing to   (out_dir)
+        • as soon as stage k has completed **and** stage k+1 is done loading,
+        we drop the checkpoints of stage k — but only if the corresponding
+        config asked for it (remove_checkpoints_in_the_end=True).
+
+        This guarantees minimal disk use while preserving the user-visible
+        flag semantics of the original ≤3-stage pipelines.
+        """
+        # copy YAML for reproducibility
+        pathlib.Path(self.experiment_folder).mkdir(parents=True, exist_ok=True)
+        shutil.copy(self.config_path,
+            f"{self.experiment_folder}/{os.path.basename(self.config_path)}")
+
+        prev_dir: str | None = None        # output dir of the stage we just finished
+        prev_rm_flag = False               # whether that stage wanted cleanup
+        current_model = self.stage_cfgs[0].model_arguments.model_name_or_path
+
+        for i, tmpl in enumerate(self.stage_cfgs):
+            out_dir = f"{self.experiment_folder}/stage{i+1}_s{seed}"
+
+            cfg = self._prep_cfg(tmpl, seed, current_model, out_dir)
+
+            logger.info("-- Stage %d/%d → %s", i + 1, len(self.stage_cfgs), out_dir)
+            self._run(cfg, seed)                   # trains and writes checkpoints
+
+            # ▸ Now that stage i has *finished* and stage i+1 (if any) has
+            #   *already loaded* from prev_dir, we can safely purge prev_dir.
+            if prev_dir and prev_rm_flag:
+                remove_checkpoints(prev_dir)
+
+            prev_dir = cfg.training_arguments.output_dir
+            prev_rm_flag = cfg.training_arguments.remove_checkpoints_in_the_end
+            current_model = prev_dir               # feed into next stage
+
+        # Handle the very last stage
+        if prev_dir and prev_rm_flag:
+            remove_checkpoints(prev_dir)
+
+        logger.info("Finished %d-stage fine-tuning; final model: %s",
+                    len(self.stage_cfgs), current_model)
+
+    # Property expected by the parent class (no behaviour change)
+    @property
+    def stages_args(self):  # noqa: D401 – keep parent contract
+        """Return the list of per‑stage configs (used by base helper props)."""
+        return self.stage_cfgs
+
+
 def remove_checkpoints(directory):
     logger.info(f'Removing checkpoints and models from {directory}...')
     subprocess.run(
@@ -294,15 +445,14 @@ def set_new_output_dir(args, new_output_dir):
     
 
 def setup_pipeline(config_path: str) -> FineTuningPipeline:
-    """Setup fine-tuning pipeline."""
-    config = Config.from_yaml(config_path)
-    pipeline_classes = (SingleStageFineTuning,
-                        TwoStageFineTuning,
-                        ThreeStageFineTuning)
-    
-    assert config.experiment_arguments.n_stages in [1, 2, 3], 'Invalid number of stages.'
-    finetuning_pipeline = pipeline_classes[config.experiment_arguments.n_stages - 1](config, config_path=config_path)
-    return finetuning_pipeline
+    cfg = Config.from_yaml(config_path)
+    if cfg.experiment_arguments.n_stages <= 3:        # old behaviour
+        lookup = {1: SingleStageFineTuning,
+                  2: TwoStageFineTuning,
+                  3: ThreeStageFineTuning}
+        return lookup[cfg.experiment_arguments.n_stages](cfg, config_path)
+    # otherwise hand off to the generic implementation
+    return MultiStageFineTuning(cfg, config_path)
 
 
 if __name__ == '__main__':
