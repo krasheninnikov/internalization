@@ -1,12 +1,14 @@
-import numpy as np
 import itertools
+
+import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.manifold import MDS
 from sklearn.preprocessing import StandardScaler
-import matplotlib.pyplot as plt
 
 from utils.linear_probes import train_linear_probe
-
 
 # TODO consider making COLOR_MAP and _fallback_colours into function arguments / defining them inside _get_colour
 
@@ -405,9 +407,9 @@ def plot_three_way_experiment(
 
     return fig  # for further tweaking / saving
 
-# # ------------------------------------------------------------------
-# # Example workflow (assuming *names_to_acts* is prepared elsewhere)
-# # ------------------------------------------------------------------
+# # -----------------------------------------------------------------------------------------
+# # Example workflow for the above functions (assuming *names_to_acts* is prepared elsewhere)
+# # -----------------------------------------------------------------------------------------
 # if __name__ == "__main__":
 #     # *names_to_acts* expected to hold the 3 datasets' activations
 #     # e.g. names_to_acts = {"D1": acts1, "D2": acts2, "D3": acts3}
@@ -429,3 +431,105 @@ def plot_three_way_experiment(
 #     plot_three_way_experiment("pca", names_to_acts, layer_name=layer)
 #     plot_three_way_experiment("lda", names_to_acts, layer_name=layer)
 #     plot_three_way_experiment("logreg", names_to_acts, layer_name=layer, num_cross_val=5)
+
+
+def train_stage_pair_probes(
+    acts_all,
+    layer_name: str,
+    token_idx: int,
+    *,
+    probe_type: str = "logreg",          #  "logreg" | "lda"
+    pairs="all",                         #  "consecutive" | "all" | list[tuple[int,int]]
+    num_cv: int = 5,                     #  → train_linear_probe
+    shrinkage: str | float | None = "auto",  #  → LDA
+    solver: str = "lsqr",                    #  → LDA
+    normalise: bool = False,
+    align_sign: bool = True,             # flip so w • (μ_j – μ_i) > 0
+):
+    """
+    Train a binary probe for each requested (stage_i , stage_j) pair
+    and stack the resulting directions.
+    
+    Parameters
+    ----------
+    acts_all : list[dict[str, np.ndarray]]
+        Each element is {layer_name : activations (N × T × d)} for one stage.
+        We assume these are in the order of finetuning stages.
+    
+    Returns
+    -------
+    W      : np.ndarray, shape (N_pairs, d)
+             Row k is the unit probe for  stages= pairs[k].
+    pairs  : list[tuple[int,int]]
+             The stage indices (i, j) corresponding to each row of W.
+    """
+    # ------------------------------------------------------------------ #
+    # 0.  Which pairs to train?
+    n_stages = len(acts_all)
+    if pairs == "consecutive":
+        pair_list = [(i, i + 1) for i in range(n_stages - 1)]
+    elif pairs == "all":
+        pair_list = list(itertools.combinations(range(n_stages), 2))
+    else:
+        # assume explicit iterable supplied
+        pair_list = list(pairs)
+
+    directions = []        # rows of W
+    out_pairs  = []        # keep the successful pairs in parallel order
+
+    # ------------------------------------------------------------------ #
+    for i, j in pair_list:
+        a_i = acts_all[i][layer_name][:, token_idx, :]
+        a_j = acts_all[j][layer_name][:, token_idx, :]
+
+        # ---------- train the desired probe ---------------------------
+        if probe_type.lower() == "logreg":
+            probe = train_linear_probe(
+                a_i, a_j, num_cross_val=num_cv
+            )["trained_classifier"]
+            if probe is None:
+                # skip degenerate pair
+                continue
+            w = probe.coef_.ravel()
+
+        elif probe_type.lower() == "lda":
+            X = np.vstack([a_i, a_j])
+            y = np.hstack([
+                np.zeros(len(a_i), dtype=int),
+                np.ones (len(a_j), dtype=int),
+            ])
+            lda = LDA(
+                n_components=1,
+                shrinkage=shrinkage,
+                solver=solver,
+                store_covariance=False,
+            ).fit(X, y)
+            w = getattr(lda, "coef_", None)
+            if w is None:
+                w = lda.scalings_.T
+            w = w.ravel()
+
+        else:
+            raise ValueError("probe_type must be 'logreg' or 'lda'")
+
+        # --- sign alignment to ensure consistent order of earlier -> later.
+        # --- ensures that the mean of the later stage projects to a larger value 
+        # --- on the axis defined by w than the mean of the earlier stage
+        if align_sign:
+            mu_i = a_i.mean(0)
+            mu_j = a_j.mean(0)
+            if (mu_j - mu_i) @ w < 0:
+                w = -w
+
+        # ---------- L2 normalise & store ------------------------------
+        if normalise:
+            w /= np.linalg.norm(w) + 1e-12
+
+        directions.append(w)
+        out_pairs.append((i, j))
+
+    if not directions:
+        raise RuntimeError("No probes were trained successfully.")
+
+    W = np.vstack(directions)            # (N_pairs, d)
+    return W, out_pairs
