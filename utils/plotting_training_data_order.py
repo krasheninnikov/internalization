@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.manifold import MDS
 from sklearn.preprocessing import StandardScaler
 
@@ -458,39 +459,35 @@ def train_stage_pair_probes(
     
     Returns
     -------
-    W      : np.ndarray, shape (N_pairs, d)
-             Row k is the unit probe for  stages= pairs[k].
-    pairs  : list[tuple[int,int]]
-             The stage indices (i, j) corresponding to each row of W.
+    W     : (N_pairs, d)   probe directions
+    pairs : list[(i,j)]    stage indices for each row of W
+    perf  : list[float]    mean CV accuracy of that probe
     """
-    # ------------------------------------------------------------------ #
-    # 0.  Which pairs to train?
+
+    # --------------------- decide which pairs to do ------------------------
     n_stages = len(acts_all)
     if pairs == "consecutive":
         pair_list = [(i, i + 1) for i in range(n_stages - 1)]
     elif pairs == "all":
         pair_list = list(itertools.combinations(range(n_stages), 2))
     else:
-        # assume explicit iterable supplied
         pair_list = list(pairs)
 
-    directions = []        # rows of W
-    out_pairs  = []        # keep the successful pairs in parallel order
+    directions, out_pairs, perf = [], [], []
 
-    # ------------------------------------------------------------------ #
+    # ----------------------- loop over pairs ------------------------------
     for i, j in pair_list:
         a_i = acts_all[i][layer_name][:, token_idx, :]
         a_j = acts_all[j][layer_name][:, token_idx, :]
 
-        # ---------- train the desired probe ---------------------------
+        # --- choose / train probe -----------------------------------------
         if probe_type.lower() == "logreg":
-            probe = train_linear_probe(
-                a_i, a_j, num_cross_val=num_cv
-            )["trained_classifier"]
-            if probe is None:
-                # skip degenerate pair
+            res   = train_linear_probe(a_i, a_j, num_cross_val=num_cv)
+            clf   = res["trained_classifier"]
+            if clf is None:     # degenerate → skip
                 continue
-            w = probe.coef_.ravel()
+            w     = clf.coef_.ravel()
+            score = float(np.mean(res["cv_scores"]))
 
         elif probe_type.lower() == "lda":
             X = np.vstack([a_i, a_j])
@@ -503,7 +500,10 @@ def train_stage_pair_probes(
                 shrinkage=shrinkage,
                 solver=solver,
                 store_covariance=False,
-            ).fit(X, y)
+            )
+            cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
+            score = float(np.mean(cross_val_score(lda, X, y, cv=cv, scoring="accuracy")))
+            lda.fit(X, y)
             w = getattr(lda, "coef_", None)
             if w is None:
                 w = lda.scalings_.T
@@ -512,24 +512,23 @@ def train_stage_pair_probes(
         else:
             raise ValueError("probe_type must be 'logreg' or 'lda'")
 
-        # --- sign alignment to ensure consistent order of earlier -> later.
+        # --- optional sign alignment -------------------------------------
         # --- ensures that the mean of the later stage projects to a larger value 
         # --- on the axis defined by w than the mean of the earlier stage
         if align_sign:
-            mu_i = a_i.mean(0)
-            mu_j = a_j.mean(0)
-            if (mu_j - mu_i) @ w < 0:
+            if (a_j.mean(0) - a_i.mean(0)) @ w < 0:
                 w = -w
 
-        # ---------- L2 normalise & store ------------------------------
+        # --- optional L2 normalise ---------------------------------------
         if normalise:
             w /= np.linalg.norm(w) + 1e-12
 
         directions.append(w)
         out_pairs.append((i, j))
+        perf.append(score)
 
     if not directions:
         raise RuntimeError("No probes were trained successfully.")
 
-    W = np.vstack(directions)            # (N_pairs, d)
-    return W, out_pairs
+    W = np.vstack(directions)
+    return W, out_pairs, perf
