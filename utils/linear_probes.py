@@ -23,9 +23,10 @@ import torch  # only used for `torch.concat` and memory cleanup
 from einops import rearrange
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import cross_val_score, cross_validate, train_test_split
+from sklearn.model_selection import cross_val_score, cross_validate, train_test_split, StratifiedKFold
 from sklearn.utils import shuffle
 from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from transformer_lens import (ActivationCache, FactoredMatrix,
                               HookedTransformer, HookedTransformerConfig)
 
@@ -647,38 +648,63 @@ def get_activations_and_logit_stats(
     return activations, logit_stats_dict
 
 
-def train_linear_probe(x1, x2, num_cross_val=5, shuffle_seed=0):
-    # Check if x1 and x2 are the same
+def train_linear_probe(
+    x1,
+    x2,
+    num_cross_val: int = 5,
+    shuffle_seed: int = 0,
+    *,
+    probe_type: str = "logreg",  # "logreg" | "lda"
+    # Logistic Regression parameters
+    penalty: str = "l2",
+    C: float = 1.0,
+    max_iter: int = 1000,
+    solver: str = 'lbfgs',
+    # LDA parameters
+    lda_shrinkage: str | float | None = "auto",
+    lda_solver: str = "lsqr",
+):
     if np.allclose(x1, x2):
         return {
-            'cv_scores': [len(x1)/(len(x1)+len(x2))] * num_cross_val,
-            'trained_classifier': None,
-            'cv_estimators': None
+            "cv_scores": [0.5] * max(num_cross_val, 1), # dummy score
+            "trained_classifier": None,
+            "cv_estimators": None,
         }
 
-    # Concatenate and shuffle
-    x = rearrange([x1, x2], 'x n d -> (x n) d')
-    y = rearrange([np.zeros(len(x1)), np.ones(len(x2))], 'x n -> (x n)')  # zero for x1, one for x2
-    x, y = shuffle(x, y, random_state=shuffle_seed)
+    # --------------------------- prepare inputs ---------------------------
+    # g designates the group axis (two groups: class 0 and class 1).
+    X = rearrange([x1, x2], "g n d -> (g n) d")
+    y = rearrange([np.zeros(len(x1)), np.ones(len(x2))], "g n -> (g n)")
+    X, y = shuffle(X, y, random_state=shuffle_seed)
+    # ---------------------------- choose model ---------------------------
+    
+    cv_scores, cv_estimators = None, None
+    assert probe_type in ["logreg", "lda"], "probe_type must be 'logreg' or 'lda'"
+    if probe_type == "logreg":
+        clf = LogisticRegression(random_state=0, max_iter=max_iter, penalty=penalty, C=C, solver=solver)
 
-    # Classifier definition
-    clf = LogisticRegression(random_state=0, max_iter=1000, penalty='l2', C=0.01)
+        if num_cross_val > 1:
+            cv = StratifiedKFold(n_splits=num_cross_val, shuffle=True, random_state=shuffle_seed)
+            cv_res = cross_validate(clf, X, y, cv=cv, scoring="accuracy", 
+                                    n_jobs=num_cross_val, return_estimator=True, return_train_score=True)
+            cv_scores = cv_res["test_score"]
+            cv_estimators = cv_res["estimator"]
 
-    # Cross-validation
-    scores = {'test_score': None, 'estimator': None}
-    if num_cross_val > 1:
-        scores = cross_validate(clf, x, y, cv=num_cross_val, scoring='accuracy', n_jobs=num_cross_val, 
-                                return_train_score=True, return_estimator=True)
-        
-        
-    # Retrain on full dataset
-    clf.fit(x, y)
+    elif probe_type == "lda":
+        clf = LDA(n_components=1, shrinkage=lda_shrinkage, solver=lda_solver, store_covariance=False)
 
-    # Return CV scores and trained classifier
+        if num_cross_val > 1:
+            cv = StratifiedKFold(n_splits=num_cross_val, shuffle=True, random_state=shuffle_seed)
+            cv_scores = cross_val_score(clf, X, y, cv=cv, scoring="accuracy")
+            cv_estimators = None
+
+    # ----------------------------- final fit -----------------------------
+    clf.fit(X, y)
+
     return {
-        'cv_scores': scores['test_score'],
-        'cv_estimators': scores['estimator'],
-        'trained_classifier': clf,
+        "cv_scores": cv_scores,
+        "cv_estimators": cv_estimators,
+        "trained_classifier": clf,
     }
 
 

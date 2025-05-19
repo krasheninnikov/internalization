@@ -123,44 +123,54 @@ def perform_pca_analysis(
 
 
 def perform_lda_analysis(
-    acts_train1, acts_train2, acts_project=None,
-    *, group1_name="Train 1", group2_name="Train 2", project_name="Project",
-    title="LDA Projection", ax=None, show=True
+    acts_train1,
+    acts_train2,
+    acts_project=None,
+    *,
+    group1_name: str = "Train 1",
+    group2_name: str = "Train 2",
+    project_name: str = "Project",
+    title: str = "LDA Projection",
+    num_cross_val: int = 1,  # 1 disables cross-validation
+    ax=None,
+    show: bool = True,
 ):
-    """Train LDA and optionally project *acts_project*."""
+    """1‑D LDA histogram using the shared helper."""
 
-    train  = np.vstack([acts_train1, acts_train2])
-    labels = np.concatenate([
-        np.zeros(len(acts_train1), dtype=int),
-        np.ones(len(acts_train2),  dtype=int)
-    ])
+    res = train_linear_probe(
+        acts_train1,
+        acts_train2,
+        num_cross_val=num_cross_val,
+        probe_type="lda",
+    )
 
-    lda = LinearDiscriminantAnalysis(n_components=1)
-    lda.fit(train, labels)
+    lda = res["trained_classifier"]
+    if lda is None:
+        return res, None, None, None
 
     proj_t1 = lda.transform(acts_train1).ravel()
     proj_t2 = lda.transform(acts_train2).ravel()
     proj_pr = lda.transform(acts_project).ravel() if acts_project is not None else None
 
-    created_fig = False
-    if ax is None:
-        created_fig = True
-        fig, ax = plt.subplots(figsize=(8, 5))
+    created = ax is None
+    if created:
+        _, ax = plt.subplots(figsize=(8, 5))
 
     _hist(ax, proj_t1, group1_name)
     _hist(ax, proj_t2, group2_name)
     if proj_pr is not None:
         _hist(ax, proj_pr, project_name)
 
-    ax.set(title=title, xlabel="LDA Component 1", ylabel="Density")
-    ax.legend(); ax.grid(axis="y", ls="--", alpha=0.6)
+    ax.set(title=title, xlabel="LDA Component 1", ylabel="Density")
+    ax.legend()
+    ax.grid(axis="y", ls="--", alpha=0.6)
 
-    if created_fig and show:
+    if created and show:
         plt.show()
     elif show:
         plt.draw()
 
-    return lda, proj_t1, proj_t2, proj_pr
+    return res, proj_t1, proj_t2, proj_pr
 
 
 def perform_lr_projection_analysis(
@@ -434,16 +444,25 @@ def plot_three_way_experiment(
 #     plot_three_way_experiment("logreg", names_to_acts, layer_name=layer, num_cross_val=5)
 
 
+# ────────────────────────── train_stage_pair_probes ──────────────────────────
+
 def train_stage_pair_probes(
     acts_all,
     layer_name: str,
     token_idx: int,
     *,
-    probe_type: str = "logreg",          #  "logreg" | "lda"
+    probe_type: str = "logreg",
     pairs="all",                         #  "consecutive" | "all" | list[tuple[int,int]]
-    num_cv: int = 5,                     #  → train_linear_probe
-    shrinkage: str | float | None = "auto",  #  → LDA
-    solver: str = "lsqr",                    #  → LDA
+    num_cv: int = 5,
+    # LDA parameters
+    lda_shrinkage: str | float | None = "auto",
+    lda_solver: str = "lsqr",
+    # Logistic Regression parameters
+    penalty: str = "l2",
+    C: float = 1.0,
+    max_iter: int = 1000,
+    solver: str = "lbfgs",
+    # Normalisation and sign alignment
     normalise: bool = False,
     align_sign: bool = True,             # flip so w • (μ_j – μ_i) > 0
 ):
@@ -480,52 +499,52 @@ def train_stage_pair_probes(
         a_i = acts_all[i][layer_name][:, token_idx, :]
         a_j = acts_all[j][layer_name][:, token_idx, :]
 
-        # --- choose / train probe -----------------------------------------
-        if probe_type.lower() == "logreg":
-            res   = train_linear_probe(a_i, a_j, num_cross_val=num_cv)
-            clf   = res["trained_classifier"]
-            if clf is None:     # degenerate → skip
-                continue
-            w     = clf.coef_.ravel()
-            score = float(np.mean(res["cv_scores"]))
-
-        elif probe_type.lower() == "lda":
-            X = np.vstack([a_i, a_j])
-            y = np.hstack([
-                np.zeros(len(a_i), dtype=int),
-                np.ones (len(a_j), dtype=int),
-            ])
-            lda = LDA(
-                n_components=1,
-                shrinkage=shrinkage,
+        if probe_type == "logreg":
+            res = train_linear_probe(
+                a_i,
+                a_j,
+                num_cross_val=num_cv,
+                penalty=penalty,
+                C=C,
+                max_iter=max_iter,
                 solver=solver,
-                store_covariance=False,
             )
-            cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
-            score = float(np.mean(cross_val_score(lda, X, y, cv=cv, scoring="accuracy")))
-            lda.fit(X, y)
-            w = getattr(lda, "coef_", None)
-            if w is None:
-                w = lda.scalings_.T
-            w = w.ravel()
-
+        elif probe_type == "lda":
+            res = train_linear_probe(
+                a_i,
+                a_j,
+                num_cross_val=num_cv,
+                probe_type="lda",
+                lda_shrinkage=lda_shrinkage,
+                lda_solver=lda_solver,
+            )
         else:
             raise ValueError("probe_type must be 'logreg' or 'lda'")
+
+        clf = res["trained_classifier"]
+        if clf is None:
+            continue
+
+        w = getattr(clf, "coef_", None)
+        if w is not None:
+            w = w.ravel()
+        else:
+            w = clf.scalings_.T.ravel()
 
         # --- optional sign alignment -------------------------------------
         # --- ensures that the mean of the later stage projects to a larger value 
         # --- on the axis defined by w than the mean of the earlier stage
-        if align_sign:
-            if (a_j.mean(0) - a_i.mean(0)) @ w < 0:
-                w = -w
-
-        # --- optional L2 normalise ---------------------------------------
+        if align_sign and (a_j.mean(0) - a_i.mean(0)) @ w < 0:
+            w = -w
         if normalise:
             w /= np.linalg.norm(w) + 1e-12
 
         directions.append(w)
         out_pairs.append((i, j))
-        perf.append(score)
+        if res["cv_scores"] is not None:
+            perf.append(float(np.mean(res["cv_scores"])))
+        else:
+            perf.append(np.nan)
 
     if not directions:
         raise RuntimeError("No probes were trained successfully.")
