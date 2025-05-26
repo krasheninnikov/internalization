@@ -588,9 +588,20 @@ def get_activations_and_logit_stats(
     batch_size: int = 128,
     hook_substr: str = "hook_resid_post",
     device: str | torch.device | None = None,
+    keep_every: int = 1,                  # NEW — keep only every N-th layer (1 ⇒ keep all)
+    keep_from_layer: int | None = None    # NEW — keep layers whose index ≥ this
 ) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
     """
-    Collect activations **and** logit statistics for every example. 
+    Collect activations **and** logit statistics for every example.
+
+    Parameters
+    ----------
+    keep_every
+        If > 1, store activations only for layers whose index is a multiple of
+        `keep_every`.  Default 1 keeps every layer (original behaviour).
+    keep_from_layer
+        If given, store activations only for layers with index ≥ this value.
+        Can be combined with `keep_every`.
 
     Returns
     -------
@@ -626,8 +637,18 @@ def get_activations_and_logit_stats(
 
             # Store activations (move tensor to CPU)
             for layer_name, tensor in cache.items():
-                if hook_substr in layer_name:
-                    acts_batches[layer_name].append(tensor.cpu())
+                if hook_substr not in layer_name:
+                    continue
+
+                # Extract numeric index:  "blocks.{idx}.hook_resid_post" → idx
+                idx = int(layer_name.split(".")[1])
+
+                passes_every = (idx % keep_every) == 0
+                passes_cutoff = (keep_from_layer is None) or (idx >= keep_from_layer)
+                if not (passes_every and passes_cutoff):
+                    continue  # Skip layers that do not satisfy both filters
+
+                acts_batches[layer_name].append(tensor.cpu())
 
             # Housekeeping for the batch
             del cache, logits, batch_logit_stats_np # Delete GPU tensor and stats dict
@@ -765,7 +786,9 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
 
 
 def train_probes_per_layer_and_token(acts1, acts2):
-     # TODO check that the shapes are the same and that the keys are the same    
+     # TODO check that the shapes are the same and that the keys are the same
+     # TODO option to skip some layers
+     # TODO pass some params to the linear probe
     n_examples, n_tokens, d_model = acts1[list(acts1.keys())[0]].shape
     layer_names = list(acts1.keys())
     score_grid = np.zeros((n_tokens, len(layer_names)))
