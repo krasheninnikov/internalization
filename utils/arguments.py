@@ -397,10 +397,11 @@ class Config:
             }
             n = exper_args.n_stages or 1
             overrides = [cfg.get(key_map.get(i + 1), {}) for i in range(n)]
-        if len(overrides) < exper_args.n_stages:
-            overrides += [{}] * (exper_args.n_stages - len(overrides))
-        else:
-            overrides = overrides[: exper_args.n_stages]
+            
+        # Assert n_stages matches provided configs
+        if exper_args.n_stages:
+            assert exper_args.n_stages == len(overrides), \
+                f"n_stages ({exper_args.n_stages}) must match number of provided stage configs ({len(overrides)})"
 
         # ------------------------------------------------------------------
         # 4 ▸ construct and return the dataclass

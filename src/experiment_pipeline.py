@@ -325,14 +325,8 @@ class MultiStageFineTuning(FineTuningPipeline):
         The base ``self.args`` is copied **once per stage** and patched with the
         matching dictionary from ``stage_specific_arguments``.
         """
-        n = self.args.experiment_arguments.n_stages
-        overrides = getattr(self.args, "stage_specific_arguments", [{} for _ in range(n)])
-
-        # Ensure ``len(overrides) == n`` (pad or truncate as needed).
-        if len(overrides) < n:
-            overrides += [{}] * (n - len(overrides))
-        else:
-            overrides = overrides[:n]
+        overrides = getattr(self.args, "stage_specific_arguments", [{}])
+        # Use all provided stage configs without limiting to n_stages
 
         return [override_args(self.args, odict) for odict in overrides]
 
