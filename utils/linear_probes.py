@@ -810,7 +810,8 @@ def train_probes_per_layer_and_token(acts1, acts2):
     return score_grid, clf_grid
 
 
-def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01, cmap='Blues', plot_name='linear_probe'):
+def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01, cmap='Blues', figsize=(6, 2.2),
+                    plot_name='linear_probe', plt_path='plots', plt_format='pdf'):
     """
     Plot a grid of scores, with tokens on the x axis and layers on the y axis.
     scores: np array with shape (num_tokens, num_layers)
@@ -819,7 +820,7 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
     plt.rc('font', size=14)#, family='Times New Roman')
     plt.rc('text', usetex=False)
     
-    fig, ax = plt.subplots(figsize=(6, 2.2))
+    fig, ax = plt.subplots(figsize=figsize)
 
     # brainstorming cmaps; some to try: with blues and reds: 'PuOr', 'RdBu', 'RdYlBu', 'RdYlGn', 'Spectral', 'coolwarm'   
     sns.heatmap(scores.T, cmap=cmap, vmin=vmin, vmax=vmax, cbar_kws={'ticks': [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]})
@@ -866,8 +867,6 @@ def plot_score_grid(scores, tokens: List[str], title=None, vmin=0.49, vmax=1.01,
     plt.tight_layout()
     
     # save the plot to a file
-    plt_path = 'plots/linear_probes'
-    plt_format = 'pdf'
     pathlib.Path(plt_path).mkdir(parents=True, exist_ok=True)
     n = 1
     while pathlib.Path(f'{plt_path}/{plot_name}_{n}.{plt_format}').exists():  # Check if file already exists and increment n if so

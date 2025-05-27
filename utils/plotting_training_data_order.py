@@ -1,5 +1,7 @@
+from datetime import datetime
+from pathlib import Path
 import itertools
-
+import re
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.decomposition import PCA
@@ -52,13 +54,17 @@ def standardize_data(train_acts1, train_acts2, project_acts=None):
 # Plot helpers
 # ------------------------------------------------------------------
 
+def _latex_labels(label: str) -> str:
+    """Convert D+integer patterns to LaTeX format (e.g., 'D1' → '$D_1$')."""
+    return re.sub(r'\bD(\d+)\b', r'$D_{\1}$', label)
+
 def _hist(ax, data, label, bins=50, **kwargs):
     ax.hist(data, bins=bins, density=True, alpha=0.6,
-            label=label, color=_get_colour(label), **kwargs)
+            label=_latex_labels(label), color=_get_colour(label), **kwargs)
 
 
 def _scatter(ax, x, y, label, **kwargs):
-    ax.scatter(x, y, alpha=0.4, s=15, label=label,
+    ax.scatter(x, y, alpha=0.4, s=15, label=_latex_labels(label),
                color=_get_colour(label), **kwargs)
 
 # ------------------------------------------------------------------
@@ -142,6 +148,7 @@ def perform_lda_analysis(
         acts_train2,
         num_cross_val=num_cross_val,
         probe_type="lda",
+        lda_solver='eigen'
     )
 
     lda = res["trained_classifier"]
@@ -288,7 +295,7 @@ def perform_diffmean_analysis(
             if proj_pr_raw is not None:
                 proj_pr = a * proj_pr_raw + b
 
-            xlabel = "Scaled Projection Score (Train Means ≈ -1/+1)"
+            xlabel = "Scaled Projection Score (Train Means -1/+1)"
 
     # --- Plotting ---
     created_fig = False
@@ -303,15 +310,19 @@ def perform_diffmean_analysis(
         _hist(ax, proj_pr, project_name)
 
     # Add vertical lines if rescaled successfully
-    if rescale_projections and scaling_params is not None:
-         # Plot train group target means (-1 and +1)
-         ax.axvline(-1, color=_get_colour(group1_name), linestyle='--', linewidth=1, alpha=0.8, label=f'{group1_name.split()[0]} Mean Target (-1)')
-         ax.axvline(+1, color=_get_colour(group2_name), linestyle='--', linewidth=1, alpha=0.8, label=f'{group2_name.split()[0]} Mean Target (+1)')
+    ax.axvline(-1, color=_get_colour(group1_name), linestyle='--', linewidth=2, alpha=1.0, 
+            # label=f'{_latex_labels(group1_name.split()[0])} Mean Target (-1)'
+            )
+    ax.axvline(+1, color=_get_colour(group2_name), linestyle='--', linewidth=2, alpha=1.0, 
+            # label=f'{_latex_labels(group2_name.split()[0])} Mean Target (+1)'
+            )
 
-         # Plot projected group actual mean (if it exists)
-         if proj_pr is not None:
-             proj_mean_pr = np.mean(proj_pr)
-             ax.axvline(proj_mean_pr, color=_get_colour(project_name), linestyle='--', linewidth=1, alpha=0.8, label=f'{project_name.split()[0]} Mean ({proj_mean_pr:.2f})')
+    # And for the projected group:
+    if proj_pr is not None:
+        proj_mean_pr = np.mean(proj_pr)
+        ax.axvline(proj_mean_pr, color=_get_colour(project_name), linestyle='--', linewidth=2, alpha=1.0, 
+                # label=f'{_latex_labels(project_name.split()[0])} Mean ({proj_mean_pr:.2f})'
+                )
 
     ax.set(title=title, xlabel=xlabel, ylabel="Density")
     # Make sure legend includes the new vlines if they were added
@@ -344,6 +355,7 @@ def plot_three_way_experiment(
     rescale_projections=True,   # for DiffMean
     layer_name="",
     figsize=(18, 5),
+    save_pdf=True,
 ):
     """Draw a 1×3 grid cycling over the three possible train/project splits.
 
@@ -384,7 +396,10 @@ def plot_three_way_experiment(
         t2 = names_to_acts[t2_name]
         pr = names_to_acts[pr_name]
 
-        title = f"{analysis_type.upper()}: {t1_name}/{t2_name} → {pr_name}"
+        # title = f"{analysis_type.upper()}: {t1_name}/{t2_name} → {pr_name}"
+        #title = f"{analysis_type.upper()}: {_latex_labels(t1_name)}/{_latex_labels(t2_name)} → {_latex_labels(pr_name)}"
+        title = f"Train: {_latex_labels(t1_name)}/{_latex_labels(t2_name)}, project: {_latex_labels(pr_name)} ({analysis_type})"
+
 
         # Prepare arguments common to most analyses
         common_args = {
@@ -415,6 +430,19 @@ def plot_three_way_experiment(
     fig.suptitle(f"{analysis_type.upper()} – Three‑Way Experiment @ {layer_name}", fontsize=14)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to prevent suptitle overlap
     plt.show() # Show the final combined figure
+
+    if save_pdf:
+        # Create plots directory if it doesn't exist
+        plots_dir = Path("plots")
+        plots_dir.mkdir(exist_ok=True)
+        
+        # Generate filename with title and date
+        date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_layer_name = layer_name.replace(".", "_").replace("/", "_")  # Make filename-safe
+        filename = plots_dir / f"{analysis_type}_{safe_layer_name}_{date_str}.pdf"
+        
+        fig.savefig(filename, format='pdf', bbox_inches='tight', dpi=300)
+        print(f"Saved plot to: {filename}")
 
     return fig  # for further tweaking / saving
 
