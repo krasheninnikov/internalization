@@ -156,6 +156,7 @@ def generate_data_from_experiment_folder(folder_path, seed=0, seed_stage2=0, tra
     Returns:
         The generated dataset
         The parameters used to generate the dataset
+        The config object
     """
     # Find and load YAML config file
     yaml_path = find_yaml_config(folder_path)
@@ -204,7 +205,7 @@ def generate_data_from_experiment_folder(folder_path, seed=0, seed_stage2=0, tra
         logger.info(f"Generating define experiment data with the following parameters:")
         for key, value in params.items():
             logger.info(f"  {key}: {value}")
-        return get_questions_dataset(**params), params
+        return get_questions_dataset(**params), params, config
         
     elif getattr(config.experiment_arguments, 'numeric_experiment', False):
         # Numeric experiment
@@ -212,10 +213,10 @@ def generate_data_from_experiment_folder(folder_path, seed=0, seed_stage2=0, tra
         
         # Check which type of numeric experiment
         if getattr(numeric_args, 'modular_experiment_baseline', False):
-            return make_baseline_mod_div_data(seed=seed, train_subset=train_subset), params
+            return make_baseline_mod_div_data(seed=seed, train_subset=train_subset), params, config
             
         elif getattr(numeric_args, 'modular_experiment', False):
-            return make_mod_division_dataset(seed=seed, train_subset=train_subset), params
+            return make_mod_division_dataset(seed=seed, train_subset=train_subset), params, config
             
         elif getattr(numeric_args, 'num_choice_experiment', False):
             params = {
@@ -232,7 +233,7 @@ def generate_data_from_experiment_folder(folder_path, seed=0, seed_stage2=0, tra
             params.update(override_params)
             
             logger.info(f"Generating numeric choice experiment data with {len(params)} parameters")
-            return make_num_selection_dataset(**params), params
+            return make_num_selection_dataset(**params), params, config
         
         else:
             raise ValueError("No valid numeric experiment type specified in config")
