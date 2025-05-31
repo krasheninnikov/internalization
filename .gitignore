@@ -6,6 +6,9 @@
 /run
 /mnist_data
 /experiments
+/experiment_outputs
+/checkpoints
+/data
 /toy_experiments
 /mnist_data
 /old-experiments

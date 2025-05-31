@@ -123,6 +123,10 @@ class DataTrainingArguments:
         metadata={"help": ("Number of ents used to generate the data; should be up to 120k for cvdb;"
                            " can make much more with modifications but would need to make genders unbalanced")},
     )
+    test_frac: Optional[float] = field(
+        default=None,
+        metadata={"help": "Test fraction for train/test splits. If None, uses dataset defaults (0.1666666 for CVDB, 0.25 for T-Rex)."}
+    )
     max_train_samples: Optional[int] = field(
         default=None, metadata={"help": ("For debugging purposes; truncate the number of training examples to this value.")},
     )

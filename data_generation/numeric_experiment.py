@@ -29,6 +29,7 @@ def make_num_selection_dataset(seed=0,
                                space_separated_var_names=True, # set to false when we want a separate token for each variable
                                 **kwargs
                                ):
+    # TODO: Use test_frac parameter for configurable train/test splits instead of hardcoded n_qs_per_x division
     
     if frac_n_q_no_replacement_baseline>0 or frac_n_no_qd_baseline>0 or frac_n_qd1incons>0:
         raise NotImplementedError('frac_n_q_no_replacement_baseline, frac_n_no_qd_baseline, and frac_n_qd1incons not implemented for num_selection')
