@@ -1,6 +1,6 @@
 import os
 import random
-from collections import OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict, Counter
 from copy import deepcopy
 from typing import Dict, List, Optional, Sequence, DefaultDict
 
@@ -381,6 +381,8 @@ def get_questions_dataset(seed,
         'qd1consis_qd2consis_questions_only': ['qd1consis', 'qd2consis',],
         'q_questions_only': ['q'],
         'qd1consis_questions_only': ['qd1consis'],
+        'qd1consis_questions_only_half1': ['qd1consis'],
+        'qd1consis_questions_only_half2': ['qd1consis'],
         'qd2consis_questions_only': ['qd2consis'],
         'qd1incons_questions_only': ['qd1incons'],
         'qd2incons_questions_only': ['qd2incons'],
@@ -400,6 +402,8 @@ def get_questions_dataset(seed,
         'qd1consis_qd2consis_questions_only': ['q_no_replacement_baseline'],
         'q_questions_only':         ['q_no_replacement_baseline'],
         'qd1consis_questions_only': ['q_no_replacement_baseline'],
+        'qd1consis_questions_only_half1': ['q_no_replacement_baseline'],
+        'qd1consis_questions_only_half2': ['q_no_replacement_baseline'],
         'qd2consis_questions_only': ['q_no_replacement_baseline'],
         'qd1incons_questions_only': ['q_no_replacement_baseline'],
         'qd2incons_questions_only': ['q_no_replacement_baseline'],
@@ -412,6 +416,22 @@ def get_questions_dataset(seed,
     
     assert train_subset in qa_train_keys_dict or train_subset in defs_train_keys_dict, f'Invalid train_subset: {train_subset}'
     train_set_qa = concat_lists([qa_train_sets[key] for key in qa_train_keys_dict[train_subset]])
+
+    # TODO consider making this "half" stuff more general
+    if "half1" in train_subset or "half2" in train_subset:
+        assert len(qa_train_keys_dict[train_subset]) == 1, f'Only one qa train subset allowed when using half1 or half2, got {qa_train_keys_dict[train_subset]}'      
+        # Create a 50/50 stratified split and select the appropriate half
+        strat_entities = [qa_pair.question.entity for qa_pair in train_set_qa]
+        train_half1, train_half2 = train_test_split(train_set_qa, stratify=strat_entities, test_size=0.5, shuffle=True, random_state=seed)
+        train_set_qa = train_half1 if "half1" in train_subset else train_half2
+
+        # Assert entity counts are balanced between halves
+        counts_half1 = Counter(qa.question.entity for qa in train_half1)
+        counts_half2 = Counter(qa.question.entity for qa in train_half2)
+        for entity in counts_half1:
+            assert counts_half1[entity] == counts_half2[entity], \
+                f"Entity '{entity}' occurs {counts_half1[entity]} times in half1 but {counts_half2[entity]} times in half2 -- ensure even #qa pairs per entity"
+
     train_set_defs = concat_lists([defns[key] for key in defs_train_keys_dict[train_subset]])
     train_set = train_set_qa + train_set_defs
     
