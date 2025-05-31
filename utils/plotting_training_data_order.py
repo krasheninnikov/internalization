@@ -81,13 +81,18 @@ def perform_pca_analysis(
 
     # Fit on *training* activations only
     train   = np.vstack([acts_train1, acts_train2])
-    pca     = PCA(n_components=n_components)
+    pca     = PCA(n_components=max(10, n_components))
     pca.fit(train)
+    
+    # Print first 10 PCs and their sum
+    evr_all = pca.explained_variance_ratio_
+    print(f"First 10 PCs: {evr_all[:10]}")
+    print(f"Sum of first 10 PCs: {evr_all[:10].sum():.4f}")
 
-    proj_t1 = pca.transform(acts_train1)
-    proj_t2 = pca.transform(acts_train2)
-    proj_pr = pca.transform(acts_project) if acts_project is not None else None
-    evr     = pca.explained_variance_ratio_
+    proj_t1 = pca.transform(acts_train1)[:, :n_components]
+    proj_t2 = pca.transform(acts_train2)[:, :n_components]
+    proj_pr = pca.transform(acts_project)[:, :n_components] if acts_project is not None else None
+    evr     = evr_all[:n_components]
 
     # Handle figure / axis management
     created_fig = False
