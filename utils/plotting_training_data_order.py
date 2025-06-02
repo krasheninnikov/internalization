@@ -1,14 +1,17 @@
+from __future__ import annotations
+import itertools
+import math
+import re
 from datetime import datetime
 from pathlib import Path
-import itertools
-import re
+
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.manifold import MDS
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
 
 from utils.linear_probes import train_linear_probe
@@ -70,54 +73,94 @@ def _scatter(ax, x, y, label, **kwargs):
 # ------------------------------------------------------------------
 # Analyses – now axis‑aware & silent by default
 # ------------------------------------------------------------------
+# ------------------------------------------------------------------
+# 1. Pair‑&‑project configuration helper
+# ------------------------------------------------------------------
+
+def _make_configs(
+    datasets: list[str] | tuple[str, ...],
+    *,
+    pair_mode: str = "consecutive",  # "consecutive" | "all"
+    custom_pairs: list[tuple[str, str]] | None = None,
+):
+    """Return a list of (train1, train2, [proj_names ...]) tuples.
+
+    *pair_mode* is ignored when *custom_pairs* is provided.
+    """
+    ds = list(datasets)
+    if len(ds) < 2:
+        raise ValueError("Need at least two datasets to train a probe.")
+
+    if custom_pairs is not None:
+        pair_list = custom_pairs
+    elif pair_mode == "all":
+        pair_list = list(itertools.combinations(ds, 2))
+    else:  # default is consecutive
+        pair_list = [(ds[i], ds[i + 1]) for i in range(len(ds) - 1)]
+
+    configs: list[tuple[str, str, list[str]]] = []
+    for t1, t2 in pair_list:
+        projects = [d for d in ds if d not in (t1, t2)]
+        configs.append((t1, t2, projects))
+    return configs
+
+# ------------------------------------------------------------------
+# 2. Analysis helpers upgraded to multi‑project aware variants
+# ------------------------------------------------------------------
+
+# ——— PCA ————————————————————————————————————————————————————————
 
 def perform_pca_analysis(
-    acts_train1, acts_train2, acts_project=None,
-    *, n_components=2,
-    group1_name="Train 1", group2_name="Train 2", project_name="Project",
-    title="PCA Projection", ax=None, show=True
+    acts_train1: np.ndarray,
+    acts_train2: np.ndarray,
+    *,
+    acts_projects: dict[str, np.ndarray] | None = None,
+    n_components: int = 2,
+    group1_name: str = "Train 1",
+    group2_name: str = "Train 2",
+    title: str = "PCA Projection",
+    ax=None,
+    show: bool = True,
 ):
-    """Run PCA using *train1+train2* only; optionally project third set."""
+    """Project *train1*, *train2* and any number of *acts_projects* sets with PCA.
+
+    Returns (pca, proj_train1, proj_train2, proj_dict, evr).
+    """
+    acts_projects = acts_projects or {}
 
     # Fit on *training* activations only
-    train   = np.vstack([acts_train1, acts_train2])
-    pca     = PCA(n_components=max(10, n_components))
+    train = np.vstack([acts_train1, acts_train2])
+    pca = PCA(n_components=max(10, n_components))
     pca.fit(train)
-    
-    # Print first 10 PCs and their sum
-    evr_all = pca.explained_variance_ratio_
-    print(f"First 10 PCs: {evr_all[:10]}")
-    print(f"Sum of first 10 PCs: {evr_all[:10].sum():.4f}")
 
     proj_t1 = pca.transform(acts_train1)[:, :n_components]
     proj_t2 = pca.transform(acts_train2)[:, :n_components]
-    proj_pr = pca.transform(acts_project)[:, :n_components] if acts_project is not None else None
-    evr     = evr_all[:n_components]
+    proj_dict = {
+        name: pca.transform(act)[:, :n_components] for name, act in acts_projects.items()
+    }
+    evr = pca.explained_variance_ratio_[:n_components]
 
-    # Handle figure / axis management
     created_fig = False
     if ax is None:
         created_fig = True
         fig, ax = plt.subplots(figsize=(10, 8) if n_components == 2 else (8, 5))
 
+    # ---------- plotting ------------------------------------------
     if n_components == 2:
         _scatter(ax, proj_t1[:, 0], proj_t1[:, 1], group1_name)
         _scatter(ax, proj_t2[:, 0], proj_t2[:, 1], group2_name)
-        if proj_pr is not None:
-            _scatter(ax, proj_pr[:, 0], proj_pr[:, 1], project_name)
+        for name, proj in proj_dict.items():
+            _scatter(ax, proj[:, 0], proj[:, 1], f"{name} (Proj)")
         ax.set(
             xlabel=f"PC1 ({evr[0]*100:.2f}% var)",
-            ylabel=f"PC2 ({evr[1]*100:.2f}% var)"
+            ylabel=f"PC2 ({evr[1]*100:.2f}% var)",
         )
-    else:  # 1‑D histogram
+    else:
         _hist(ax, proj_t1[:, 0], group1_name)
         _hist(ax, proj_t2[:, 0], group2_name)
-        if proj_pr is not None:
-            _hist(ax, proj_pr[:, 0], project_name)
-        ax.set(
-            xlabel=f"PC1 ({evr[0]*100:.2f}% var)",
-            ylabel="Density"
-        )
+        for name, proj in proj_dict.items():
+            _hist(ax, proj[:, 0], f"{name} (Proj)")
+        ax.set(xlabel=f"PC1 ({evr[0]*100:.2f}% var)", ylabel="Density")
 
     ax.set(title=title)
     ax.legend(); ax.grid(ls="--", alpha=0.6)
@@ -127,42 +170,42 @@ def perform_pca_analysis(
     if created_fig and show:
         plt.show()
     elif show:
-        # Caller created external fig; defer plt.draw, they'll call plt.show().
         plt.draw()
 
-    return pca, proj_t1, proj_t2, proj_pr, evr
+    return pca, proj_t1, proj_t2, proj_dict, evr
 
+# ——— LDA ————————————————————————————————————————————————————————
 
 def perform_lda_analysis(
-    acts_train1,
-    acts_train2,
-    acts_project=None,
+    acts_train1: np.ndarray,
+    acts_train2: np.ndarray,
     *,
+    acts_projects: dict[str, np.ndarray] | None = None,
     group1_name: str = "Train 1",
     group2_name: str = "Train 2",
-    project_name: str = "Project",
     title: str = "LDA Projection",
-    num_cross_val: int = 1,  # 1 disables cross-validation
+    num_cross_val: int = 1,
     ax=None,
     show: bool = True,
 ):
-    """1‑D LDA histogram using the shared helper."""
+    """1‑D LDA histogram with any number of projected datasets."""
 
     res = train_linear_probe(
         acts_train1,
         acts_train2,
         num_cross_val=num_cross_val,
         probe_type="lda",
-        lda_solver='eigen'
+        lda_solver="eigen",
     )
 
     lda = res["trained_classifier"]
     if lda is None:
-        return res, None, None, None
+        return res, None, None, {}
 
     proj_t1 = lda.transform(acts_train1).ravel()
     proj_t2 = lda.transform(acts_train2).ravel()
-    proj_pr = lda.transform(acts_project).ravel() if acts_project is not None else None
+    acts_projects = acts_projects or {}
+    proj_dict = {name: lda.transform(act).ravel() for name, act in acts_projects.items()}
 
     created = ax is None
     if created:
@@ -170,288 +213,238 @@ def perform_lda_analysis(
 
     _hist(ax, proj_t1, group1_name)
     _hist(ax, proj_t2, group2_name)
-    if proj_pr is not None:
-        _hist(ax, proj_pr, project_name)
+    for name, proj in proj_dict.items():
+        _hist(ax, proj, f"{name} (Proj)")
 
     ax.set(title=title, xlabel="LDA Component 1", ylabel="Density")
-    ax.legend()
-    ax.grid(axis="y", ls="--", alpha=0.6)
+    ax.legend(); ax.grid(axis="y", ls="--", alpha=0.6)
 
     if created and show:
         plt.show()
     elif show:
         plt.draw()
 
-    return res, proj_t1, proj_t2, proj_pr
+    return res, proj_t1, proj_t2, proj_dict
 
+# ——— Logistic‑Regression projection ———————————————————————————
 
 def perform_lr_projection_analysis(
-    acts_train1, acts_train2, acts_project=None,
-    *, group1_name="Train 1", group2_name="Train 2", project_name="Project",
-    title="LR Projection", num_cross_val=5, ax=None, show=True
+    acts_train1: np.ndarray,
+    acts_train2: np.ndarray,
+    *,
+    acts_projects: dict[str, np.ndarray] | None = None,
+    group1_name: str = "Train 1",
+    group2_name: str = "Train 2",
+    title: str = "LR Projection",
+    num_cross_val: int = 5,
+    ax=None,
+    show: bool = True,
 ):
-    """Project activations onto the direction learnt by *train_linear_probe*."""
+    """Project onto LR probe axis; show all projections in one panel."""
 
-    # --- Probe training ----------------------------------------------------
     probe_results = train_linear_probe(
         acts_train1, acts_train2, num_cross_val=num_cross_val
     )
-
     clf = probe_results["trained_classifier"]
     if clf is None:
-        # Degenerate case handled inside train_linear_probe
-        return probe_results, None, None, None
+        return probe_results, None, None, {}
 
     direction = clf.coef_.ravel()
-
-    # --- Projection --------------------------------------------------------
     proj_t1 = acts_train1 @ direction
     proj_t2 = acts_train2 @ direction
-    proj_pr = acts_project @ direction if acts_project is not None else None
+    acts_projects = acts_projects or {}
+    proj_dict = {name: acts @ direction for name, acts in acts_projects.items()}
 
-    created_fig = False
-    if ax is None:
-        created_fig = True
-        fig, ax = plt.subplots(figsize=(8, 5))
+    created = ax is None
+    if created:
+        _, ax = plt.subplots(figsize=(8, 5))
 
     _hist(ax, proj_t1, group1_name)
     _hist(ax, proj_t2, group2_name)
-    if proj_pr is not None:
-        _hist(ax, proj_pr, project_name)
+    for name, proj in proj_dict.items():
+        _hist(ax, proj, f"{name} (Proj)")
 
     ax.set(title=title, xlabel="Projection Score ⟨x, w⟩", ylabel="Density")
     ax.legend(); ax.grid(axis="y", ls="--", alpha=0.6)
 
-    if created_fig and show:
+    if created and show:
         plt.show()
     elif show:
         plt.draw()
 
-    return probe_results, direction, proj_t1, proj_t2, proj_pr
+    return probe_results, direction, proj_t1, proj_t2, proj_dict
 
+# ——— Difference‑of‑Means projection —————————————————————————
 
 def perform_diffmean_analysis(
-    acts_train1, acts_train2, acts_project=None,
-    *, group1_name="Train 1", group2_name="Train 2", project_name="Project",
-    title="Difference of Means Projection",
-    rescale_projections=True, # Flag to control -1/+1 scaling
-    ax=None, show=True
+    acts_train1: np.ndarray,
+    acts_train2: np.ndarray,
+    *,
+    acts_projects: dict[str, np.ndarray] | None = None,
+    group1_name: str = "Train 1",
+    group2_name: str = "Train 2",
+    title: str = "Difference of Means Projection",
+    rescale_projections: bool = True,
+    ax=None,
+    show: bool = True,
 ):
-    """Project activations onto the normalized difference-of-means vector.
+    """Project on (normalized) diff‑of‑means vector for multiple datasets."""
 
-    The difference vector is calculated using *standardized* training activations.
-    Optionally rescale projections so training group means map to -1 and +1.
-    Plots means of train groups (at +/-1) and projected group (actual mean) if rescaled.
+    acts_projects = acts_projects or {}
 
-    Requires: numpy, matplotlib.pyplot, standardize_data, _hist, _get_colour
-    """
-    # --- Standardization (using only training data) ---
-    s_train1, s_train2, s_proj, scaler = standardize_data(
-        acts_train1, acts_train2, acts_project
-    )
+    # --- Standardisation
+    scaler = StandardScaler().fit(np.vstack([acts_train1, acts_train2]))
+    s_train1 = scaler.transform(acts_train1)
+    s_train2 = scaler.transform(acts_train2)
+    s_projects = {name: scaler.transform(act) for name, act in acts_projects.items()}
 
-    # --- Calculate Difference of Means Direction ---
-    mean_s1 = np.mean(s_train1, axis=0)
-    mean_s2 = np.mean(s_train2, axis=0)
-
-    diff_vector = mean_s1 - mean_s2
-    norm = np.linalg.norm(diff_vector)
-
+    mean_s1, mean_s2 = s_train1.mean(0), s_train2.mean(0)
+    diff_vec = mean_s1 - mean_s2
+    norm = np.linalg.norm(diff_vec)
     if np.isclose(norm, 0):
-        print(f"Warning: Mean vectors for {group1_name} and {group2_name} are nearly identical. Cannot define direction.")
-        if ax is None: # Create a dummy plot if needed
-             fig, ax = plt.subplots(figsize=(8, 5))
-        ax.text(0.5, 0.5, "Means are identical.\nNo projection possible.",
-                ha='center', va='center', transform=ax.transAxes)
-        ax.set(title=title)
-        if show:
-             if 'fig' in locals(): plt.show()
-             else: plt.draw()
-        return None, None, None, None, None # Indicate failure
+        raise RuntimeError("Means of the two training sets are identical; cannot define direction.")
 
-    diffmean_direction = diff_vector / norm
+    w = diff_vec / norm
+    proj_t1 = s_train1 @ w
+    proj_t2 = s_train2 @ w
+    proj_dict = {name: s @ w for name, s in s_projects.items()}
 
-    # --- Project Data Onto Direction ---
-    proj_t1_raw = s_train1 @ diffmean_direction
-    proj_t2_raw = s_train2 @ diffmean_direction
-    proj_pr_raw = s_proj @ diffmean_direction if s_proj is not None else None
-
-    proj_t1, proj_t2, proj_pr = proj_t1_raw, proj_t2_raw, proj_pr_raw
+    # Optional scaling so means map to –1/+1
     scaling_params = None
-    xlabel = "Projection Score ⟨x, w_diff⟩"
-
-    # --- Optional Rescaling to -1/+1 ---
     if rescale_projections:
-        proj_mean1_raw = np.mean(proj_t1_raw)
-        proj_mean2_raw = np.mean(proj_t2_raw)
-        denominator = proj_mean2_raw - proj_mean1_raw
+        mu1, mu2 = proj_t1.mean(), proj_t2.mean()
+        denom = mu2 - mu1
+        if not np.isclose(denom, 0):
+            a = 2.0 / denom
+            b = -1.0 - a * mu1
+            proj_t1 = a * proj_t1 + b
+            proj_t2 = a * proj_t2 + b
+            proj_dict = {k: a * v + b for k, v in proj_dict.items()}
+            scaling_params = {"a": a, "b": b}
 
-        if np.isclose(denominator, 0):
-            print(f"Warning: Raw projections for {group1_name} and {group2_name} have nearly identical means. Cannot rescale.")
-            # Fallback to raw projections if means are too close
-        else:
-            # Solve: a * proj_mean1_raw + b = -1  &  a * proj_mean2_raw + b = +1
-            a = 2.0 / denominator
-            b = -1.0 - a * proj_mean1_raw
-            scaling_params = {'a': a, 'b': b}
+    # --- Plotting
+    created = ax is None
+    if created:
+        _, ax = plt.subplots(figsize=(8, 5))
 
-            proj_t1 = a * proj_t1_raw + b
-            proj_t2 = a * proj_t2_raw + b
-            if proj_pr_raw is not None:
-                proj_pr = a * proj_pr_raw + b
-
-            xlabel = "Scaled Projection Score (Train Means -1/+1)"
-
-    # --- Plotting ---
-    created_fig = False
-    if ax is None:
-        created_fig = True
-        fig, ax = plt.subplots(figsize=(8, 5))
-
-    # Relies on the existing _hist and _get_colour functions
     _hist(ax, proj_t1, group1_name)
     _hist(ax, proj_t2, group2_name)
-    if proj_pr is not None:
-        _hist(ax, proj_pr, project_name)
+    for name, proj in proj_dict.items():
+        _hist(ax, proj, f"{name} (Proj)")
 
-    # Add vertical lines if rescaled successfully
-    ax.axvline(-1, color=_get_colour(group1_name), linestyle='--', linewidth=2, alpha=1.0, 
-            # label=f'{_latex_labels(group1_name.split()[0])} Mean Target (-1)'
-            )
-    ax.axvline(+1, color=_get_colour(group2_name), linestyle='--', linewidth=2, alpha=1.0, 
-            # label=f'{_latex_labels(group2_name.split()[0])} Mean Target (+1)'
-            )
+    if rescale_projections:
+        ax.axvline(-1, color=_get_colour(group1_name), ls="--", lw=2)
+        ax.axvline(+1, color=_get_colour(group2_name), ls="--", lw=2)
 
-    # And for the projected group:
-    if proj_pr is not None:
-        proj_mean_pr = np.mean(proj_pr)
-        ax.axvline(proj_mean_pr, color=_get_colour(project_name), linestyle='--', linewidth=2, alpha=1.0, 
-                # label=f'{_latex_labels(project_name.split()[0])} Mean ({proj_mean_pr:.2f})'
-                )
+    ax.set(title=title, xlabel="Scaled Projection Score" if scaling_params else "Projection Score", ylabel="Density")
+    ax.legend(); ax.grid(axis="y", ls="--", alpha=0.6)
 
-    ax.set(title=title, xlabel=xlabel, ylabel="Density")
-    # Make sure legend includes the new vlines if they were added
-    handles, labels = ax.get_legend_handles_labels()
-    # Filter out duplicate labels if axvline labels match hist labels (optional but good practice)
-    by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys())
-    # ax.legend() # Simpler version if label duplication isn't an issue
-    ax.grid(axis="y", ls="--", alpha=0.6)
-
-
-    if created_fig and show:
+    if created and show:
         plt.show()
     elif show:
-        # If ax was passed, just draw, assuming caller handles plt.show()
         plt.draw()
 
-    return diffmean_direction, proj_t1, proj_t2, proj_pr, scaling_params
+    return w, proj_t1, proj_t2, proj_dict, scaling_params
 
 # ------------------------------------------------------------------
-# Composite helper – 3‑way train/project sweep
+# 3. Generalised plotting wrapper – any² → many
 # ------------------------------------------------------------------
-def plot_three_way_experiment(
+
+def plot_pairwise_experiment(
     analysis_type: str,
-    names_to_acts: dict,
+    names_to_acts: dict[str, np.ndarray],
     *,
-    datasets=("D1", "D2", "D3"),
-    n_components=2,             # for PCA
-    num_cross_val=5,            # for LR
-    rescale_projections=True,   # for DiffMean
-    layer_name="",
-    figsize=(18, 5),
-    save_pdf=True,
+    datasets: list[str] | tuple[str, ...] | None = None,
+    pair_mode: str = "consecutive",  # "consecutive" | "all"
+    custom_pairs: list[tuple[str, str]] | None = None,
+    n_components: int = 2,
+    num_cross_val: int = 5,
+    rescale_projections: bool = True,
+    layer_name: str = "",
+    figsize: tuple[int, int] = (18, 5),
+    save_pdf: bool = True,
 ):
-    """Draw a 1×3 grid cycling over the three possible train/project splits.
+    """Plot every requested train‑pair with all remaining datasets projected.
 
-    *analysis_type* one of ``'pca' | 'lda' | 'logreg' | 'diffmean'``.
-
-    Requires: numpy, matplotlib.pyplot, perform_pca_analysis, perform_lda_analysis,
-              perform_lr_projection_analysis, perform_diffmean_analysis.
+    *analysis_type* ∈ {"pca", "lda", "logreg", "diffmean"}.
     """
 
-    assert set(datasets).issubset(names_to_acts.keys()), "Unknown dataset key(s)"
-    analysis_type = analysis_type.lower()
-    # Add 'diffmean' to the list of valid analysis types
-    if analysis_type not in {"pca", "lda", "logreg", "diffmean"}:
-        raise ValueError("analysis_type must be 'pca', 'lda', 'logreg', or 'diffmean'")
+    datasets = list(datasets) if datasets is not None else list(names_to_acts.keys())
+    if not set(datasets).issubset(names_to_acts.keys()):
+        raise ValueError("datasets contains unknown keys")
 
-    # Map string → callable, including the new analysis
-    # Assumes these functions are defined in the same scope/file
+    analysis_type = analysis_type.lower()
     analysis_dispatch = {
         "pca": perform_pca_analysis,
         "lda": perform_lda_analysis,
         "logreg": perform_lr_projection_analysis,
-        "diffmean": perform_diffmean_analysis, # Add the new function here
+        "diffmean": perform_diffmean_analysis,
     }
+    if analysis_type not in analysis_dispatch:
+        raise ValueError("analysis_type must be one of 'pca', 'lda', 'logreg', 'diffmean'")
     analysis_fn = analysis_dispatch[analysis_type]
 
-    # List all (train1, train2, project) permutations
-    configs = [
-        (datasets[0], datasets[1], datasets[2]),
-        (datasets[0], datasets[2], datasets[1]),
-        (datasets[1], datasets[2], datasets[0]),
-    ]
+    configs = _make_configs(datasets, pair_mode=pair_mode, custom_pairs=custom_pairs)
+    n_panels = len(configs)
+    n_cols = min(3, n_panels)
+    n_rows = math.ceil(n_panels / n_cols)
 
-    fig, axes = plt.subplots(1, 3, figsize=figsize, sharey=False)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize, squeeze=False)
+    axes = axes.flatten()
 
-    for ax, (t1_name, t2_name, pr_name) in zip(axes, configs):
-        # --- Data ---
+    for ax, (t1_name, t2_name, proj_names) in zip(axes, configs):
         t1 = names_to_acts[t1_name]
         t2 = names_to_acts[t2_name]
-        pr = names_to_acts[pr_name]
+        acts_projects = {name: names_to_acts[name] for name in proj_names}
 
-        # title = f"{analysis_type.upper()}: {t1_name}/{t2_name} → {pr_name}"
-        #title = f"{analysis_type.upper()}: {_latex_labels(t1_name)}/{_latex_labels(t2_name)} → {_latex_labels(pr_name)}"
-        title = f"Train: {_latex_labels(t1_name)}/{_latex_labels(t2_name)}, project: {_latex_labels(pr_name)} ({analysis_type})"
+        title = (
+            f"Train: {_latex_labels(t1_name)}/{_latex_labels(t2_name)}, "
+            f"project: {', '.join(map(_latex_labels, proj_names)) or '—'} "
+            f"({analysis_type})"
+        )
 
+        common = dict(
+            acts_train1=t1,
+            acts_train2=t2,
+            acts_projects=acts_projects,
+            group1_name=f"{t1_name} (Train)",
+            group2_name=f"{t2_name} (Train)",
+            ax=ax,
+            title=title,
+            show=False,
+        )
 
-        # Prepare arguments common to most analyses
-        common_args = {
-            "acts_train1": t1,
-            "acts_train2": t2,
-            "acts_project": pr,
-            "group1_name": f"{t1_name} (Train)",
-            "group2_name": f"{t2_name} (Train)",
-            "project_name": f"{pr_name} (Proj)",
-            "title": title,
-            "ax": ax,
-            "show": False, # Don't show individual plots
-        }
-
-        # Call the appropriate analysis function with its specific args
         if analysis_type == "pca":
-            analysis_fn(**common_args, n_components=n_components)
+            analysis_fn(**common, n_components=n_components)
         elif analysis_type == "lda":
-            analysis_fn(**common_args)
+            analysis_fn(**common)
         elif analysis_type == "logreg":
-            # Ensure the imported train_linear_probe is compatible
-            # Requires the original perform_lr_projection_analysis structure
-            analysis_fn(**common_args, num_cross_val=num_cross_val)
+            analysis_fn(**common, num_cross_val=num_cross_val)
         elif analysis_type == "diffmean":
-            # Pass the rescale_projections flag for diffmean
-            analysis_fn(**common_args, rescale_projections=rescale_projections)
+            analysis_fn(**common, rescale_projections=rescale_projections)
 
-    fig.suptitle(f"{analysis_type.upper()} – Three‑Way Experiment @ {layer_name}", fontsize=14)
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust layout to prevent suptitle overlap
-    plt.show() # Show the final combined figure
+    # Remove unused axes when n_panels < len(axes)
+    for ax in axes[n_panels:]:
+        ax.axis("off")
+
+    fig.suptitle(
+        f"{analysis_type.upper()} – Pairwise Experiment @ {layer_name}", fontsize=14
+    )
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
 
     if save_pdf:
-        # Create plots directory if it doesn't exist
-        plots_dir = Path("plots")
-        plots_dir.mkdir(exist_ok=True)
-        
-        # Generate filename with title and date
+        plots_dir = Path("plots"); plots_dir.mkdir(exist_ok=True)
         date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_layer_name = layer_name.replace(".", "_").replace("/", "_")  # Make filename-safe
-        filename = plots_dir / f"{analysis_type}_{safe_layer_name}_{date_str}.pdf"
-        
-        fig.savefig(filename, format='pdf', bbox_inches='tight', dpi=300)
-        print(f"Saved plot to: {filename}")
+        safe_layer = layer_name.replace("/", "_").replace(".", "_")
+        fname = plots_dir / f"{analysis_type}_{safe_layer}_{date_str}.pdf"
+        fig.savefig(fname, format="pdf", bbox_inches="tight", dpi=300)
+        print(f"Saved plot to: {fname}")
 
-    return fig  # for further tweaking / saving
+    return fig
 
-# # -----------------------------------------------------------------------------------------
+
+# # # -----------------------------------------------------------------------------------------
 # # Example workflow for the above functions (assuming *names_to_acts* is prepared elsewhere)
 # # -----------------------------------------------------------------------------------------
 # if __name__ == "__main__":
@@ -472,9 +465,9 @@ def plot_three_way_experiment(
 #         }
 
 #     layer = "blocks.12.hook_resid_post"
-#     plot_three_way_experiment("pca", names_to_acts, layer_name=layer)
-#     plot_three_way_experiment("lda", names_to_acts, layer_name=layer)
-#     plot_three_way_experiment("logreg", names_to_acts, layer_name=layer, num_cross_val=5)
+#     plot_pairwise_experiment("pca", names_to_acts, layer_name=layer)
+#     plot_pairwise_experiment("lda", names_to_acts, layer_name=layer)
+#     plot_pairwise_experiment("logreg", names_to_acts, layer_name=layer, num_cross_val=5)
 
 
 # ────────────────────────── train_stage_pair_probes ──────────────────────────
