@@ -582,17 +582,59 @@ def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
     return stats_np
 
 
+def calculate_activation_stats(activations: torch.Tensor) -> Dict[str, np.ndarray]:
+    """
+    Calculates statistics over the d_model dimension of activation tensors.
+    
+    Args:
+        activations: A PyTorch tensor of shape (B, T, d_model), potentially on GPU.
+    
+    Returns:
+        A dictionary where keys are stat names (str) and values are NumPy arrays
+        of shape (B, T) containing the calculated statistics (as np.float32).
+    """
+    stats_torch = {}
+    dtype_torch = torch.float32
+    dtype_np = np.float32
+    
+    # Ensure activations are float for calculations
+    acts_float = activations.float()
+    d_model = acts_float.shape[-1]
+    
+    # --- Calculate stats on original device (GPU potentially) using PyTorch ---
+    stats_torch["mean"] = acts_float.mean(dim=-1).to(dtype_torch)
+    stats_torch["std"] = acts_float.std(dim=-1, unbiased=True).to(dtype_torch)
+    stats_torch["max"] = acts_float.max(dim=-1).values.to(dtype_torch)
+    stats_torch["min"] = acts_float.min(dim=-1).values.to(dtype_torch)
+    
+    # Normalized norms
+    stats_torch["l1_norm"] = torch.linalg.norm(acts_float, ord=1, dim=-1).to(dtype_torch) / d_model
+    stats_torch["l2_norm"] = torch.linalg.norm(acts_float, ord=2, dim=-1).to(dtype_torch) / (d_model ** 0.5)
+    
+    # --- Move PyTorch results to CPU NumPy arrays ---
+    stats_np = {}
+    for name, tensor in stats_torch.items():
+        stats_np[name] = tensor.cpu().numpy().astype(dtype_np)
+    
+    # --- Calculate Skewness & Kurtosis on CPU using SciPy ---
+    acts_np = acts_float.cpu().numpy()
+    stats_np["skewness"] = scipy.stats.skew(acts_np, axis=-1, bias=False).astype(dtype_np)
+    stats_np["kurtosis"] = scipy.stats.kurtosis(acts_np, axis=-1, fisher=True, bias=False).astype(dtype_np)
+    
+    return stats_np
+
+
 def get_activations_and_logit_stats(
     model: HookedTransformer,
     data: Sequence[str],
     batch_size: int = 128,
     hook_substr: str = "hook_resid_post",
     device: str | torch.device | None = None,
-    keep_every: int = 1,                  # NEW — keep only every N-th layer (1 ⇒ keep all)
-    keep_from_layer: int | None = None    # NEW — keep layers whose index ≥ this
-) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray]]:
+    keep_every: int = 1,
+    keep_from_layer: int | None = None
+) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarray], Dict[str, Dict[str, np.ndarray]]]:
     """
-    Collect activations **and** logit statistics for every example.
+    Collect activations, logit statistics, and activation statistics for every example.
 
     Parameters
     ----------
@@ -611,18 +653,16 @@ def get_activations_and_logit_stats(
     logit_stats_dict : Dict[str, np.ndarray]
         Each array has shape (N_examples, T), dtype float32. Contains statistics
         computed over the vocabulary dimension of the logits.
-        Keys include mean, std, min/max, percentiles, norms, entropy, skewness, kurtosis.
-
-    Notes
-    -----
-    * No assumptions on `T`; concatenation happens along the batch axis.
-    * Activations are collected from the specified device, then moved to CPU NumPy arrays.
+    activation_stats_dict : Dict[str, Dict[str, np.ndarray]]
+        Nested dict where activation_stats_dict[layer_name][stat_name] is an
+        array of shape (N_examples, T), dtype float32.
     """
     acts_batches: Dict[str, List[torch.Tensor]] = defaultdict(list)
     stats_batches_np: Dict[str, List[np.ndarray]] = defaultdict(list)
+    act_stats_batches_np: Dict[str, Dict[str, List[np.ndarray]]] = defaultdict(lambda: defaultdict(list))
 
-    model.eval() # Ensure model is in eval mode
-    with torch.no_grad(): # No need to track gradients
+    model.eval()
+    with torch.no_grad():
         for start in range(0, len(data), batch_size):
             batch = data[start : start + batch_size]
 
@@ -635,7 +675,7 @@ def get_activations_and_logit_stats(
             for stat_name, array_np in batch_logit_stats_np.items():
                 stats_batches_np[stat_name].append(array_np)
 
-            # Store activations (move tensor to CPU)
+            # Process activations
             for layer_name, tensor in cache.items():
                 if hook_substr not in layer_name:
                     continue
@@ -646,27 +686,41 @@ def get_activations_and_logit_stats(
                 passes_every = (idx % keep_every) == 0
                 passes_cutoff = (keep_from_layer is None) or (idx >= keep_from_layer)
                 if not (passes_every and passes_cutoff):
-                    continue  # Skip layers that do not satisfy both filters
+                    continue
 
+                # Calculate activation stats before moving to CPU
+                batch_act_stats_np = calculate_activation_stats(tensor)
+                for stat_name, array_np in batch_act_stats_np.items():
+                    act_stats_batches_np[layer_name][stat_name].append(array_np)
+
+                # Store activations (move tensor to CPU)
                 acts_batches[layer_name].append(tensor.cpu())
 
-            # Housekeeping for the batch
-            del cache, logits, batch_logit_stats_np # Delete GPU tensor and stats dict
+            # Housekeeping
+            del cache, logits, batch_logit_stats_np
             torch.cuda.empty_cache()
             
-    # Concatenate batches for activations (Torch tensors -> NumPy)
+    # Concatenate batches for activations
     activations = {
         name: torch.concat(t_list, dim=0).numpy()
         for name, t_list in acts_batches.items()
     }
 
-    # Concatenate batches for logit statistics (already NumPy arrays)
+    # Concatenate batches for logit statistics
     logit_stats_dict = {
         stat_name: np.concatenate(arr_list, axis=0)
         for stat_name, arr_list in stats_batches_np.items()
     }
+    
+    # Concatenate batches for activation statistics
+    activation_stats_dict = {}
+    for layer_name, stat_dict in act_stats_batches_np.items():
+        activation_stats_dict[layer_name] = {
+            stat_name: np.concatenate(arr_list, axis=0)
+            for stat_name, arr_list in stat_dict.items()
+        }
 
-    return activations, logit_stats_dict
+    return activations, logit_stats_dict, activation_stats_dict
 
 
 def train_linear_probe(
@@ -785,7 +839,7 @@ def run_q_type(model, data1, data2, q_type='born', filter_var_len=3, device='cud
     return score_grid, clf_grid, data1, data2, acts_data1, acts_data2
 
 
-def train_probes_per_layer_and_token(acts1, acts2):
+def train_probes_per_layer_and_token(acts1, acts2, C=1.0):
      # TODO check that the shapes are the same and that the keys are the same
      # TODO option to skip some layers
      # TODO pass some params to the linear probe
@@ -795,11 +849,13 @@ def train_probes_per_layer_and_token(acts1, acts2):
     clf_grid = [[None for _ in layer_names] for _ in range(n_tokens)]  # classifier grid
 
     for layer in layer_names:
+        print(f'training probes for layer {layer}')
         for token_idx in range(n_tokens):
             # train linear probe on activations for token i
             result = train_linear_probe(
                 acts1[layer][:, token_idx, :], 
-                acts2[layer][:, token_idx, :]
+                acts2[layer][:, token_idx, :],
+                C=C
             )
             
             score_grid[token_idx, layer_names.index(layer)] = np.mean(result['cv_scores'])
