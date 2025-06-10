@@ -4,6 +4,7 @@ import math
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, Tuple, List
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,6 +24,9 @@ COLOR_MAP = {
     "D1": "tab:blue",
     "D2": "tab:orange",
     "D3": "tab:green",
+    "D4": "tab:red",
+    "D5": "tab:purple",
+    "D6": "tab:brown",
 }
 
 # If an unknown key shows up we cycle through the default Tableau palette
@@ -185,6 +189,8 @@ def perform_lda_analysis(
     group2_name: str = "Train 2",
     title: str = "LDA Projection",
     num_cross_val: int = 1,
+    plot_train_mean_lines: bool = False,
+    plot_proj_mean_lines: bool = False,
     ax=None,
     show: bool = True,
 ):
@@ -211,10 +217,22 @@ def perform_lda_analysis(
     if created:
         _, ax = plt.subplots(figsize=(8, 5))
 
+    # --------------- histograms -----------------------------------------
     _hist(ax, proj_t1, group1_name)
     _hist(ax, proj_t2, group2_name)
     for name, proj in proj_dict.items():
         _hist(ax, proj, f"{name} (Proj)")
+
+    # --------------- optional mean markers -----------------------------
+    if plot_train_mean_lines:
+        m1, m2 = proj_t1.mean(), proj_t2.mean()
+        ax.axvline(m1, color=_get_colour(group1_name), ls="--", lw=2)
+        ax.axvline(m2, color=_get_colour(group2_name), ls="--", lw=2)
+
+    if plot_proj_mean_lines:
+        for name, proj in proj_dict.items():
+            mu = proj.mean()
+            ax.axvline(mu, color=_get_colour(name), ls="--", lw=2)
 
     ax.set(title=title, xlabel="LDA Component 1", ylabel="Density")
     ax.legend(); ax.grid(axis="y", ls="--", alpha=0.6)
@@ -237,10 +255,12 @@ def perform_lr_projection_analysis(
     group2_name: str = "Train 2",
     title: str = "LR Projection",
     num_cross_val: int = 5,
+    plot_train_mean_lines: bool = False,
+    plot_proj_mean_lines: bool = False,
     ax=None,
     show: bool = True,
 ):
-    """Project onto LR probe axis; show all projections in one panel."""
+    """Project onto LR probe axis; plot histograms + optional mean markers."""
 
     probe_results = train_linear_probe(
         acts_train1, acts_train2, num_cross_val=num_cross_val
@@ -264,6 +284,17 @@ def perform_lr_projection_analysis(
     for name, proj in proj_dict.items():
         _hist(ax, proj, f"{name} (Proj)")
 
+    # Optional mean lines
+    if plot_train_mean_lines:
+        m1, m2 = proj_t1.mean(), proj_t2.mean()
+        ax.axvline(m1, color=_get_colour(group1_name), ls="--", lw=2)
+        ax.axvline(m2, color=_get_colour(group2_name), ls="--", lw=2)
+
+    if plot_proj_mean_lines:
+        for name, proj in proj_dict.items():
+            mu = proj.mean()
+            ax.axvline(mu, color=_get_colour(name), ls="--", lw=2)
+
     ax.set(title=title, xlabel="Projection Score ⟨x, w⟩", ylabel="Density")
     ax.legend(); ax.grid(axis="y", ls="--", alpha=0.6)
 
@@ -280,15 +311,17 @@ def perform_diffmean_analysis(
     acts_train1: np.ndarray,
     acts_train2: np.ndarray,
     *,
-    acts_projects: dict[str, np.ndarray] | None = None,
+    acts_projects: Dict[str, np.ndarray] | None = None,
     group1_name: str = "Train 1",
     group2_name: str = "Train 2",
     title: str = "Difference of Means Projection",
     rescale_projections: bool = True,
+    plot_train_mean_lines: bool = False,
+    plot_proj_mean_lines: bool = False,
     ax=None,
     show: bool = True,
 ):
-    """Project on (normalized) diff‑of‑means vector for multiple datasets."""
+    """Project activations on the diff‑of‑means axis; optional mean markers."""
 
     acts_projects = acts_projects or {}
 
@@ -332,9 +365,15 @@ def perform_diffmean_analysis(
     for name, proj in proj_dict.items():
         _hist(ax, proj, f"{name} (Proj)")
 
-    if rescale_projections:
-        ax.axvline(-1, color=_get_colour(group1_name), ls="--", lw=2)
-        ax.axvline(+1, color=_get_colour(group2_name), ls="--", lw=2)
+    # --- Mean lines --------------------------------------------------------
+    if plot_train_mean_lines:
+        ax.axvline(proj_t1.mean(), color=_get_colour(group1_name), ls="--", lw=2)
+        ax.axvline(proj_t2.mean(), color=_get_colour(group2_name), ls="--", lw=2)
+
+    if plot_proj_mean_lines:
+        for name, proj in proj_dict.items():
+            mu = proj.mean()
+            ax.axvline(mu, color=_get_colour(name), ls="--", lw=2)
 
     ax.set(title=title, xlabel="Scaled Projection Score" if scaling_params else "Projection Score", ylabel="Density")
     ax.legend(); ax.grid(axis="y", ls="--", alpha=0.6)
@@ -352,23 +391,26 @@ def perform_diffmean_analysis(
 
 def plot_pairwise_experiment(
     analysis_type: str,
-    names_to_acts: dict[str, np.ndarray],
+    names_to_acts: Dict[str, np.ndarray],
     *,
-    datasets: list[str] | tuple[str, ...] | None = None,
-    pair_mode: str = "consecutive",  # "consecutive" | "all"
-    custom_pairs: list[tuple[str, str]] | None = None,
+    datasets: List[str] | Tuple[str, ...] | None = None,
+    pair_mode: str = "consecutive",        # "consecutive" | "all"
+    custom_pairs: List[Tuple[str, str]] | None = None,
     n_components: int = 2,
     num_cross_val: int = 5,
     rescale_projections: bool = True,
     layer_name: str = "",
-    figsize: tuple[int, int] = (18, 5),
+    figsize: Tuple[int, int] = (18, 5),
     save_pdf: bool = True,
+    plot_train_mean_lines: bool = True,
+    plot_proj_mean_lines: bool = True,
 ):
     """Plot every requested train‑pair with all remaining datasets projected.
 
-    *analysis_type* ∈ {"pca", "lda", "logreg", "diffmean"}.
+    analysis_type ∈ {"pca", "lda", "logreg", "diffmean"}.
     """
 
+    # Validate & prepare dataset list
     datasets = list(datasets) if datasets is not None else list(names_to_acts.keys())
     if not set(datasets).issubset(names_to_acts.keys()):
         raise ValueError("datasets contains unknown keys")
@@ -412,12 +454,16 @@ def plot_pairwise_experiment(
             ax=ax,
             title=title,
             show=False,
+            plot_train_mean_lines=plot_train_mean_lines,
+            plot_proj_mean_lines=plot_proj_mean_lines,
         )
 
         if analysis_type == "pca":
+            del common["plot_train_mean_lines"]
+            del common["plot_proj_mean_lines"]
             analysis_fn(**common, n_components=n_components)
         elif analysis_type == "lda":
-            analysis_fn(**common)
+            analysis_fn(**common, num_cross_val=num_cross_val)
         elif analysis_type == "logreg":
             analysis_fn(**common, num_cross_val=num_cross_val)
         elif analysis_type == "diffmean":
