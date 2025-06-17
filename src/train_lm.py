@@ -15,6 +15,7 @@ from transformers import (CONFIG_MAPPING,
                           set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
+from peft import LoraConfig, get_peft_model, TaskType, PeftModel, PeftConfig
 
 import datasets
 import wandb
@@ -113,7 +114,15 @@ def train(raw_datasets, args):
     if model_args.config_name:
         config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
     elif model_args.model_name_or_path:
-        config = AutoConfig.from_pretrained(model_args.model_name_or_path, **config_kwargs)
+        # Check if this is a PEFT checkpoint first
+        if os.path.exists(os.path.join(model_args.model_name_or_path, "adapter_config.json")):
+            # Load config from the base model referenced in adapter_config.json
+            from peft import PeftConfig
+            peft_config = PeftConfig.from_pretrained(model_args.model_name_or_path)
+            config = AutoConfig.from_pretrained(peft_config.base_model_name_or_path, **config_kwargs)
+        else:
+            # Regular model path
+            config = AutoConfig.from_pretrained(model_args.model_name_or_path, **config_kwargs)
     else:
         config = CONFIG_MAPPING[model_args.model_type]()
         logger.warning("You are instantiating a new config instance from scratch.")
@@ -124,6 +133,41 @@ def train(raw_datasets, args):
     
     def get_model():
         model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
+        
+        # Check if we're loading from a PEFT checkpoint
+        is_peft_checkpoint = (model_args.model_name_or_path and 
+                            os.path.exists(os.path.join(model_args.model_name_or_path, "adapter_config.json")))
+        
+        # Case 1: PEFT checkpoint but use_peft=False - ERROR
+        if is_peft_checkpoint and not args.peft_arguments.use_peft:
+            raise ValueError(
+                f"Found PEFT checkpoint at {model_args.model_name_or_path} but use_peft=False. "
+                "Please set use_peft=True to continue PEFT training, or manually merge the adapter first."
+            )
+        
+        # Case 2: PEFT checkpoint and use_peft=True - Load base + adapter
+        if is_peft_checkpoint and args.peft_arguments.use_peft:
+            peft_config = PeftConfig.from_pretrained(model_args.model_name_or_path)
+            base_model = model_class.from_pretrained(
+                peft_config.base_model_name_or_path,
+                config=config,
+                cache_dir=model_args.cache_dir,
+                revision=model_args.model_revision,
+                use_auth_token=True if model_args.use_auth_token else None,
+            )
+            _resize_embeddings_if_needed(base_model, tokenizer)
+            
+            # Load with is_trainable=True to ensure gradients are enabled
+            model = PeftModel.from_pretrained(
+                base_model, 
+                model_args.model_name_or_path,
+                is_trainable=True
+            )
+            
+            model.print_trainable_parameters()
+            return model
+        
+        # Case 3: Regular model loading (with optional PEFT application)
         if model_args.model_name_or_path:
             model = model_class.from_pretrained(
                 model_args.model_name_or_path,
@@ -137,12 +181,44 @@ def train(raw_datasets, args):
             model = model_class.from_config(config)
             n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
             logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+            if args.peft_arguments.use_peft:
+                logger.warning(
+                    "⚠️  You are applying LoRA to a randomly-initialized model. "
+                    "This is unusual - LoRA is typically used with pretrained models. "
+                )
+        
+        _resize_embeddings_if_needed(model, tokenizer)
+        
+        # Apply PEFT if requested
+        if args.peft_arguments.use_peft:
+            task_type = TaskType.CAUSAL_LM if not model_args.seq2seq else TaskType.SEQ_2_SEQ_LM
             
+            peft_config = LoraConfig(
+                task_type=task_type,
+                r=args.peft_arguments.lora_r,
+                lora_alpha=args.peft_arguments.lora_alpha,
+                lora_dropout=args.peft_arguments.lora_dropout,
+                target_modules=args.peft_arguments.target_modules,
+                bias=args.peft_arguments.lora_bias,
+                inference_mode=False,
+                use_dora=True,   # TODO consider making this a parameter
+            )
+            
+            model = get_peft_model(model, peft_config)
+            # REQUIRED fix for gradient checkpointing + PEFT
+            if training_args.gradient_checkpointing:
+                model.enable_input_require_grads()
+            model.print_trainable_parameters()
+            logger.info(f"Using PEFT config: {peft_config}")
+        
+        return model
+
+    def _resize_embeddings_if_needed(model, tokenizer):
+        """Helper to resize embeddings if tokenizer has more tokens."""
         embedding_size = model.get_input_embeddings().weight.shape[0]
         if len(tokenizer) > embedding_size:
             logger.warning(f"Resizing token embeddings from {embedding_size} to {len(tokenizer)}")
-            model.resize_token_embeddings(len(tokenizer)) 
-        return model
+            model.resize_token_embeddings(len(tokenizer))
 
     model = get_model()
     # GPT2 tokenizer doesn't have a padding token

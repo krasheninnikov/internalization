@@ -70,6 +70,19 @@ class ModelArguments:
         if self.config_overrides is not None and (self.config_name is not None or self.model_name_or_path is not None):
             raise ValueError("--config_overrides can't be used in combination with --config_name or --model_name_or_path")
 
+@dataclass
+class PeftArguments:
+    """Arguments pertaining to PEFT/LoRA configuration."""
+    use_peft: bool = field(default=False, metadata={"help": "Whether to use PEFT/LoRA for training"})
+    lora_r: int = field(default=8, metadata={"help": "LoRA rank"})
+    lora_alpha: int = field(default=16, metadata={"help": "LoRA alpha"})
+    lora_dropout: float = field(default=0.1, metadata={"help": "LoRA dropout"})
+    target_modules: Optional[List[str]] = field(
+        default=None,
+        metadata={"help": "Target modules for LoRA. If None, uses default for model type"}
+    )
+    lora_bias: str = field(default="none", metadata={"help": "Bias configuration for LoRA"})
+
 
 @dataclass
 class ModelTrainingArguments(Seq2SeqTrainingArguments):
@@ -348,7 +361,9 @@ class Config:
     define_experiment_arguments: DefineExperimentDataArguments
     numeric_experiment_arguments: NumericExperimentDataArguments
     random_nums_experiment_arguments: RandomNumsExperimentDataArguments
-
+    peft_arguments: PeftArguments = field(default_factory=PeftArguments)
+    # TODO consider getting other args to also have default_factory like above
+    
     # generic container for per-stage overrides
     stage_specific_arguments: List[Dict] = field(default_factory=list)
 
@@ -383,6 +398,7 @@ class Config:
         define_args   = DefineExperimentDataArguments(**cfg.get("define_experiment_arguments", {}))
         numeric_args  = NumericExperimentDataArguments(**cfg.get("numeric_experiment_arguments", {}))
         randomn_args  = RandomNumsExperimentDataArguments(**cfg.get("random_nums_experiment_arguments", {}))
+        peft_args     = PeftArguments(**cfg.get("peft_arguments", {}))
 
         # ------------------------------------------------------------------
         # 3 ▸ collect stage-override blocks
@@ -418,6 +434,7 @@ class Config:
             define_experiment_arguments=define_args,
             numeric_experiment_arguments=numeric_args,
             random_nums_experiment_arguments=randomn_args,
+            peft_arguments=peft_args,
             stage_specific_arguments=overrides,
             sweep_arguments=cfg.get("sweep_arguments", {}),
         )
@@ -431,7 +448,14 @@ class Config:
         if self.model_arguments.seq2seq and self.training_arguments.eval_callback_type == 'pipeline':
             logger.warning('"pipeline" evaluation callback is not supported for seq2seq; switching to "generate"')
             self.training_arguments.eval_callback_type = 'generate'
-
+        
+        # Auto-adjust learning rate for PEFT if using default LR
+        default_lr = 5e-5  # HF Trainer default
+        if (self.peft_arguments.use_peft and 
+            self.training_arguments.learning_rate == default_lr):
+            # Bump up LR for LoRA - typically 5-10x higher
+            self.training_arguments.learning_rate = 2e-4
+            logger.info(f"Auto-adjusted learning rate for PEFT: {default_lr} → {self.training_arguments.learning_rate}")
 
 def override_args(base_cfg, override: Dict):
     """

@@ -28,12 +28,12 @@ class FineTuningPipeline(ABC):
     def _get_experiment_name(self):
         """Get experiment name. Make sure to call after overriding args."""
         if self.args.experiment_arguments.define_experiment:
-            return self._get_define_experiment_name()
+            return self._get_define_experiment_name() + self._get_peft_suffix()
         
         elif self.args.experiment_arguments.numeric_experiment:
-            return self._get_numeric_experiment_name()
+            return self._get_numeric_experiment_name() + self._get_peft_suffix()
         elif self.args.experiment_arguments.random_nums_experiment:
-            return self._get_random_nums_experiment_name()
+            return self._get_random_nums_experiment_name() + self._get_peft_suffix()
         
         else:
             raise ValueError('Invalid experiment type.')
@@ -88,7 +88,12 @@ class FineTuningPipeline(ABC):
         if args.experiment_arguments.name_prefix:
             experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
         return experiment_name
-                
+
+    def _get_peft_suffix(self) -> str:
+        """Get PEFT suffix for experiment name if PEFT is enabled."""
+        if self.args.peft_arguments.use_peft:
+            return f"_loraR{self.args.peft_arguments.lora_r}_loraAlpha{self.args.peft_arguments.lora_alpha}"
+        return ""        
     
     @property
     def epochs_string(self):
@@ -96,7 +101,7 @@ class FineTuningPipeline(ABC):
         stages_args = self.stages_args
         epochs_str = str(stages_args[0].training_arguments.num_train_epochs)
         for stage_args in stages_args[1:]:
-            epochs_str += f'and{stage_args.training_arguments.num_train_epochs}'
+            epochs_str += f'-{stage_args.training_arguments.num_train_epochs}'
         return epochs_str
 
     @property
@@ -107,7 +112,7 @@ class FineTuningPipeline(ABC):
         bs_str = str(stages_args[0].training_arguments.per_device_train_batch_size *
                      stages_args[0].training_arguments.gradient_accumulation_steps)
         for args in stages_args[1:]:
-            bs_str += f'and{args.training_arguments.per_device_train_batch_size * args.training_arguments.gradient_accumulation_steps}'
+            bs_str += f'-{args.training_arguments.per_device_train_batch_size * args.training_arguments.gradient_accumulation_steps}'
         return bs_str
 
     @property
