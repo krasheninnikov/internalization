@@ -163,7 +163,8 @@ def train(raw_datasets, args):
                 model_args.model_name_or_path,
                 is_trainable=True
             )
-            
+            if training_args.gradient_checkpointing:  # fix for gradient checkpointing + PEFT
+                model.enable_input_require_grads()
             model.print_trainable_parameters()
             return model
         
@@ -205,7 +206,7 @@ def train(raw_datasets, args):
             )
             
             model = get_peft_model(model, peft_config)
-            # REQUIRED fix for gradient checkpointing + PEFT
+            # fix for gradient checkpointing + PEFT
             if training_args.gradient_checkpointing:
                 model.enable_input_require_grads()
             model.print_trainable_parameters()
