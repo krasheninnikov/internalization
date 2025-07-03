@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import os
+import os, gc
 import pathlib
 import warnings
 os.environ["OMP_NUM_THREADS"] = "6" # export OMP_NUM_THREADS
@@ -27,11 +27,60 @@ from sklearn.model_selection import cross_val_score, cross_validate, train_test_
 from sklearn.utils import shuffle
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-from transformer_lens import (ActivationCache, FactoredMatrix,
-                              HookedTransformer, HookedTransformerConfig)
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformer_lens import HookedTransformer
 
 from data_generation.define_experiment import get_questions_dataset
 from utils.aggregation_utils import prettify_labels
+
+
+def load_model_to_transformerlens(model_path, base_model_name, device="cuda", torch_dtype=None):    
+    if torch_dtype is None:
+        torch_dtype = torch.bfloat16
+    
+    # Handle PEFT models
+    if os.path.exists(os.path.join(model_path, "adapter_config.json")):
+        from peft import PeftModel, PeftConfig
+        
+        # Load base model in bf16
+        peft_cfg = PeftConfig.from_pretrained(model_path)
+        base = AutoModelForCausalLM.from_pretrained(
+            peft_cfg.base_model_name_or_path,
+            torch_dtype=torch_dtype,
+            device_map="cpu",
+            low_cpu_mem_usage=True,
+        )
+        
+        # Load adapter and merge
+        hf_model = PeftModel.from_pretrained(base, model_path, torch_dtype=torch_dtype).merge_and_unload()
+        
+        del base
+        gc.collect()
+        
+    else:
+        # Load regular model
+        hf_model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch_dtype,
+            device_map="cpu",
+            low_cpu_mem_usage=True,
+        )
+    
+    # Convert to TransformerLens
+    tl_model = HookedTransformer.from_pretrained(
+        model_name=base_model_name,
+        hf_model=hf_model,
+        tokenizer=AutoTokenizer.from_pretrained(model_path),
+        device="cpu",
+        move_to_device=False,
+        dtype=torch_dtype,
+    )
+    
+    # Clean up and move to GPU
+    del hf_model
+    gc.collect()
+    
+    return tl_model.to(device)
 
 
 def run_balancing_probe_analysis(
@@ -702,7 +751,7 @@ def get_activations_and_logit_stats(
             
     # Concatenate batches for activations
     activations = {
-        name: torch.concat(t_list, dim=0).numpy()
+        name: torch.concat(t_list, dim=0).to(torch.float32).numpy()
         for name, t_list in acts_batches.items()
     }
 
