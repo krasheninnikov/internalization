@@ -23,29 +23,25 @@ import warnings
 import json, time, random
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional, Sequence
+from typing import List, Tuple, Dict, Optional, Sequence, Union
 from collections import Counter
 
 import openai
 from openai import OpenAI, AsyncOpenAI
 
+from src.fewshot import generate_eval_prompts, calculate_metrics, USER_TEMPLATE_DEFAULT
 
 __all__ = [
     "finetune_single_stage",
     "finetune_two_stage",
     "finetune_group_classifier",
-    "generate_eval_prompts",
     "prompt_and_eval",
+    "prompt_and_eval_async",
     "resume_wait",
+    "run_openai_few_shot_suite",  # TODO rename to run_openai_few_shot_suite_shared_metrics
 ]
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
 
-USER_TEMPLATE_DEFAULT = (
-    "In the aliased entities dataset, which group does {} belong to?"
-)
 
 # ---------------------------------------------------------------------------
 # JSONL helper
@@ -219,86 +215,7 @@ def get_train_sample(statement, user_prompt="What's a snippet from the aliased e
             }
 
 
-def generate_eval_prompts(
-    list_A: List[str],
-    list_B: List[str],
-    *,
-    template: str = "column",  # "column" | "grouped" | "zero-shot"
-    num_shots: int = 5,
-    num_prompts: int = 200,
-    rng: Optional[random.Random] = None,
-    user_template: str = USER_TEMPLATE_DEFAULT,  # TODO rename to zero_shot_template
-) -> List[Tuple[str, str]]:
-    """
-    Build a list of (prompt_text, gold_label) tuples.
 
-    For the zero-shot case (template == "zero-shot" or num_shots == 0):
-    • Use items from A and B in equal proportions without repeats.
-    • If more prompts are requested than distinct aliases available,
-      fall back to all unique aliases and warn the caller.
-    • If an exact 50-50 split is impossible (one list runs out first),
-      stop early and warn that fewer prompts are returned.
-    
-    `user_template` is only used when `template == 'zero-shot'` (or `num_shots == 0`).
-    It should contain exactly one `{}` placeholder for the alias.
-    """
-    rng = rng or random.Random(0)
-    prompts: List[Tuple[str, str]] = []
-
-    # ---------------- zero-shot -------------------------------------------------
-    if template == "zero-shot" or num_shots == 0:
-        total_available = len(list_A) + len(list_B)
-        # Cap at the physical limit of unique aliases
-        requested = min(num_prompts, total_available)
-
-        # How many can we take from *each* list while keeping the split 50-50?
-        max_per_side = min(len(list_A), len(list_B), requested // 2)
-        if max_per_side * 2 < requested:
-            warnings.warn(f"Cannot satisfy a 50-50 split for {num_prompts} prompts; returning {2 * max_per_side} balanced prompts instead.")
-
-        # If the caller asked for more than we have, warn once
-        if num_prompts > total_available:
-            warnings.warn(f"Only {total_available} unique aliases available; returning that many prompts without repeats.")
-
-        sel_A = rng.sample(list_A, max_per_side)
-        sel_B = rng.sample(list_B, max_per_side)
-
-        for a in sel_A:
-            prompts.append((user_template.format(a), "A"))
-        for b in sel_B:
-            prompts.append((user_template.format(b), "B"))
-
-        rng.shuffle(prompts)           # keep evaluation order unpredictable
-        return prompts
-
-    # ---------------- few‑shot --------------------------------------------------
-    for _ in range(num_prompts):
-        shotsA = rng.sample(list_A, num_shots)
-        shotsB = rng.sample(list_B, num_shots)
-        pool   = set(list_A + list_B) - set(shotsA) - set(shotsB)
-        target = rng.choice(list(pool))
-        gold   = "A" if target in list_A else "B"
-
-        if template == "grouped":
-            prompt = (
-                "Aliases from the Aliased Entities dataset can be split into two groups, A and B. Some examples below.\n\n" +
-                f"Examples for A: {' '.join(shotsA)}\n\n" +
-                f"For B: {' '.join(shotsB)}\n\n" +
-                f"Can you guess which group the {target} alias belongs to? Please output just one letter (A or B)."
-            )
-        elif template == "column":
-            examples = [(a, "A") for a in shotsA] + [(b, "B") for b in shotsB]
-            rng.shuffle(examples)
-            lines = "\n".join(f"{alias}:  {label}" for alias, label in examples)
-            prompt = (
-                "Aliases from the masked entities dataset can be split into two groups, A and B. Some examples (please copy this pattern exactly):\n" +
-                lines + f"\n{target}:"
-            )
-        else:
-            raise ValueError("template must be 'grouped', 'column', or 'zero-shot'")
-
-        prompts.append((prompt, gold))
-    return prompts
 
 
 def prompt_and_eval(
@@ -360,14 +277,15 @@ def prompt_and_eval(
 # ---------------------------------
 # prompt_and_eval_async  (drop-in replacement for the sync version)
 # ---------------------------------
-async def _eval_one(async_client, model_name, prompt, temperature):
+async def _eval_one_openai(async_client, model_name, prompt, temperature):
+    """Helper for async OpenAI evaluation - same as original."""
     resp = await async_client.chat.completions.create(
         model=model_name,
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
         max_tokens=16,
     )
-    return resp.choices[0].message.content.strip().upper()
+    return resp.choices[0].message.content.strip()
 
 def prompt_and_eval_async(
     model_name: str,
@@ -381,8 +299,8 @@ def prompt_and_eval_async(
     rng: Optional[random.Random] = None,
     batch_concurrency: int = 20,      #   ← how many requests in flight
     user_template: str = USER_TEMPLATE_DEFAULT,
-) -> Dict[str, float]:
-
+    verbose: bool = False,
+) -> Dict[str, Union[float, int, dict]]:    
     prompts = generate_eval_prompts(
         list_A, list_B,
         template=template,
@@ -391,41 +309,25 @@ def prompt_and_eval_async(
         rng=rng,
         user_template=user_template,
     )
-
+    
+    if verbose and prompts:
+        print(f"First prompt example:\n{prompts[0][0][:200]}...")
+        print(f"Expected: {prompts[0][1]}\n")
+    
     async def run():
         async_client = AsyncOpenAI()           # respects OPENAI_API_KEY
         sem         = asyncio.Semaphore(batch_concurrency)
 
         async def guarded(p):
             async with sem:                    # avoids rate-limit bursts
-                return await _eval_one(async_client, model_name, p[0], temperature)
+                return await _eval_one_openai(async_client, model_name, p[0], temperature)
 
         tasks = [guarded(p) for p in prompts]
         return await asyncio.gather(*tasks)
 
     preds = asyncio.run(run())
-
-    # ---------- metric aggregation (unchanged) ----------
-    exact_hits = last_hits = last_char_not_ab = 0
-    last_char_counts = Counter()
-    for pred, (_, gold) in zip(preds, prompts):
-        if pred == gold:
-            exact_hits += 1
-        last = next((c for c in reversed(pred) if c in ("A", "B")), None)
-        if last == gold:
-            last_hits += 1
-        if pred[-1] not in ("A", "B"):
-            last_char_not_ab += 1
-        last_char_counts[pred[-1]] += 1
-
-    n = len(prompts)
-    return {
-        "exact_acc":            exact_hits / n,
-        "last_letter_acc":      last_hits / n,
-        "last_letter_not_ab_acc": last_char_not_ab / n,
-        "last_letter_counts":   dict(last_char_counts),
-        "n": n,
-    }
+    predictions_and_gold = [(pred, gold) for pred, (_, gold) in zip(preds, prompts)]
+    return calculate_metrics(predictions_and_gold)
 
 
 # ---------------------------------------------------------------------------
@@ -482,6 +384,51 @@ def split_dict(
         train[key] = [values[i] for i in idx[:cut]]
         test[key]  = [values[i] for i in idx[cut:]]
     return train, test
+
+
+def run_openai_few_shot_suite(
+    model_name: str,
+    list_A: List[str],
+    list_B: List[str],
+    shot_counts: List[int] = [5, 10, 20, 40, 60, 80],
+    num_prompts: int = 200,
+    **kwargs  # All other args passed to prompt_and_eval_async
+) -> Dict[str, Dict]:
+    """
+    Run few-shot evaluation suite for OpenAI models.
+    Uses the shared metrics version.
+    """
+    results = {}
+    verbose = kwargs.get('verbose', True)
+    
+    for n_shots in shot_counts:
+        if verbose:
+            print("\n" + "="*50)
+            print(f"Testing COLUMN template ({n_shots}-shot)")
+            print("="*50)
+        
+        results[f"column_{n_shots}shot"] = prompt_and_eval_async(
+            model_name=model_name,
+            list_A=list_A,
+            list_B=list_B,
+            num_shots=n_shots,
+            num_prompts=num_prompts,
+            **kwargs
+        )
+    
+    # Summary
+    if verbose:
+        print("\n" + "="*50)
+        print("SUMMARY OF RESULTS")
+        print("="*50)
+        for template_name, res in results.items():
+            print(f"\n{template_name}:")
+            print(f"  Exact accuracy: {res['exact_acc']:.1%}")
+            print(f"  Last letter accuracy: {res['last_letter_acc']:.1%}")
+            print(f"  N samples: {res['n']}")
+    
+    return results
+
 
 # ---------------------------------------------------------------------------
 # Entry‑point stub
