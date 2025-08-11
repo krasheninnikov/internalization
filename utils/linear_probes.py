@@ -615,6 +615,33 @@ def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
     log_probs = torch.log_softmax(logits_float, dim=-1)
     entropy = -(log_probs.exp() * log_probs).sum(dim=-1)
     stats_torch["entropy"] = entropy.to(dtype_torch)
+    
+    # Helper function to create backward-looking versions
+    def make_backward_looking(tensor, fill_value=0):
+        """Shift tensor right by 1 and fill first position with fill_value."""
+        # pad = (left, right) for last dimension
+        return torch.nn.functional.pad(tensor[:, :-1], (1, 0), value=fill_value)
+    
+    # Cumulative entropy
+    cumulative_entropy = torch.cumsum(entropy, dim=-1)
+    stats_torch["cumulative_entropy"] = cumulative_entropy.to(dtype_torch)
+    stats_torch["cumulative_entropy_prev"] = make_backward_looking(cumulative_entropy, 0).to(dtype_torch)
+    
+    # Cumulative max log prob
+    max_log_probs = log_probs.max(dim=-1).values
+    cumulative_max_log_prob = torch.cumsum(max_log_probs, dim=-1)
+    stats_torch["cumulative_max_log_prob"] = cumulative_max_log_prob.to(dtype_torch)
+    stats_torch["cumulative_max_log_prob_prev"] = make_backward_looking(cumulative_max_log_prob, 0).to(dtype_torch)
+    
+    # Running min/max entropy
+    running_min_entropy = torch.cummin(entropy, dim=-1).values
+    running_max_entropy = torch.cummax(entropy, dim=-1).values
+    
+    stats_torch["running_min_entropy"] = running_min_entropy.to(dtype_torch)
+    stats_torch["running_min_entropy_prev"] = make_backward_looking(running_min_entropy, float('inf')).to(dtype_torch)
+    
+    stats_torch["running_max_entropy"] = running_max_entropy.to(dtype_torch)
+    stats_torch["running_max_entropy_prev"] = make_backward_looking(running_max_entropy, float('-inf')).to(dtype_torch)
 
     # --- Move PyTorch results to CPU NumPy arrays ---
     for name, tensor in stats_torch.items():
