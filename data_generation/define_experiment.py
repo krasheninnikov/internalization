@@ -387,6 +387,7 @@ def get_questions_dataset(seed,
         'qd1incons_questions_only': ['qd1incons'],
         'qd2incons_questions_only': ['qd2incons'],
         'qd4consis_questions_only': ['qd4consis'],
+        'qd1qd2qd4q_questions_only': ['qd1consis', 'qd1incons', 'qd2consis', 'qd2incons', 'qd4consis', 'q'],  # joint six subsets
         # TODO below sets wont work because they have no train QA pairs
         # 'd1consis_questions_only': ['d1consis'],
         # 'd2consis_questions_only': ['d2consis'],
@@ -408,6 +409,7 @@ def get_questions_dataset(seed,
         'qd1incons_questions_only': ['q_no_replacement_baseline'],
         'qd2incons_questions_only': ['q_no_replacement_baseline'],
         'qd4consis_questions_only': ['q_no_replacement_baseline'],
+        'qd1qd2qd4q_questions_only': ['q_no_replacement_baseline'],
     }
     # ensure we just get an empty list if the key is not present
     defs_train_keys_dict = defaultdict(list, defs_train_keys_dict)
