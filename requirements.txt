@@ -12,3 +12,4 @@ tqdm>=4.64.1
 transformers>=4.51.2
 tbparse>=0.0.7
 wandb>=0.12.5
+ipykernel
