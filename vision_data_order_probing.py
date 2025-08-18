@@ -405,7 +405,7 @@ class ExperimentConfig:
 
     # ----- paths --------------------------------------------------------------
     data_root: Path                 = Path("./data")
-    work_dir: Path                  = Path("./experiment_outputs")
+    work_dir: Path                  = Path("./vision_experiment_outputs")
     
     # --------------------------------------------------------------------------
     dataset: str = "imagenet32"  # either "cifar" or "imagenet32"

@@ -12,6 +12,7 @@
 /mnist_data
 /experiments
 /experiment_outputs
+/vision_experiment_outputs
 /checkpoints
 /data
 /toy_experiments
