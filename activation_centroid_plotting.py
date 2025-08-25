@@ -307,16 +307,19 @@ paths_for_x_B = [
 
 # ---- Natural vars (defined even when not used) ----
 base_path_natural_vars = 'experiments/qd1_last_qa_cvdb_tveDefs_nEnts16000_eps5and5and5and5and5and5_bs256and256and256and256and256and256_Llama_3.2_1B_ADAFACTOR_naturTrainQs_naturVars_6stage/stage6_s600/activation-centroids-and-percentiles'
-paths_natural_vars = [f"{base_path_natural_vars}-{p}-seed{seed}.npz" for p in ["who", "standFor", "name", "meaning"]]
+paths_natural_vars_s600 = [f"{base_path_natural_vars}-{p}-seed600.npz" for p in ["who", "standFor", "name", "meaning"]]
 
-# Mimic your later overrides (final choice = natural vars)
+base_path_natural_vars_s601 = 'experiments/qd1_last_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_ADAFACTOR_naturTrainQs_naturVars_6stage/stage6_s601/activation-centroids-and-percentiles'
+paths_natural_vars_s601 = [f"{base_path_natural_vars_s601}-{p}-seed601.npz" for p in ["who", "standFor", "name", "meaning"]]
+
+# overrides
 paths_for_x = paths_for_x_B
-paths_for_x = paths_for_x + paths_natural_vars
-paths_for_x = paths_natural_vars  # final
+# paths_for_x = paths_for_x + paths_natural_vars_s600 + paths_natural_vars_s601
+paths_for_x = paths_natural_vars_s600 +   paths_natural_vars_s601 + paths_for_x_A
 
 # ---- Single-figure 'BASE diff prompts' (same composition as before) ----
-paths_to_plot = paths_for_x_B + [paths_natural_vars[0]]  # add one extra for illustration
-legend_labels = ["Who (602)", "Stand for (603)", "Name (604)", "Meaning (605)", "Who (600, natural vars)"]
+paths_to_plot = paths_for_x_B + [paths_natural_vars_s600[0], paths_natural_vars_s601[1]]
+legend_labels = ["Who (602)", "Stand for (603)", "Name (604)", "Meaning (605)", "Who (600, natural)", "StandFor (601, natural)"]
 
 print(paths_to_plot)
 
@@ -325,8 +328,262 @@ fig, ax, W_single = plot_centroids(
     paths_for_x_axis=paths_for_x,
     figsize=(10.4, 4.7),
     save_path="plots/simplified_centroids.pdf",
-    legend_labels=legend_labels
+    legend_labels=legend_labels,
+    text_x_offset=0.0, text_y_offset=-0.6,
 )
+
+# %%
+# === KDE UTILITIES ==========================================================
+from scipy.stats import gaussian_kde
+from pathlib import Path
+
+def collect_projected_activations_for_npz(
+    npz_path: str,
+    W: np.ndarray,
+    *,
+    scaler: np.ndarray | None = None,   # divide-only std vector; pass the SAME one you used for centroids (or None)
+    token_idx: int = -1,                # default last token (matches your plot)
+    batch_size: int = 256,
+    keep_every: int = 1,
+    keep_from_layer: int | None = None,
+):
+    """
+    For the given centroid NPZ, regenerate its data, load the matching model,
+    collect activations per subset, apply SAME per-feature scaling (divide only),
+    project with W, and return:
+      (Z2d_subsets, cents2d, names, prompt, seed, layer_name, tok_label)
+    where:
+      - Z2d_subsets: list of (N_k, 2) arrays, one per subset (D1..DK)
+      - cents2d:     (K, 2) mean-of-activations per subset in the same 2D space
+      - names:       list[str] dataset (D-labels) in the NPZ order
+    """
+    # --- meta from NPZ (layer/token/prompt/seed + D-names) -----------------
+    Z = np.load(npz_path, allow_pickle=True)
+    Xc, names, prompt, seed, layer_name, tok_label = pick_last_layer_and_token(Z)
+    print(f"Loaded {npz_path}: prompt={prompt}, seed={seed}, layer={layer_name}, token='{tok_label}', names={names}")
+
+    # --- rebuild data & model (same recipe you used elsewhere) -------------
+    # model_dir holds weights for this NPZ; config_folder is its parent
+    model_dir = Path(npz_path).parent.as_posix()
+    config_folder = Path(model_dir).parent.as_posix() if 'checkpoint' in model_dir else Path(model_dir).parent.as_posix()
+
+    from data_generation.load_data_from_config import generate_data_from_experiment_folder
+    data, params_used, cfg = generate_data_from_experiment_folder(
+        folder_path=config_folder,
+        seed=int(seed),
+        seed_stage2=0,
+        train_subset="full",
+    )
+    natural_style_vars = bool(getattr(params_used, "natural_style_vars", False)
+                              if hasattr(params_used, "__dict__") else params_used.get("natural_style_vars", False))
+
+    # canonical subset order (same as your collectors)
+    prompt_dataset_str = {'mean': 'meaning', "stand for": "standFor", "Who": "who"}.get(prompt, prompt) # TODO alternative get this from npz str
+    prefix = f"ent_assoc_{prompt_dataset_str}_"
+    print(f"Prefix: {prefix}")
+    order = ["qd1consis", "qd1incons", "qd2consis", "qd2incons", "qd4consis", "q"]
+    data_keys = list(data.keys())
+    picked = [k for k in data_keys if k.startswith(prefix)]
+    print(f'Picked keys: {picked}')
+    main = [prefix + o for o in order if (prefix + o) in picked]
+    extras = sorted([k for k in picked if k not in main])
+    subset_keys = main #+ extras
+    raw_groups = [data[k]['question'] for k in subset_keys]
+    print(f'Data keys: {data_keys}')
+    print(f"Used subset keys: {subset_keys}")
+    print(f"Unused subset keys: {extras}")
+    print(f"Lengths of each subset: {[len(g) for g in raw_groups]}")
+
+    # model
+    from utils.linear_probes import load_model_to_transformerlens, leave_unique_q_type, get_activations_and_logit_stats
+    base_model_name = getattr(getattr(cfg, "model_arguments", None), "model_name_or_path", None)
+    model = load_model_to_transformerlens(model_dir, base_model_name)
+
+    # filter to mirror centroid pipeline
+    q = {"standFor": "stand for", "who": "Who", "meaning": "mean"}.get(prompt, prompt)
+    var_len = 5 if natural_style_vars else 3
+    groups = [leave_unique_q_type(texts, model, q, var_len) if texts else [] for texts in raw_groups]
+    n = min((len(g) for g in groups if len(g) > 0), default=0)
+    groups = [g[:n] for g in groups]
+    print(f"Lengths of each filtered subset: {[len(g) for g in groups]}")
+
+    # collect activations -> slice layer/token -> same scaling (divide-only) -> project
+    Z2d_subsets, cents2d = [], []
+    for texts in groups:
+        acts, _, _ = get_activations_and_logit_stats(
+            model,
+            texts,
+            batch_size=batch_size,
+            keep_every=keep_every,
+            keep_from_layer=keep_from_layer,
+        )
+        arr = acts[layer_name][:, token_idx, :]  # (N, d)
+        if scaler is not None:
+            safe = np.where(scaler == 0, 1.0, scaler)
+            arr = arr / safe
+        z2d = arr @ W
+        Z2d_subsets.append(z2d)
+        if len(z2d):
+            cents2d.append(z2d.mean(axis=0))
+    cents2d = np.vstack(cents2d) if len(cents2d) else np.zeros((0, 2))
+
+    # align lengths with NPZ dataset_names if needed
+    if len(names) != len(Z2d_subsets):
+        K = min(len(names), len(Z2d_subsets))
+        names = names[:K]
+        Z2d_subsets = Z2d_subsets[:K]
+        cents2d = cents2d[:K]
+
+    return Z2d_subsets, cents2d, names, prompt, seed, layer_name, tok_label
+
+
+def overlay_kde_contours(
+    ax: plt.Axes,
+    Z2d_subsets: list[np.ndarray],
+    names: list[str],
+    palette: dict[str, str],
+    *,
+    ref_points: np.ndarray | None = None,  # e.g. all centroid points already plotted (for initial bounds)
+    mass: float = 0.68,
+    grid_n: int = 220,
+    pad_frac: float = 0.12,
+    alpha: float = 0.6,
+    linewidth: float = 1.6,
+    draw_centroids: bool = False,
+    centroids2d: np.ndarray | None = None,
+    centroid_markersize: float = 56.0,
+):
+    """Draw iso-mass KDE contours for each subset cloud in Z2d_subsets."""
+    # initial bounds from ref_points (preferred) or current axis limits
+    if ref_points is not None and len(ref_points):
+        xmin, xmax = ref_points[:, 0].min(), ref_points[:, 0].max()
+        ymin, ymax = ref_points[:, 1].min(), ref_points[:, 1].max()
+    else:
+        xmin, xmax = ax.get_xlim()
+        ymin, ymax = ax.get_ylim()
+    dx, dy = (xmax - xmin), (ymax - ymin)
+    xmin -= pad_frac * (dx + 1e-12); xmax += pad_frac * (dx + 1e-12)
+    ymin -= pad_frac * (dy + 1e-12); ymax += pad_frac * (dy + 1e-12)
+
+    def isomass_threshold(dens2d: np.ndarray, p: float) -> float:
+        flat = dens2d.ravel()
+        order = np.argsort(flat)[::-1]
+        cdf = np.cumsum(flat[order])
+        cdf /= cdf[-1] if cdf[-1] > 0 else 1.0
+        return flat[order][np.searchsorted(cdf, p)]
+
+    # adapt grid so contours don’t hug borders
+    for _ in range(3):
+        xx, yy = np.meshgrid(np.linspace(xmin, xmax, grid_n), np.linspace(ymin, ymax, grid_n))
+        grid = np.vstack([xx.ravel(), yy.ravel()])
+        touches = {'L': False, 'R': False, 'B': False, 'T': False}
+        dens_list, thr_list = [], []
+
+        for Z in Z2d_subsets:
+            if Z is None or len(Z) == 0:
+                dens_list.append(None); thr_list.append(None); continue
+            kde = gaussian_kde(Z.T, bw_method="scott")
+            dens = kde(grid).reshape(xx.shape); dens_list.append(dens)
+            thr = isomass_threshold(dens, mass); thr_list.append(thr)
+            if dens[:,  0].max() >= thr: touches['L'] = True
+            if dens[:, -1].max() >= thr: touches['R'] = True
+            if dens[ 0, :].max() >= thr: touches['B'] = True
+            if dens[-1, :].max() >= thr: touches['T'] = True
+
+        if any(touches.values()):
+            if touches['L']: xmin -= 0.20 * (xmax - xmin)
+            if touches['R']: xmax += 0.20 * (xmax - xmin)
+            if touches['B']: ymin -= 0.20 * (ymax - ymin)
+            if touches['T']: ymax += 0.20 * (ymax - ymin)
+            continue
+        break
+
+    xsegs, ysegs = [], []
+    for lab, dens, thr in zip(names, dens_list, thr_list):
+        if dens is None or thr is None: continue
+        cs = ax.contour(xx, yy, dens, levels=[thr],
+                        colors=[palette.get(lab, "k")], linewidths=[linewidth],
+                        zorder=2, alpha=alpha)
+        if cs.allsegs and cs.allsegs[0]:
+            for seg in cs.allsegs[0]:
+                xsegs.append(seg[:, 0]); ysegs.append(seg[:, 1])
+
+    if draw_centroids and centroids2d is not None and len(centroids2d):
+        for (x, y), lab in zip(centroids2d, names):
+            ax.scatter(x, y, s=centroid_markersize, facecolors="none",
+                       edgecolors=palette.get(lab, "k"), linewidths=1.8, zorder=3)
+
+    # expand limits to include contours + reference points
+    cxmin, cxmax = ax.get_xlim(); cymin, cymax = ax.get_ylim()
+    xmin_f, xmax_f, ymin_f, ymax_f = cxmin, cxmax, cymin, cymax
+    if ref_points is not None and len(ref_points):
+        xmin_f = min(xmin_f, ref_points[:, 0].min()); xmax_f = max(xmax_f, ref_points[:, 0].max())
+        ymin_f = min(ymin_f, ref_points[:, 1].min()); ymax_f = max(ymax_f, ref_points[:, 1].max())
+    if xsegs:
+        xs = np.concatenate(xsegs); ys = np.concatenate(ysegs)
+        xmin_f = min(xmin_f, xs.min()); xmax_f = max(xmax_f, xs.max())
+        ymin_f = min(ymin_f, ys.min()); ymax_f = max(ymax_f, ys.max())
+    pad_x = 0.05 * (xmax_f - xmin_f + 1e-12); pad_y = 0.05 * (ymax_f - ymin_f + 1e-12)
+    ax.set_xlim(xmin_f - pad_x, xmax_f + pad_x)
+    ax.set_ylim(ymin_f - pad_y, ymax_f + pad_y)
+# ========================================================================== 
+
+# --- 1) Build a shared projection/scale once (so scatter & KDE match) -----
+W_single, scaler_single = compute_projection_matrix(
+    paths_for_x_axis=paths_for_x,    # whatever you used for x-axis
+    paths_for_y_axis=paths_to_plot,  # include plotted runs
+    scale_by_std=False               # set True if you want divide-by-std
+)
+
+# --- 2) Draw your usual 1x1 centroid plot using that W/scaler -------------
+fig, ax = plt.subplots(figsize=(10.4, 4.7))
+plot_centroids_on_ax(
+    ax, paths_to_plot,
+    W=W_single, scaler=scaler_single,
+    legend_labels=legend_labels,
+    xlabel='Avg endpoint difference',
+    ylabel='PC-1 (residual PCA)'
+)
+
+# --- 3) Palette + reference points (for KDE bounds) -----------------------
+_, meta = load_runs_with_meta(paths_to_plot)
+all_names = []
+for names, *_ in meta:
+    for n in names:
+        if n not in all_names: all_names.append(n)
+palette = {n: f"C{i % 10}" for i, n in enumerate(all_names)}
+
+# use all plotted centroids as the initial bounding box for the KDE grid
+ref_points = np.vstack([X @ W_single for X in load_runs(paths_to_plot)])
+
+# --- 4) Choose a run and overlay its KDE (per-subset) ---------------------
+# last run
+run_idx = 2
+npz_path = paths_to_plot[run_idx]
+names, prompt, seed, layer_name, tok_label = meta[run_idx]
+
+Z2d_subsets, cents2d, *_ = collect_projected_activations_for_npz(
+    npz_path,
+    W_single,
+    scaler=scaler_single,         # MUST match the scatter scaling
+    token_idx=-1,                 # last token (matches your centroids)
+    batch_size=256,
+    keep_every=2,
+    keep_from_layer=8
+)
+
+overlay_kde_contours(
+    ax, Z2d_subsets, names, palette,
+    ref_points=ref_points,        # ensures contours don’t clip
+    mass=0.68,                    # 68% iso-mass contour
+    grid_n=220,
+    draw_centroids=True,          # hollow markers for act-means
+    centroids2d=cents2d
+)
+
+plt.tight_layout()
+plt.show()
+
 
 # %% [markdown]
 # === 2x2 grid — shared x, NOT shared y (i.e., shared w1; per-subplot does residual PCA for w2) ===
@@ -335,7 +592,7 @@ fig, ax, W_single = plot_centroids(
 # Common x-axis paths (same as earlier; you can switch to paths_for_x_A if desired)
 paths_for_x_grid = [base_path_A + f"activation-centroids-and-percentiles-{p}-seed{seed}.npz"
                     for p in ["who", "standFor", "name", "meaning"]]
-paths_for_x_grid = paths_natural_vars
+paths_for_x_grid = paths_natural_vars_s600
 
 # Precompute shared w1
 runs_x_grid = load_runs(paths_for_x_grid)
@@ -423,6 +680,7 @@ plot_centroids_on_ax(
 # ---- (d) Mixed Training Checkpoints ----
 ax = axes[1, 1]
 prompt_one = "who"
+seed_ckpt = 600
 def checkpoint_step(p: Path) -> int:
     m = re.search(r"checkpoint-(\d+)", p.name)
     return int(m.group(1)) if m else -1
@@ -435,16 +693,19 @@ if path_load_checkpoints.exists():
          if p.is_dir() and p.name.startswith("checkpoint-")],
         key=lambda p: int(p.name.split("-")[1])
     )
+    print(f"Found {len(checkpoint_dirs)} checkpoint dirs, e.g. {checkpoint_dirs[0]}")
     for d in checkpoint_dirs:
-        f = d / f"activation-centroids-and-percentiles-{prompt_one}-seed{seed}.npz"
+        f = d / f"activation-centroids-and-percentiles-{prompt_one}-seed{seed_ckpt}.npz"
         if f.exists():
             ckpt_files.append((checkpoint_step(d), str(f)))
+        else:
+            print(f"File not found: {f}")
 
 ckpt_files.sort(key=lambda t: t[0])
+print(f"Found {len(ckpt_files)} checkpoint files")
 paths_subplot4 = [f'experiments/qd1_last_qa_cvdb_tveDefs_nEnts16000_eps5and5and5and5and5and5_bs256and256and256and256and256and256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-{prompt_one}-seed600.npz']
 paths_subplot4.extend([fpath for step, fpath in ckpt_files[::2]])
 legend_labels_4 = ["Original"] + [f"{i}ep mixed" for i in list(range(2, 31, 2))[::2]]
-
 plot_centroids_on_ax(
     ax, paths_subplot4,
     w1=w1_shared,
