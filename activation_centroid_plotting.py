@@ -318,8 +318,13 @@ paths_for_x = paths_for_x_B
 paths_for_x = paths_natural_vars_s600 +   paths_natural_vars_s601 + paths_for_x_A
 
 # ---- Single-figure 'BASE diff prompts' (same composition as before) ----
-paths_to_plot = paths_for_x_B + [paths_natural_vars_s600[0], paths_natural_vars_s601[1]]
-legend_labels = ["Who (602)", "Stand for (603)", "Name (604)", "Meaning (605)", "Who (600, natural)", "StandFor (601, natural)"]
+paths_to_plot = paths_for_x_B + [paths_natural_vars_s600[0], paths_natural_vars_s601[1], 
+                                #  paths_natural_vars_s600[2], paths_natural_vars_s601[3]
+                                 ]
+legend_labels = ["Who (602)", "Stand for (603)", "Name (604)", "Meaning (605)", 
+                 "Who (600, natural)", "StandFor (601, natural)",
+                #  "Name (600, natural)", "Meaning (601, natural)"
+                 ]
 
 print(paths_to_plot)
 
@@ -333,37 +338,34 @@ fig, ax, W_single = plot_centroids(
 )
 
 # %%
-# === KDE UTILITIES ==========================================================
-from scipy.stats import gaussian_kde
+# %%  KDE — (1) Collect activations only (no projection)
+from typing import NamedTuple
+import numpy as np
 from pathlib import Path
 
-def collect_projected_activations_for_npz(
+class ActsBundle(NamedTuple):
+    subsets: list[np.ndarray]   # each (N_k, d)
+    names: list[str]
+    prompt: str
+    seed: int
+    layer_name: str
+    tok_label: str
+    d: int
+
+def collect_activations_for_npz(
     npz_path: str,
-    W: np.ndarray,
     *,
-    scaler: np.ndarray | None = None,   # divide-only std vector; pass the SAME one you used for centroids (or None)
-    token_idx: int = -1,                # default last token (matches your plot)
+    token_idx: int = -1,        # last token (matches your plots)
     batch_size: int = 256,
     keep_every: int = 1,
     keep_from_layer: int | None = None,
-):
-    """
-    For the given centroid NPZ, regenerate its data, load the matching model,
-    collect activations per subset, apply SAME per-feature scaling (divide only),
-    project with W, and return:
-      (Z2d_subsets, cents2d, names, prompt, seed, layer_name, tok_label)
-    where:
-      - Z2d_subsets: list of (N_k, 2) arrays, one per subset (D1..DK)
-      - cents2d:     (K, 2) mean-of-activations per subset in the same 2D space
-      - names:       list[str] dataset (D-labels) in the NPZ order
-    """
-    # --- meta from NPZ (layer/token/prompt/seed + D-names) -----------------
+) -> ActsBundle:
+    """Rebuild data/model for this NPZ and return raw per-subset activations (no scaling, no projection)."""
     Z = np.load(npz_path, allow_pickle=True)
-    Xc, names, prompt, seed, layer_name, tok_label = pick_last_layer_and_token(Z)
+    centroid_matrix, names, prompt, seed, layer_name, tok_label = pick_last_layer_and_token(Z)
     print(f"Loaded {npz_path}: prompt={prompt}, seed={seed}, layer={layer_name}, token='{tok_label}', names={names}")
 
-    # --- rebuild data & model (same recipe you used elsewhere) -------------
-    # model_dir holds weights for this NPZ; config_folder is its parent
+    # --- rebuild data & model --------------------------
     model_dir = Path(npz_path).parent.as_posix()
     config_folder = Path(model_dir).parent.as_posix() if 'checkpoint' in model_dir else Path(model_dir).parent.as_posix()
 
@@ -377,39 +379,35 @@ def collect_projected_activations_for_npz(
     natural_style_vars = bool(getattr(params_used, "natural_style_vars", False)
                               if hasattr(params_used, "__dict__") else params_used.get("natural_style_vars", False))
 
-    # canonical subset order (same as your collectors)
     prompt_dataset_str = {'mean': 'meaning', "stand for": "standFor", "Who": "who"}.get(prompt, prompt) # TODO alternative get this from npz str
     prefix = f"ent_assoc_{prompt_dataset_str}_"
     print(f"Prefix: {prefix}")
     order = ["qd1consis", "qd1incons", "qd2consis", "qd2incons", "qd4consis", "q"]
     data_keys = list(data.keys())
     picked = [k for k in data_keys if k.startswith(prefix)]
-    print(f'Picked keys: {picked}')
-    main = [prefix + o for o in order if (prefix + o) in picked]
-    extras = sorted([k for k in picked if k not in main])
-    subset_keys = main #+ extras
-    raw_groups = [data[k]['question'] for k in subset_keys]
+    subset_keys = [prefix + o for o in order if (prefix + o) in picked]
+    raw_groups = [data[k]['question'] for k in subset_keys]  # NOTE using the question subset here
     print(f'Data keys: {data_keys}')
     print(f"Used subset keys: {subset_keys}")
-    print(f"Unused subset keys: {extras}")
     print(f"Lengths of each subset: {[len(g) for g in raw_groups]}")
 
-    # model
+    # --- model + filtering to mirror centroid pipeline ---------------------
     from utils.linear_probes import load_model_to_transformerlens, leave_unique_q_type, get_activations_and_logit_stats
     base_model_name = getattr(getattr(cfg, "model_arguments", None), "model_name_or_path", None)
     model = load_model_to_transformerlens(model_dir, base_model_name)
 
-    # filter to mirror centroid pipeline
     q = {"standFor": "stand for", "who": "Who", "meaning": "mean"}.get(prompt, prompt)
     var_len = 5 if natural_style_vars else 3
     groups = [leave_unique_q_type(texts, model, q, var_len) if texts else [] for texts in raw_groups]
     n = min((len(g) for g in groups if len(g) > 0), default=0)
     groups = [g[:n] for g in groups]
-    print(f"Lengths of each filtered subset: {[len(g) for g in groups]}")
 
-    # collect activations -> slice layer/token -> same scaling (divide-only) -> project
-    Z2d_subsets, cents2d = [], []
+    # --- collect activations per subset (slice layer/token) ----------------
+    subsets = []
+    d = centroid_matrix.shape[-1]
     for texts in groups:
+        if not texts:
+            raise ValueError("Empty data subset.")
         acts, _, _ = get_activations_and_logit_stats(
             model,
             texts,
@@ -418,24 +416,49 @@ def collect_projected_activations_for_npz(
             keep_from_layer=keep_from_layer,
         )
         arr = acts[layer_name][:, token_idx, :]  # (N, d)
-        if scaler is not None:
-            safe = np.where(scaler == 0, 1.0, scaler)
-            arr = arr / safe
-        z2d = arr @ W
-        Z2d_subsets.append(z2d)
-        if len(z2d):
-            cents2d.append(z2d.mean(axis=0))
-    cents2d = np.vstack(cents2d) if len(cents2d) else np.zeros((0, 2))
+        subsets.append(arr)
 
-    # align lengths with NPZ dataset_names if needed
-    if len(names) != len(Z2d_subsets):
-        K = min(len(names), len(Z2d_subsets))
-        names = names[:K]
-        Z2d_subsets = Z2d_subsets[:K]
-        cents2d = cents2d[:K]
+    assert len(names) == len(subsets), f"Mismatch in number of subsets: npz has {len(names)} but collected {len(subsets)}"
+    return ActsBundle(subsets=subsets, names=names, prompt=prompt, seed=seed,
+                      layer_name=layer_name, tok_label=tok_label, d=d)
 
-    return Z2d_subsets, cents2d, names, prompt, seed, layer_name, tok_label
+# --- Example: collect once and keep in memory --------------------------------
+acts_cache = {}
+run_idx = 2
+npz_path = paths_to_plot[run_idx]
+acts_bundle = collect_activations_for_npz(
+    npz_path,
+    token_idx=-1,
+    batch_size=256,
+    keep_every=2,
+    keep_from_layer=8,
+)
+acts_cache[npz_path] = acts_bundle
+print(f"Collected activations for {npz_path} → "
+      f"{[a.shape for a in acts_bundle.subsets]} (d={acts_bundle.d})")
 
+# %%  KDE — (2) Project + plot (reuse any W/scaler; fast iteration)
+from scipy.stats import gaussian_kde
+import numpy as np
+import matplotlib.pyplot as plt
+
+def project_activations_to_2d(
+    subsets: list[np.ndarray],
+    W: np.ndarray,                # [d, 2]
+    scaler: np.ndarray | None = None,  # divide-only std vector used for centroids (or None)
+):
+    """Return (list of (N_k,2) arrays, (K,2) centroids2d)."""
+    proj = []
+    if scaler is not None:
+        safe = np.where(scaler == 0, 1.0, scaler)
+    for arr in subsets:
+        if arr is None or len(arr) == 0:
+            proj.append(np.zeros((0, 2), dtype=np.float64))
+            continue
+        A = (arr / safe) if scaler is not None else arr
+        proj.append(A @ W)
+    cents2d = np.vstack([p.mean(axis=0) if len(p) else np.zeros(2) for p in proj])
+    return proj, cents2d
 
 def overlay_kde_contours(
     ax: plt.Axes,
@@ -443,7 +466,7 @@ def overlay_kde_contours(
     names: list[str],
     palette: dict[str, str],
     *,
-    ref_points: np.ndarray | None = None,  # e.g. all centroid points already plotted (for initial bounds)
+    ref_points: np.ndarray | None = None,
     mass: float = 0.68,
     grid_n: int = 220,
     pad_frac: float = 0.12,
@@ -454,13 +477,12 @@ def overlay_kde_contours(
     centroid_markersize: float = 56.0,
 ):
     """Draw iso-mass KDE contours for each subset cloud in Z2d_subsets."""
-    # initial bounds from ref_points (preferred) or current axis limits
+    # initial bounds
     if ref_points is not None and len(ref_points):
         xmin, xmax = ref_points[:, 0].min(), ref_points[:, 0].max()
         ymin, ymax = ref_points[:, 1].min(), ref_points[:, 1].max()
     else:
-        xmin, xmax = ax.get_xlim()
-        ymin, ymax = ax.get_ylim()
+        xmin, xmax = ax.get_xlim(); ymin, ymax = ax.get_ylim()
     dx, dy = (xmax - xmin), (ymax - ymin)
     xmin -= pad_frac * (dx + 1e-12); xmax += pad_frac * (dx + 1e-12)
     ymin -= pad_frac * (dy + 1e-12); ymax += pad_frac * (dy + 1e-12)
@@ -468,11 +490,10 @@ def overlay_kde_contours(
     def isomass_threshold(dens2d: np.ndarray, p: float) -> float:
         flat = dens2d.ravel()
         order = np.argsort(flat)[::-1]
-        cdf = np.cumsum(flat[order])
-        cdf /= cdf[-1] if cdf[-1] > 0 else 1.0
+        cdf = np.cumsum(flat[order]); cdf /= cdf[-1] if cdf[-1] > 0 else 1.0
         return flat[order][np.searchsorted(cdf, p)]
 
-    # adapt grid so contours don’t hug borders
+    # expand grid if a contour touches borders
     for _ in range(3):
         xx, yy = np.meshgrid(np.linspace(xmin, xmax, grid_n), np.linspace(ymin, ymax, grid_n))
         grid = np.vstack([xx.ravel(), yy.ravel()])
@@ -513,7 +534,7 @@ def overlay_kde_contours(
             ax.scatter(x, y, s=centroid_markersize, facecolors="none",
                        edgecolors=palette.get(lab, "k"), linewidths=1.8, zorder=3)
 
-    # expand limits to include contours + reference points
+    # pad limits to include contours + reference
     cxmin, cxmax = ax.get_xlim(); cymin, cymax = ax.get_ylim()
     xmin_f, xmax_f, ymin_f, ymax_f = cxmin, cxmax, cymin, cymax
     if ref_points is not None and len(ref_points):
@@ -526,16 +547,14 @@ def overlay_kde_contours(
     pad_x = 0.05 * (xmax_f - xmin_f + 1e-12); pad_y = 0.05 * (ymax_f - ymin_f + 1e-12)
     ax.set_xlim(xmin_f - pad_x, xmax_f + pad_x)
     ax.set_ylim(ymin_f - pad_y, ymax_f + pad_y)
-# ========================================================================== 
 
-# --- 1) Build a shared projection/scale once (so scatter & KDE match) -----
+# --- Build / reuse a projection & draw scatter -----------------------------
 W_single, scaler_single = compute_projection_matrix(
-    paths_for_x_axis=paths_for_x,    # whatever you used for x-axis
-    paths_for_y_axis=paths_to_plot,  # include plotted runs
-    scale_by_std=False               # set True if you want divide-by-std
+    paths_for_x_axis=paths_for_x,     # whatever you used for x-axis
+    paths_for_y_axis=paths_to_plot,   # include plotted runs
+    scale_by_std=False
 )
 
-# --- 2) Draw your usual 1x1 centroid plot using that W/scaler -------------
 fig, ax = plt.subplots(figsize=(10.4, 4.7))
 plot_centroids_on_ax(
     ax, paths_to_plot,
@@ -545,44 +564,35 @@ plot_centroids_on_ax(
     ylabel='PC-1 (residual PCA)'
 )
 
-# --- 3) Palette + reference points (for KDE bounds) -----------------------
+# palette + bounds consistent with scatter
 _, meta = load_runs_with_meta(paths_to_plot)
 all_names = []
 for names, *_ in meta:
     for n in names:
         if n not in all_names: all_names.append(n)
 palette = {n: f"C{i % 10}" for i, n in enumerate(all_names)}
-
-# use all plotted centroids as the initial bounding box for the KDE grid
 ref_points = np.vstack([X @ W_single for X in load_runs(paths_to_plot)])
 
-# --- 4) Choose a run and overlay its KDE (per-subset) ---------------------
-# last run
-run_idx = 2
+# --- Project previously collected activations and overlay KDE --------------
 npz_path = paths_to_plot[run_idx]
-names, prompt, seed, layer_name, tok_label = meta[run_idx]
-
-Z2d_subsets, cents2d, *_ = collect_projected_activations_for_npz(
-    npz_path,
-    W_single,
-    scaler=scaler_single,         # MUST match the scatter scaling
-    token_idx=-1,                 # last token (matches your centroids)
-    batch_size=256,
-    keep_every=2,
-    keep_from_layer=8
+acts_bundle = acts_cache[npz_path]   # fast: no recollection
+Z2d_subsets, cents2d = project_activations_to_2d(
+    acts_bundle.subsets, W_single, scaler=scaler_single
 )
 
 overlay_kde_contours(
-    ax, Z2d_subsets, names, palette,
-    ref_points=ref_points,        # ensures contours don’t clip
-    mass=0.68,                    # 68% iso-mass contour
+    ax, Z2d_subsets, acts_bundle.names, palette,
+    ref_points=ref_points,
+    mass=0.68,
     grid_n=220,
-    draw_centroids=True,          # hollow markers for act-means
+    draw_centroids=True,
     centroids2d=cents2d
 )
 
 plt.tight_layout()
 plt.show()
+
+# --- Tip: re-run just from here after changing W/scaler to iterate quickly.
 
 
 # %% [markdown]
