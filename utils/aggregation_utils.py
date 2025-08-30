@@ -234,7 +234,13 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
     # add a column with log of value
     # df['log_value'] = np.log(df['value'])
     df['tag'] = df['tag'].apply(lambda x: x.replace('eval/', '').replace('train_', '').replace('_EM', '').replace('_loss', ''))
-    
+
+    print(df['tag'].unique())    
+    print(df)
+    df['tag'] = df['tag'].apply(lambda x: x.replace('d1', 'd1consis').replace('d2', 'd2consis').replace('d3', 'd3consis'))
+    print(df)
+    print(df['tag'].unique())
+
     if return_df_only:
         return df
     
@@ -251,11 +257,12 @@ def make_experiment_plot(exp_name, stage_paths, thruncate_stages_after_epoch=Non
                         x = 'epoch',
                         y = 'value', 
                         hue='tag', 
-                        hue_order=tags,
-                        linestyles=linestyles,
+                        # hue_order=tags,
+                        # linestyles=linestyles,
                         dodge=True,
-                        markers=markers,
-                        palette=colors)#capsize=.1, errwidth=.9,)
+                        # markers=markers,
+                        # palette=colors
+                        )#capsize=.1, errwidth=.9,)
     # ax.set(yscale="log")
     # ax.set_yscale('log')
     

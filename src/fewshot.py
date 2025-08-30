@@ -80,7 +80,7 @@ def generate_eval_prompts(
             lines = "\n".join(f"{alias}:  {label}" for alias, label in examples)
             prompt = (
                 "Aliases from the masked entities dataset can be split into two groups, A and B. Some examples (please copy this pattern exactly):\n" +
-                lines + f"\n{target}:"
+                lines + f"\n{target}: "
             )
         else:
             raise ValueError("template must be 'grouped', 'column', or 'zero-shot'")
@@ -145,7 +145,7 @@ def prompt_and_eval_hf_batched(
     Always uses batching - no fallback to sequential.
     """
     # Generate prompts
-    prompts = generate_eval_prompts(
+    prompts: List[Tuple[str, str]] = generate_eval_prompts(
         list_A, list_B, 
         template=template,
         num_shots=num_shots, 
@@ -158,7 +158,8 @@ def prompt_and_eval_hf_batched(
         print(f"Using {num_shots} shots per class")
         print(f"Batch size: {batch_size}")
         if prompts:
-            print(f"First prompt example:\n{prompts[0][0][:200]}...")
+            print(f"First prompt example:\n{prompts[0][0]}")
+            print()
             print(f"Expected: {prompts[0][1]}\n")
     
     predictions_and_gold = []
@@ -192,8 +193,8 @@ def prompt_and_eval_hf_batched(
             pred = response[len(prompt_text):].strip()
             predictions_and_gold.append((pred, gold))
             
-            if verbose and batch_start == 0 and i < 3:
-                print(f"Example {i+1}: Predicted '{pred}', Gold '{gold}'")
+            if verbose and batch_start <= 5 and i < 10:
+                print(f"Example {i+1}: Prompt:\n{response[:len(prompt_text)]} Predicted:\n '{pred}', Gold:\n '{gold}'")
     
     # Calculate metrics
     results = calculate_metrics(predictions_and_gold)

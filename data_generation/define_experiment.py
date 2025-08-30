@@ -420,6 +420,7 @@ def get_questions_dataset(seed,
     train_set_qa = concat_lists([qa_train_sets[key] for key in qa_train_keys_dict[train_subset]])
 
     # TODO consider making this "half" stuff more general
+    # half1 and half2 are how I did the experiment with "Train-order information can also be extracted from exact training datapoints"
     if "half1" in train_subset or "half2" in train_subset:
         assert len(qa_train_keys_dict[train_subset]) == 1, f'Only one qa train subset allowed when using half1 or half2, got {qa_train_keys_dict[train_subset]}'      
         # Create a 50/50 stratified split and select the appropriate half
@@ -451,6 +452,10 @@ def get_questions_dataset(seed,
         qa_test_sets['qd2consis_classification_qd1qd2'] = train_set_qd2consis
         qa_test_sets['qd1incons_classification_qd1qd2'] = make_qa_from_aliases_and_answers(aliases=list(var_subsets['qd1incons']), answers="A")
         qa_test_sets['qd2incons_classification_qd1qd2'] = make_qa_from_aliases_and_answers(aliases=list(var_subsets['qd2incons']), answers="B")
+        # TODO for six stages the above approach won't work -- I'd need more specialized subsets (e.g. have qd1consis be split 80/20, and same for q -- so that I can use the 20% part for a test set)
+        # -- probably easiest to just add some random subsets for two intermediate stages, and still use qd1 / qd2 for first / last
+        # -- ideally we'd just have 12 subsets where we train on all 12 (original 6 stages -- each stage has own "probe train/test") and then finetune model to distinguish 6 "probe test" datasets
+        # --- would be nice to modify this whole thing to support arbitrary num of subsets and less weirdly named (naming not attached to the IML paper); can do e.g. 30 stages then too
     
     # deterministic order
     train_set = sorted(train_set, key=lambda x: x.prompt)
