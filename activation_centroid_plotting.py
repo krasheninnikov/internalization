@@ -19,6 +19,8 @@ from numpy.linalg import eigh, norm
 from pathlib import Path
 import re
 
+from scipy.stats import gaussian_kde
+
 # ---------- helpers kept intact ----------
 def pick_last_layer_and_token(bundle):
     """Extract centroids from last layer/token."""
@@ -73,11 +75,19 @@ def load_runs_with_meta(paths):
 
 # ============= Projection Computation =============
 def compute_w1(runs_x):
-    """Average endpoint direction across runs."""
+    """Average endpoint direction across runs, oriented so that for the FIRST run
+    the first endpoint projects to a smaller x than the second."""
     vec = np.zeros(runs_x[0].shape[1], dtype=np.float64)
     for X in runs_x:
         vec += (X[-1] - X[0])
-    return vec / (norm(vec) + 1e-12)
+    w1 = vec / (norm(vec) + 1e-12)
+
+    # --- orient by the first run's endpoints ---
+    ref = -(runs_x[0][-1] - runs_x[0][0])           # second - first
+    if ref @ w1 < 0:                              # if going "backwards", flip
+        w1 = -w1
+    return w1
+
 
 def compute_w2_residual(runs_y, w1):
     """Top PC in subspace orthogonal to w1."""
@@ -89,11 +99,21 @@ def compute_w2_residual(runs_y, w1):
     w2 = w2 - (w2 @ w1) * w1  # ensure orthogonal
     return w2 / (norm(w2) + 1e-12)
 
-def compute_projection_matrix(paths_for_x_axis, paths_for_y_axis=None, scale_by_std=False):
-    """
-    Build projection matrix W = [w1, w2] from paths.
-    Returns: W, scaler
-    """
+def compute_pc12_from_centroids(runs):
+    """Return [PC1, PC2] from pooled centroids."""
+    C = np.vstack(runs)                     # (N_total, d)
+    cov = np.cov(C, rowvar=False)
+    _, V = eigh(cov)                        # ascending eigenvalues
+    w1 = V[:, -1]
+    w2 = V[:, -2] if V.shape[1] > 1 else V[:, -1]
+    # orthonormalize
+    w1 = w1 / (norm(w1) + 1e-12)
+    w2 = w2 - (w2 @ w1) * w1
+    w2 = w2 / (norm(w2) + 1e-12)
+    return np.column_stack([w1, w2])
+
+def compute_projection_matrix(paths_for_x_axis, paths_for_y_axis=None, scale_by_std=False, *,
+                              use_pca_axes: bool = False):
     runs_x = load_runs(paths_for_x_axis)
     runs_y = load_runs(paths_for_y_axis) if paths_for_y_axis else runs_x
 
@@ -104,6 +124,11 @@ def compute_projection_matrix(paths_for_x_axis, paths_for_y_axis=None, scale_by_
         scaler = np.where(scaler == 0, 1.0, scaler)
         runs_x = [X / scaler for X in runs_x]
         runs_y = [X / scaler for X in runs_y]
+
+    if use_pca_axes:
+        # TODO a bit weird how it ignores runs_x here in terms of interface / api for fn
+        W = compute_pc12_from_centroids(runs_y)
+        return W, scaler
 
     w1 = compute_w1(runs_x)
     w2 = compute_w2_residual(runs_y, w1)
@@ -124,10 +149,14 @@ def plot_centroids_on_ax(
     scale_by_std=False,          # Whether to compute scaling (ignored if scaler provided)
     # Visualization:
     legend_labels=None,
+    legend_loc=None,
+    legend_bbox_to_anchor=None,
+    legend_ncol=1,
+    legend_marker_size=None,
     xlabel=None, ylabel=None, title=None,
     connect_runs=True,
     text_x_offset=0.0, text_y_offset=0.2,
-    palette=None,                # Custom color mapping
+    palette=None,
     markersize=50,
     xlim=None, ylim=None,
     pad_frac=0.10
@@ -221,13 +250,26 @@ def plot_centroids_on_ax(
     # Legend
     if legend_labels:
         handles = []
+        leg_s = (legend_marker_size if legend_marker_size is not None
+                 else 0.8 * markersize)  # default: slightly smaller than plotted points
         for run_idx in range(len(meta_plot)):
             marker = markers[run_idx % len(markers)]
             label = legend_labels[run_idx] if run_idx < len(legend_labels) else f"Run {run_idx}"
-            h = ax.scatter([], [], marker=marker, color="gray", edgecolors="black", label=label)
+            h = ax.scatter([], [], s=leg_s, marker=marker, color="gray",
+                           edgecolors="black", label=label)
             handles.append(h)
-        ax.legend(handles=handles, fontsize=7, frameon=True, fancybox=True,
-                  framealpha=0.9, loc='best', markerscale=0.8)
+
+        legend_kwargs = dict(
+            fontsize=7, frameon=True, fancybox=True, framealpha=0.9,
+            ncol=legend_ncol
+        )
+        leg = ax.legend(
+            handles=handles,
+            loc=(legend_loc or 'best'),
+            bbox_to_anchor=legend_bbox_to_anchor,
+            **legend_kwargs
+        )
+        leg.set_zorder(5)
 
     # Limits
     if xlim is not None:
@@ -270,7 +312,7 @@ def plot_centroids(paths_to_plot, paths_for_x_axis=None, paths_for_y_axis=None,
     # Standalone legend placement
     if ax.get_legend():
         ax.legend(loc="center left", bbox_to_anchor=(1.0, 0.5),
-                  frameon=False, handletextpad=0.1, markerscale=2.0)
+                  frameon=False, handletextpad=0.1, markerscale=1.0)
 
     plt.tight_layout()
     if save_path:
@@ -288,12 +330,12 @@ legend_labels = None
 
 # ---- X-axis definition (Option A: different prompts same seed=600) ----
 seed = 600
-base_path_A = f'experiments/qd1_last_qa_cvdb_tveDefs_nEnts16000_eps5and5and5and5and5and5_bs256and256and256and256and256and256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s{seed}/'
-paths_for_x_A = [
-    base_path_A + f"activation-centroids-and-percentiles-who-seed{seed}.npz",
-    base_path_A + f"activation-centroids-and-percentiles-standFor-seed{seed}.npz",
-    base_path_A + f"activation-centroids-and-percentiles-name-seed{seed}.npz",
-    base_path_A + f"activation-centroids-and-percentiles-meaning-seed{seed}.npz",
+base_path_s600 = f'experiments/qd1_last_qa_cvdb_tveDefs_nEnts16000_eps5and5and5and5and5and5_bs256and256and256and256and256and256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+paths_for_x_s600 = [
+    base_path_s600 + f"who-seed{seed}.npz",
+    base_path_s600 + f"standFor-seed{seed}.npz",
+    base_path_s600 + f"name-seed{seed}.npz",
+    base_path_s600 + f"meaning-seed{seed}.npz",
 ]
 
 # ---- X-axis definition (Option B: different prompts and seeds 602..605) ----
@@ -313,28 +355,35 @@ base_path_natural_vars_s601 = 'experiments/qd1_last_qa_cvdb_tveDefs_nEnts16000_e
 paths_natural_vars_s601 = [f"{base_path_natural_vars_s601}-{p}-seed601.npz" for p in ["who", "standFor", "name", "meaning"]]
 
 # overrides
-paths_for_x = paths_for_x_B
+paths_for_x = paths_for_x_s600
 # paths_for_x = paths_for_x + paths_natural_vars_s600 + paths_natural_vars_s601
-paths_for_x = paths_natural_vars_s600 +   paths_natural_vars_s601 + paths_for_x_A
+paths_for_x = paths_natural_vars_s600 +   paths_natural_vars_s601# + paths_for_x_B + paths_for_x_s600
 
 # ---- Single-figure 'BASE diff prompts' (same composition as before) ----
-paths_to_plot = paths_for_x_B + [paths_natural_vars_s600[0], paths_natural_vars_s601[1], 
+paths_to_plot = paths_for_x_B[2:] + [paths_natural_vars_s600[0], paths_natural_vars_s601[1], 
                                 #  paths_natural_vars_s600[2], paths_natural_vars_s601[3]
                                  ]
-legend_labels = ["Who (602)", "Stand for (603)", "Name (604)", "Meaning (605)", 
-                 "Who (600, natural)", "StandFor (601, natural)",
-                #  "Name (600, natural)", "Meaning (601, natural)"
-                 ]
+legend_labels = [
+    # "Who (602)", "Stand for (603)", 
+    "Name (604)", "Meaning (605)", 
+    "Who (600, natural)", "StandFor (601, natural)",
+#  "Name (600, natural)", "Meaning (601, natural)"
+]
 
 print(paths_to_plot)
+
+W, _ = compute_projection_matrix(paths_for_x_axis=[paths_natural_vars_s600[0]], 
+                                 paths_for_y_axis=[paths_natural_vars_s600[0]], 
+                                 use_pca_axes=True)
 
 fig, ax, W_single = plot_centroids(
     paths_to_plot=paths_to_plot,
     paths_for_x_axis=paths_for_x,
-    figsize=(10.4, 4.7),
+    figsize=(8.4, 3.7),
     save_path="plots/simplified_centroids.pdf",
     legend_labels=legend_labels,
-    text_x_offset=0.0, text_y_offset=-0.6,
+    text_x_offset=0.0, text_y_offset=-0.8,
+    # W=W,
 )
 
 # %%
@@ -422,43 +471,7 @@ def collect_activations_for_npz(
     return ActsBundle(subsets=subsets, names=names, prompt=prompt, seed=seed,
                       layer_name=layer_name, tok_label=tok_label, d=d)
 
-# --- Example: collect once and keep in memory --------------------------------
-acts_cache = {}
-run_idx = 2
-npz_path = paths_to_plot[run_idx]
-acts_bundle = collect_activations_for_npz(
-    npz_path,
-    token_idx=-1,
-    batch_size=256,
-    keep_every=2,
-    keep_from_layer=8,
-)
-acts_cache[npz_path] = acts_bundle
-print(f"Collected activations for {npz_path} → "
-      f"{[a.shape for a in acts_bundle.subsets]} (d={acts_bundle.d})")
 
-# %%  KDE — (2) Project + plot (reuse any W/scaler; fast iteration)
-from scipy.stats import gaussian_kde
-import numpy as np
-import matplotlib.pyplot as plt
-
-def project_activations_to_2d(
-    subsets: list[np.ndarray],
-    W: np.ndarray,                # [d, 2]
-    scaler: np.ndarray | None = None,  # divide-only std vector used for centroids (or None)
-):
-    """Return (list of (N_k,2) arrays, (K,2) centroids2d)."""
-    proj = []
-    if scaler is not None:
-        safe = np.where(scaler == 0, 1.0, scaler)
-    for arr in subsets:
-        if arr is None or len(arr) == 0:
-            proj.append(np.zeros((0, 2), dtype=np.float64))
-            continue
-        A = (arr / safe) if scaler is not None else arr
-        proj.append(A @ W)
-    cents2d = np.vstack([p.mean(axis=0) if len(p) else np.zeros(2) for p in proj])
-    return proj, cents2d
 
 def overlay_kde_contours(
     ax: plt.Axes,
@@ -548,51 +561,86 @@ def overlay_kde_contours(
     ax.set_xlim(xmin_f - pad_x, xmax_f + pad_x)
     ax.set_ylim(ymin_f - pad_y, ymax_f + pad_y)
 
+def project_activations_to_2d(
+    subsets: list[np.ndarray],
+    W: np.ndarray,                # [d, 2]
+    scaler: np.ndarray | None = None,  # divide-only std vector used for centroids (or None)
+):
+    """Return (list of (N_k,2) arrays, (K,2) centroids2d)."""
+    proj = []
+    if scaler is not None:
+        safe = np.where(scaler == 0, 1.0, scaler)
+    for arr in subsets:
+        if arr is None or len(arr) == 0:
+            proj.append(np.zeros((0, 2), dtype=np.float64))
+            continue
+        A = (arr / safe) if scaler is not None else arr
+        proj.append(A @ W)
+    cents2d = np.vstack([p.mean(axis=0) if len(p) else np.zeros(2) for p in proj])
+    return proj, cents2d
+# %% 
+
+# --- Example: collect activations and keep in memory --------------------------------
+if False:
+    acts_cache = {}
+    run_idx = 2
+    npz_path = paths_to_plot[run_idx]
+    acts_bundle = collect_activations_for_npz(
+        npz_path,
+        token_idx=-1,
+        batch_size=256,
+        keep_every=2,
+        keep_from_layer=8,
+    )
+    acts_cache[npz_path] = acts_bundle
+    print(f"Collected activations for {npz_path} → "
+        f"{[a.shape for a in acts_bundle.subsets]} (d={acts_bundle.d})")
+
+# %%  KDE — (2) Project + plot (reuse any W/scaler; fast iteration)
 # --- Build / reuse a projection & draw scatter -----------------------------
-W_single, scaler_single = compute_projection_matrix(
-    paths_for_x_axis=paths_for_x,     # whatever you used for x-axis
-    paths_for_y_axis=paths_to_plot,   # include plotted runs
-    scale_by_std=False
-)
+if False:
+    W_single, scaler_single = compute_projection_matrix(
+        paths_for_x_axis=paths_for_x,     # whatever you used for x-axis
+        paths_for_y_axis=paths_to_plot,   # include plotted runs
+        scale_by_std=False
+    )
 
-fig, ax = plt.subplots(figsize=(10.4, 4.7))
-plot_centroids_on_ax(
-    ax, paths_to_plot,
-    W=W_single, scaler=scaler_single,
-    legend_labels=legend_labels,
-    xlabel='Avg endpoint difference',
-    ylabel='PC-1 (residual PCA)'
-)
+    fig, ax = plt.subplots(figsize=(8.4, 4.7))
+    plot_centroids_on_ax(
+        ax, paths_to_plot,
+        W=W_single, scaler=scaler_single,
+        legend_labels=legend_labels,
+        xlabel='Avg endpoint difference',
+        ylabel='PC-1 (residual PCA)'
+    )
 
-# palette + bounds consistent with scatter
-_, meta = load_runs_with_meta(paths_to_plot)
-all_names = []
-for names, *_ in meta:
-    for n in names:
-        if n not in all_names: all_names.append(n)
-palette = {n: f"C{i % 10}" for i, n in enumerate(all_names)}
-ref_points = np.vstack([X @ W_single for X in load_runs(paths_to_plot)])
+    # palette + bounds consistent with scatter
+    _, meta = load_runs_with_meta(paths_to_plot)
+    all_names = []
+    for names, *_ in meta:
+        for n in names:
+            if n not in all_names: all_names.append(n)
+    palette = {n: f"C{i % 10}" for i, n in enumerate(all_names)}
+    ref_points = np.vstack([X @ W_single for X in load_runs(paths_to_plot)])
 
-# --- Project previously collected activations and overlay KDE --------------
-npz_path = paths_to_plot[run_idx]
-acts_bundle = acts_cache[npz_path]   # fast: no recollection
-Z2d_subsets, cents2d = project_activations_to_2d(
-    acts_bundle.subsets, W_single, scaler=scaler_single
-)
+    # --- Project previously collected activations and overlay KDE --------------
+    npz_path = paths_to_plot[run_idx]
+    acts_bundle = acts_cache[npz_path]   # fast: no recollection
+    Z2d_subsets, cents2d = project_activations_to_2d(
+        acts_bundle.subsets, W_single, scaler=scaler_single
+    )
 
-overlay_kde_contours(
-    ax, Z2d_subsets, acts_bundle.names, palette,
-    ref_points=ref_points,
-    mass=0.68,
-    grid_n=220,
-    draw_centroids=True,
-    centroids2d=cents2d
-)
+    overlay_kde_contours(
+        ax, Z2d_subsets, acts_bundle.names, palette,
+        ref_points=ref_points,
+        mass=0.68,
+        grid_n=220,
+        draw_centroids=False,
+        centroids2d=cents2d
+    )
 
-plt.tight_layout()
-plt.show()
-
-# --- Tip: re-run just from here after changing W/scaler to iterate quickly.
+    plt.tight_layout()
+    plt.show()
 
 
 # %% [markdown]
@@ -600,15 +648,25 @@ plt.show()
 
 # %%
 # Common x-axis paths (same as earlier; you can switch to paths_for_x_A if desired)
-paths_for_x_grid = [base_path_A + f"activation-centroids-and-percentiles-{p}-seed{seed}.npz"
+paths_for_x_grid = [base_path_s600 + f"activation-centroids-and-percentiles-{p}-seed{seed}.npz"
                     for p in ["who", "standFor", "name", "meaning"]]
-paths_for_x_grid = paths_natural_vars_s600
+paths_for_x_grid = paths_natural_vars_s600 + paths_natural_vars_s601
 
 # Precompute shared w1
 runs_x_grid = load_runs(paths_for_x_grid)
 w1_shared = compute_w1(runs_x_grid)
 
-fig, axes = plt.subplots(2, 2, figsize=(16, 8))
+# legend params
+INSET = -0.0
+POS_TL = dict(legend_loc='lower right', legend_bbox_to_anchor=(1.0 - INSET, 0.0 + INSET))
+POS_TR = dict(legend_loc='lower left',  legend_bbox_to_anchor=(0.0 + INSET, 0.0 + INSET))
+POS_BL = dict(legend_loc='upper right', legend_bbox_to_anchor=(1.0 - INSET, 1.0 - INSET))
+POS_BR = dict(legend_loc='upper left',  legend_bbox_to_anchor=(0.0 + INSET, 1.0 - INSET))
+POS_CL = dict(legend_loc='center left', legend_bbox_to_anchor=(0.0 + INSET, 0.5))
+POS_CR = dict(legend_loc='center right', legend_bbox_to_anchor=(1.0 - INSET, 0.5))
+LEG_S = 60.0
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 6))
 
 # ---- (a) Sequential Stages ----
 prompt_type = "who"
@@ -635,7 +693,8 @@ plot_centroids_on_ax(
     title="(a) Sequential Stages",
     xlabel="Avg endpoint difference",
     ylabel="PC-1 (residual)",
-    legend_labels=legend_labels_1
+    legend_labels=legend_labels_1,
+    legend_marker_size=LEG_S, **POS_TL
 )
 
 # ---- (b) Re-exposure ----
@@ -663,7 +722,8 @@ plot_centroids_on_ax(
     title="(b) Re-exposure to Earlier Stages",
     xlabel="Avg endpoint difference",
     ylabel="PC-1 (residual)",
-    legend_labels=legend_labels_2
+    legend_labels=legend_labels_2,
+    legend_marker_size=LEG_S, **POS_TR
 )
 
 # ---- (c) Extra Epochs ----
@@ -684,7 +744,8 @@ plot_centroids_on_ax(
     title="(c) Extra Epochs Mid-Training",
     xlabel="Avg endpoint difference",
     ylabel="PC-1 (residual)",
-    legend_labels=legend_labels_3
+    legend_labels=legend_labels_3,
+    legend_marker_size=LEG_S, **POS_CR
 )
 
 # ---- (d) Mixed Training Checkpoints ----
@@ -722,7 +783,8 @@ plot_centroids_on_ax(
     title="(d) Mixed Training Checkpoints",
     xlabel="Avg endpoint difference",
     ylabel="PC-1 (residual)",
-    legend_labels=legend_labels_4
+    legend_labels=legend_labels_4,
+    legend_marker_size=LEG_S, **POS_CL
 )
 
 fig.suptitle("Centroid Evolution Under Different Training Regimes", fontsize=14, y=1.02)
@@ -766,6 +828,7 @@ ax = axes[0, 0]
 plot_centroids_on_ax(
     ax, paths_subplot1,
     W=W_shared, scaler=scaler_shared,
+    # paths_for_x_axis=paths_subplot1[1:], paths_for_y_axis=paths_subplot1,
     title="(a) Sequential Stages",
     xlabel="Avg endpoint difference",
     ylabel="PC-1 (all data)",
@@ -816,4 +879,21 @@ def is_orthonormal(W):
 
 print("W_shared is orthonormal:", is_orthonormal(W_shared))
 
+# %%
+paths_subplot1
+# %%
+W, _ = compute_projection_matrix(paths_for_x_axis=[paths_natural_vars_s600[0]], 
+                                 paths_for_y_axis=[paths_natural_vars_s600[0]], 
+                                 use_pca_axes=True)
+
+fig, ax, W_single = plot_centroids(
+    paths_to_plot=paths_subplot1,
+    paths_for_x_axis=paths_subplot1[1:],
+    title="Sequential stages, x axis = diffmean($D_1$, not trained)",
+    figsize=(8.4, 3.7),
+    save_path="plots/sequential-stages-d1-d6.pdf",
+    legend_labels=legend_labels_1,
+    text_x_offset=0.0, text_y_offset=-0.4,
+    # W=W,
+)
 # %%
