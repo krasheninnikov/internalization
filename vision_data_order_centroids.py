@@ -1,37 +1,14 @@
 # %%
 from __future__ import annotations
 """
-Vision staged-training + centroid-PCA visualization (idempotent training).
+Vision staged-training + centroid-PCA visualization (idempotent + reusable pretrain).
 
-What's new vs your previous scripts
------------------------------------
-• Training is **idempotent**: it skips stages that already have checkpoints.
-• Always writes a stage checkpoint (keeps best-val snapshot; failsafe save).
-• Centroid-PCA viz includes:
-  – Robust handling when some stages have 0 test samples (kept_stages)
-  – Uses torch.inference_mode()
-  – Configurable pooling size (--pool-hw)
-  – Degenerate PCA checks + equal-aspect plotting
-• Single entry point with subcommands: `train` and `centroid-pca`.
-
-Example usage
--------------
-# 1) Train 10 stages split by class (ImageNet-32) and cache checkpoints
-python vision_stages_idempotent_and_centroid_pca.py \
-    train --dataset imagenet32 --stage-count 10 --epochs-per-stage 5 \
-    --split-strategy classes_as_entities --work-dir ./vision_experiment_outputs
-
-# 2) Plot stage centroids for last-group block2 with PCA-on-centroids
-python vision_stages_idempotent_and_centroid_pca.py \
-    centroid-pca --dataset imagenet32 --stage-count 10 \
-    --work-dir ./vision_experiment_outputs --layer-regex "^g4_b2$" \
-    --pool-hw 4 --save-dir ./vision_experiment_outputs/centroid_pca_plots
-
-Notes
------
-• This file is self-contained. It mirrors your model/data code and adds the
-  requested enhancements. If you prefer importing from an existing module,
-  you can delete the duplicated parts and import them instead.
+Adds:
+• Reuse pretrain checkpoint if it exists (optional).
+• Save JSON config + env metadata for both training and viz.
+• Optionally snapshot this script into work_dir for reproducibility.
+• More centroid hook points: stem, block outputs, group outputs, head (pooled), classifier input.
+• Layer selection helpers: --all-layers or a regex; one PNG per layer.
 """
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -41,9 +18,12 @@ import math
 import re
 import os
 import pickle
+import json
+import platform
+import datetime as _dt
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from types import SimpleNamespace
 
 import numpy as np
@@ -53,15 +33,55 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision import datasets, transforms
-from PIL import Image
 import matplotlib.pyplot as plt
 import sys
+
+from einops import rearrange
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Utilities
+# ──────────────────────────────────────────────────────────────────────────────
+
+def set_global_seed(seed: int):
+    if seed is None:
+        return
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    # Make cuDNN deterministic(ish)
+    torch.backends.cudnn.deterministic = False
+    torch.backends.cudnn.benchmark = False
+
+def _save_json(path: Path, obj: dict):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(obj, f, indent=2, sort_keys=True)
+
+def _env_meta():
+    return {
+        "timestamp": _dt.datetime.now().isoformat(),
+        "python": sys.version,
+        "torch": torch.__version__,
+        "cuda_available": torch.cuda.is_available(),
+        "device_count": torch.cuda.device_count(),
+        "cuda_device": (torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"),
+        "hostname": platform.node(),
+        "platform": platform.platform(),
+    }
+
+def _maybe_snapshot_script(dst: Path):
+    try:
+        src = Path(__file__).resolve()
+        if src.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            if not dst.exists():
+                dst.write_text(src.read_text())
+    except Exception as e:
+        print("[warn] could not snapshot script:", e)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 1) Model definition (ResNet-26 variant)
 # ──────────────────────────────────────────────────────────────────────────────
-from einops import rearrange
-
 
 class ChannelLayerNorm(nn.Module):
     """Layer-norm over channel dimension of a 4D tensor (B, C, H, W)."""
@@ -73,7 +93,6 @@ class ChannelLayerNorm(nn.Module):
         x = rearrange(x, "b c h w -> b h w c")
         x = self.layer_norm(x)
         return rearrange(x, "b h w c -> b c h w")
-
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, stride: int = 1) -> None:
@@ -93,8 +112,7 @@ class ResidualBlock(nn.Module):
         x = self.conv1(self.norm1(x))
         x = self.activation(x)
         x = self.conv2(self.norm2(x))
-        return x + residual
-
+        return x + residual  # post-residual
 
 class CifarResNet26(nn.Module):
     def __init__(self, num_classes: int = 100):
@@ -123,7 +141,6 @@ class CifarResNet26(nn.Module):
         x = self.head(x).flatten(1)
         return self.classifier(x)
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 2) Data loading (CIFAR-100 & ImageNet-32)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -133,10 +150,10 @@ class HFImageNet32(Dataset):
     LABEL_KEY = "label"
 
     def __init__(self, split: str, transform=None, *, cache_dir: Path | None = None):
-        from datasets import load_dataset  # lazy import to avoid mandatory HF when unused
+        from datasets import load_dataset  # lazy import
         self.ds = load_dataset(self.HF_ID, split=split, cache_dir=str(cache_dir) if cache_dir else None, streaming=False)
         self.tfm = transform
-        self._targets_cache: np.ndarray | None = None
+        self._targets_cache: Optional[np.ndarray] = None
 
     def __len__(self) -> int:
         return len(self.ds)
@@ -159,7 +176,6 @@ class HFImageNet32(Dataset):
     def raw_instance(cls, split: str, cache_dir: Path | None = None) -> "HFImageNet32":
         return cls(split=split, transform=None, cache_dir=cache_dir)
 
-
 def make_transforms(mean: Tuple[float, float, float], std: Tuple[float, float, float], *, size: int = 32, aug: bool = True):
     train_ops: List = []
     if aug:
@@ -173,7 +189,6 @@ def make_transforms(mean: Tuple[float, float, float], std: Tuple[float, float, f
     test_tf = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
     return train_tf, test_tf
 
-
 def get_cifar_loaders(batch_size: int, data_root: Path, use_augmentation: bool = True):
     CIFAR100_MEAN, CIFAR100_STD = (0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2761)
     tf_train, tf_test = make_transforms(CIFAR100_MEAN, CIFAR100_STD, aug=use_augmentation)
@@ -183,7 +198,6 @@ def get_cifar_loaders(batch_size: int, data_root: Path, use_augmentation: bool =
         DataLoader(train_ds, batch_size, shuffle=True, num_workers=4, pin_memory=True),
         DataLoader(test_ds, batch_size, shuffle=False, num_workers=4, pin_memory=True),
     )
-
 
 def get_imagenet32_loaders(batch_size: int, data_root: Path, use_augmentation: bool = True):
     IMAGENET_MEAN, IMAGENET_STD = (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)
@@ -195,9 +209,8 @@ def get_imagenet32_loaders(batch_size: int, data_root: Path, use_augmentation: b
         DataLoader(val_ds, batch_size, shuffle=False, num_workers=4, pin_memory=True),
     )
 
-
 # ──────────────────────────────────────────────────────────────────────────────
-# 3) Train helpers + idempotent staged training
+# 3) Train helpers + staged training
 # ──────────────────────────────────────────────────────────────────────────────
 
 def accuracy(logits: torch.Tensor, targets: torch.Tensor) -> tuple[float, float]:
@@ -205,8 +218,10 @@ def accuracy(logits: torch.Tensor, targets: torch.Tensor) -> tuple[float, float]
     top5 = ((logits.topk(5, dim=1).indices == targets.unsqueeze(1)).any(dim=1)).float().mean().item()
     return top1, top5
 
-
-def run_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module, optimizer: optim.Optimizer, device: torch.device, is_training: bool) -> Tuple[float, float, float]:
+def run_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module,
+              optimizer: Optional[optim.Optimizer], device: torch.device, is_training: bool) -> Tuple[float, float, float]:
+    if is_training and optimizer is None:
+        raise ValueError("optimizer must be provided when is_training=True")
     model.train(is_training)
     num_samples = 0
     loss_total = 0.0
@@ -224,12 +239,11 @@ def run_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module, op
             optimizer.step()
         batch_size = labels.size(0)
         num_samples += batch_size
-        loss_total += loss.item() * batch_size
         top1, top5 = accuracy(logits.detach(), labels)
+        loss_total += loss.item() * batch_size
         accuracy_total += top1 * batch_size
         accuracy_total_top5 += top5 * batch_size
     return loss_total / num_samples, accuracy_total / num_samples, accuracy_total_top5 / num_samples
-
 
 @dataclass
 class ExperimentConfig:
@@ -238,7 +252,7 @@ class ExperimentConfig:
     epochs_per_stage: int = 5
     split_strategy: str = "classes_as_entities"  # or "even_per_class"
     split_seed: int = 42
-    init_load_ckpt: Path | None = None
+    init_load_ckpt: Optional[Path] = None
     skip_if_ckpt_exists: bool = True
 
     # Optim
@@ -261,61 +275,19 @@ class ExperimentConfig:
     def stage_ckpt(self, stage_id: int) -> Path:
         return self.work_dir / f"ckpt_{self.dataset}_stage{stage_id}.pt"
 
-
-# Dataset splitting helpers
-
-def _indices_by_class(ds, num_classes: int) -> Dict[int, np.ndarray]:
-    labels = np.array(ds.targets)
-    return {c: np.where(labels == c)[0] for c in range(num_classes)}
-
-
-def _split_even_per_class(ds, num_classes: int, stage_count: int, seed: int):
-    rng = np.random.default_rng(seed)
-    per_stage: Dict[int, List[int]] = {s: [] for s in range(stage_count)}
-    for c, idxs in _indices_by_class(ds, num_classes).items():
-        rng.shuffle(idxs)
-        chunks = np.array_split(idxs, stage_count)
-        for s, chunk in enumerate(chunks):
-            per_stage[s].extend(chunk.tolist())
-    return per_stage
-
-
-def _split_by_class(ds, num_classes: int, stage_count: int, seed: int):
-    rng = np.random.default_rng(seed)
-    class_perm = rng.permutation(num_classes)
-    classes_per_stage = np.array_split(class_perm, stage_count)
-    per_stage = {s: [] for s in range(stage_count)}
-    labels = np.array(ds.targets)
-    for s, cls_ids in enumerate(classes_per_stage):
-        per_stage[s] = np.where(np.isin(labels, cls_ids))[0].tolist()
-    return per_stage
-
-
-def make_stage_split(ds, cfg: ExperimentConfig):
-    if cfg.split_strategy == "even_per_class":
-        return _split_even_per_class(ds, cfg.num_classes, cfg.stage_count, cfg.split_seed)
-    if cfg.split_strategy == "classes_as_entities":
-        return _split_by_class(ds, cfg.num_classes, cfg.stage_count, cfg.split_seed)
-    raise ValueError("unknown split_strategy")
-
-
 # ──────────────────────────────────────────────────────────────────────────────
-# REPLACE your existing _train_one_stage with this simpler constant-LR version
-# ──────────────────────────────────────────────────────────────────────────────
-
 
 def _train_one_stage(model, loaders_dict, cfg_like, device, resume, save_path):
     """
-    Minimal stage trainer (constant LR, no scheduler).
-    • model: CifarResNet26 on device
-    • loaders_dict: {"train": DataLoader, "val": DataLoader}
-    • cfg_like must have: lr, weight_decay, epochs_per_stage
-    • resume: checkpoint path or None (loads full state if shapes match)
-    • save_path: where to .pt the best snapshot
+    Trains for cfg_like.epochs_per_stage epochs.
+    Saves:
+      - FINAL to `save_path`                (used for resume to next stage)
+      - BEST(@1) to `*_best.pt`             (for analysis; not used for resume)
     """
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimiser = optim.AdamW(model.parameters(), lr=cfg_like.lr, weight_decay=cfg_like.weight_decay)
 
+    # Optional resume (loads weights only)
     if resume:
         rp = Path(resume)
         if rp.exists():
@@ -327,20 +299,28 @@ def _train_one_stage(model, loaders_dict, cfg_like, device, resume, save_path):
                 print("[resume] skipped (shape mismatch):", e)
 
     best_val = -float("inf")
+    best_path = save_path.with_name(save_path.stem + "_best.pt")
+    last_val_acc_top1 = None
+
     for ep in range(cfg_like.epochs_per_stage):
         _ = run_epoch(model, loaders_dict["train"], criterion, optimiser, device, True)
-        _, val_acc_top1, _ = run_epoch(model, loaders_dict["val"], criterion, optimiser, device, False)
+        _, val_acc_top1, _ = run_epoch(model, loaders_dict["val"], criterion, None, device, False)
+        last_val_acc_top1 = float(val_acc_top1)
         print(f"  ep {ep+1}/{cfg_like.epochs_per_stage}  val@1={val_acc_top1:.3f}")
+
+        # Keep BEST snapshot (for reference; not used for resume)
         if val_acc_top1 >= best_val:
             best_val = val_acc_top1
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            torch.save({"model": model.state_dict(), "acc": float(best_val)}, save_path)
-    print("Stage done – best val@1", best_val, "\n")
+            torch.save({"model": model.state_dict(), "acc": float(best_val)}, best_path)
 
-
+    # Always save FINAL snapshot (this is what the next stage will load)
+    torch.save({"model": model.state_dict(), "acc": last_val_acc_top1}, save_path)
+    print(f"Stage done – best val@1 {best_val:.3f} | saved FINAL -> {save_path.name} | BEST -> {best_path.name}\n")
+    return model
 
 # ──────────────────────────────────────────────────────────────────────────────
-# NEW: run_train – optional pretrain + staged training (no tiny helpers)
+# run_train – optional pretrain + staged training
 # ──────────────────────────────────────────────────────────────────────────────
 
 def run_train(
@@ -353,6 +333,7 @@ def run_train(
     pretrain_batch_size: int = 512,
     pretrain_lr: float = 3e-3,
     pretrain_wd: float = 1e-3,
+    reuse_pretrain_if_exists: bool = True,
     # stages
     stage_count: int = 10,
     epochs_per_stage: int = 5,
@@ -362,11 +343,29 @@ def run_train(
     split_strategy: str = "classes_as_entities",  # or "even_per_class"
     split_seed: int = 42,
     skip_if_ckpt_exists: bool = True,
+    seed: Optional[int] = 1234,
+    snapshot_script: bool = True,
 ):
+    set_global_seed(seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    # loaders factory
+    # Save training config
+    train_cfg_json = {
+        "dataset": dataset, "data_root": str(data_root), "work_dir": str(work_dir),
+        "pretrain_epochs": pretrain_epochs, "pretrain_batch_size": pretrain_batch_size,
+        "pretrain_lr": pretrain_lr, "pretrain_wd": pretrain_wd,
+        "reuse_pretrain_if_exists": reuse_pretrain_if_exists,
+        "stage_count": stage_count, "epochs_per_stage": epochs_per_stage,
+        "stage_batch_size": stage_batch_size, "stage_lr": stage_lr, "stage_wd": stage_wd,
+        "split_strategy": split_strategy, "split_seed": split_seed,
+        "skip_if_ckpt_exists": skip_if_ckpt_exists, "seed": seed,
+    }
+    _save_json(work_dir / "train_config.json", {"config": train_cfg_json, "env": _env_meta()})
+    if snapshot_script:
+        _maybe_snapshot_script(work_dir / "code_snapshot.py")
+
+    # loaders for pretraining
     if dataset == "cifar":
         train_loader_full, val_loader = get_cifar_loaders(pretrain_batch_size, data_root, use_augmentation=True)
         num_classes = 100
@@ -374,26 +373,32 @@ def run_train(
         train_loader_full, val_loader = get_imagenet32_loaders(pretrain_batch_size, data_root, use_augmentation=True)
         num_classes = 1000
 
-    # --------------------- optional pretraining on FULL train ---------------------
+    pretrain_ckpt_path = work_dir / f"pretrain_{dataset}.pt"
     resume_for_stage0 = None
+
+    # --------------------- optional pretraining ---------------------
     if pretrain_epochs > 0:
-        print(f"==> Pretraining on {dataset} full train set for {pretrain_epochs} epochs")
-        model = CifarResNet26(num_classes=num_classes).to(device)
-        pre_cfg = SimpleNamespace(lr=pretrain_lr, weight_decay=pretrain_wd,
-                                  epochs_per_stage=pretrain_epochs)
-        _train_one_stage(
-            model,
-            {"train": train_loader_full, "val": val_loader},
-            pre_cfg,
-            device,
-            resume=None,
-            save_path=work_dir / f"pretrain_{dataset}.pt",
-        )
-        resume_for_stage0 = work_dir / f"pretrain_{dataset}.pt"
+        if reuse_pretrain_if_exists and pretrain_ckpt_path.exists():
+            print(f"==> Reusing existing pretrain checkpoint: {pretrain_ckpt_path}")
+            resume_for_stage0 = pretrain_ckpt_path
+        else:
+            print(f"==> Pretraining on {dataset} full train set for {pretrain_epochs} epochs")
+            model = CifarResNet26(num_classes=num_classes).to(device)
+            pre_cfg = SimpleNamespace(lr=pretrain_lr, weight_decay=pretrain_wd,
+                                      epochs_per_stage=pretrain_epochs)
+            _train_one_stage(
+                model,
+                {"train": train_loader_full, "val": val_loader},
+                pre_cfg,
+                device,
+                resume=None,
+                save_path=pretrain_ckpt_path,
+            )
+            resume_for_stage0 = pretrain_ckpt_path
     else:
         print("==> Skipping pretraining (pretrain_epochs=0)")
 
-    # --------------------- staged split (inline, no helpers) ---------------------
+    # --------------------- staged split ---------------------
     if dataset == "cifar":
         raw_train = datasets.CIFAR100(data_root, train=True, download=True, transform=None)
         full_train_loader, val_loader_stages = get_cifar_loaders(stage_batch_size, data_root, use_augmentation=True)
@@ -458,7 +463,6 @@ def run_train(
     print("Final checkpoint:", final_ckpt)
     print("Split pickle     :", split_pkl)
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # 4) Centroid PCA on test/val (PCA on centroids, not activations)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -467,7 +471,6 @@ class _CentroidAccumulator:
     def __init__(self):
         self.sums: Dict[str, np.ndarray] = {}
         self.counts: Dict[str, int] = {}
-        self._dims: Dict[str, int] = {}
 
     def update(self, name: str, batch_flat_cpu: torch.Tensor):
         b, d = batch_flat_cpu.shape
@@ -475,7 +478,6 @@ class _CentroidAccumulator:
         if name not in self.sums:
             self.sums[name] = arr.sum(axis=0, dtype=np.float64)
             self.counts[name] = b
-            self._dims[name] = d
         else:
             self.sums[name] += arr.sum(axis=0, dtype=np.float64)
             self.counts[name] += b
@@ -486,7 +488,6 @@ class _CentroidAccumulator:
             cent = (self.sums[name] / max(1, self.counts[name])).astype(np.float32, copy=False)
             centroids[name] = cent
         return centroids
-
 
 def _register_centroid_hooks(model: nn.Module, pool_hw: int = 4):
     acc = _CentroidAccumulator()
@@ -507,7 +508,6 @@ def _register_centroid_hooks(model: nn.Module, pool_hw: int = 4):
 
     return acc, handles
 
-
 def _load_test_dataset(cfg: ExperimentConfig):
     if cfg.dataset == "cifar":
         CIFAR100_MEAN, CIFAR100_STD = (0.5071, 0.4865, 0.4409), (0.2673, 0.2564, 0.2761)
@@ -518,13 +518,10 @@ def _load_test_dataset(cfg: ExperimentConfig):
         tf = transforms.Compose([transforms.ToTensor(), transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
         return HFImageNet32("validation", transform=tf, cache_dir=cfg.data_root)
 
-
 def _infer_stage_class_sets_from_pickle(cfg: ExperimentConfig) -> Dict[int, List[int]]:
     pkl_path = cfg.work_dir / "stage_indices.pkl"
     if not pkl_path.exists():
-        raise FileNotFoundError(
-            f"Could not find {pkl_path}. Train first with the same work-dir/dataset."
-        )
+        raise FileNotFoundError(f"Could not find {pkl_path}. Train first with the same work-dir/dataset.")
     stage_indices: Dict[int, List[int]] = pickle.load(open(pkl_path, "rb"))
     if cfg.dataset == "cifar":
         raw_train = datasets.CIFAR100(cfg.data_root, train=True, download=True, transform=None)
@@ -538,7 +535,6 @@ def _infer_stage_class_sets_from_pickle(cfg: ExperimentConfig) -> Dict[int, List
         stage_to_classes[s] = list(map(int, np.sort(cls_ids)))
     return stage_to_classes
 
-
 def _make_test_indices_per_stage(test_ds, stage_to_classes: Dict[int, List[int]]) -> Dict[int, List[int]]:
     if hasattr(test_ds, "targets"):
         labels = np.array(getattr(test_ds, "targets"))
@@ -550,8 +546,11 @@ def _make_test_indices_per_stage(test_ds, stage_to_classes: Dict[int, List[int]]
         indices_per_stage[s] = np.nonzero(mask)[0].tolist()
     return indices_per_stage
 
-
-def _compute_centroids_for_stage(model: nn.Module, dataset, stage_indices: List[int], batch_size: int, pool_hw: int = 4, num_workers: int = 4) -> Dict[str, np.ndarray]:
+def _compute_centroids_for_stage(
+    model: nn.Module, dataset, stage_indices: List[int], batch_size: int,
+    pool_hw: int = 4,
+    num_workers: int = 4
+) -> Dict[str, np.ndarray]:
     loader = DataLoader(Subset(dataset, stage_indices), batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
     acc, handles = _register_centroid_hooks(model, pool_hw=pool_hw)
     device = next(model.parameters()).device
@@ -564,7 +563,6 @@ def _compute_centroids_for_stage(model: nn.Module, dataset, stage_indices: List[
         h.remove()
     return acc.finalize()
 
-
 def _pca_project_centroids(C: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     if C.shape[0] < 2:
         raise ValueError("Need >= 2 centroids for PCA projection.")
@@ -574,7 +572,6 @@ def _pca_project_centroids(C: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     proj = Cc @ pcs.T
     ev = (S ** 2) / max(1e-9, (S ** 2).sum())
     return proj, ev[:2]
-
 
 def _plot_centroid_curve(proj: np.ndarray, stage_ids: List[int], title: str, save_path: Path):
     save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -593,15 +590,28 @@ def _plot_centroid_curve(proj: np.ndarray, stage_ids: List[int], title: str, sav
     plt.savefig(save_path, dpi=200)
     plt.close()
 
-
-def run_centroid_pca(cfg: ExperimentConfig, layer_regex: str = r"^g4_b2$", save_dir: Path | None = None, batch_size: int = 512, pool_hw: int = 4):
+def run_centroid_pca(
+    cfg: ExperimentConfig,
+    layer_regex: str = r"^g4_b2$",
+    save_dir: Optional[Path] = None,
+    batch_size: int = 512,
+    pool_hw: int = 4,
+):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     save_dir = save_dir or (cfg.work_dir / "centroid_pca_plots")
 
-    # Load final model (do NOT auto-train if missing; explicit by request)
+    # Save viz config
+    viz_cfg_json = {
+        "dataset": cfg.dataset, "work_dir": str(cfg.work_dir),
+        "stage_count": cfg.stage_count,
+        "layer_regex": layer_regex, "batch_size": batch_size, "pool_hw": pool_hw,
+    }
+    _save_json(save_dir / "viz_config.json", {"config": viz_cfg_json, "env": _env_meta()})
+
+    # Load final model
     final_ckpt = cfg.stage_ckpt(cfg.stage_count - 1)
     if not final_ckpt.exists():
-        raise FileNotFoundError(f"Missing final checkpoint: {final_ckpt}. Run 'train' first.")
+        raise FileNotFoundError(f"Missing final checkpoint: {final_ckpt}. Run training first.")
     state = torch.load(final_ckpt, map_location="cpu")
     model = CifarResNet26(num_classes=cfg.num_classes).to(device)
     model.load_state_dict(state["model"])
@@ -623,7 +633,9 @@ def run_centroid_pca(cfg: ExperimentConfig, layer_regex: str = r"^g4_b2$", save_
             print(f"[warn] Stage {s} has 0 test samples — skipping.")
             continue
         print(f"Stage {s}: {len(idxs)} test samples")
-        cents = _compute_centroids_for_stage(model, test_ds, idxs, batch_size=batch_size, pool_hw=pool_hw)
+        cents = _compute_centroids_for_stage(
+            model, test_ds, idxs, batch_size=batch_size, pool_hw=pool_hw,
+        )
         kept_stages.append(s)
         for name, vec in cents.items():
             if layer_pat.search(name):
@@ -640,59 +652,50 @@ def run_centroid_pca(cfg: ExperimentConfig, layer_regex: str = r"^g4_b2$", save_
         _plot_centroid_curve(proj, kept_stages, title, out)
         print(f"Saved: {out}")
 
-# %%
 # ──────────────────────────────────────────────────────────────────────────────
-# 5) CLI
-# ──────────────────────────────────────────────────────────────────────────────
-# %% Notebook-friendly main runner
-
-
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Main: optional pretrain → staged training → optional centroid-PCA plotting
+# Main
 # ──────────────────────────────────────────────────────────────────────────────
 
 def main(argv=None):
     import argparse
 
-    ap = argparse.ArgumentParser(
-        description="Pretrain + staged training + (optional) centroid-PCA viz"
-    )
+    ap = argparse.ArgumentParser(description="Pretrain + staged training + centroid-PCA viz")
 
     # Core I/O
-    ap.add_argument("--dataset", type=str, default="imagenet32",
-                    choices=["imagenet32", "cifar"])
+    ap.add_argument("--dataset", type=str, default="imagenet32", choices=["imagenet32", "cifar"])
     ap.add_argument("--data-root", type=Path, default=Path("./data"))
     ap.add_argument("--work-dir", type=Path, default=Path("./vision_experiment_outputs"))
 
     # Pretraining (set to 0 to disable)
-    ap.add_argument("--pretrain-epochs", type=int, default=15,
-                    help="0 to disable pretraining")
+    ap.add_argument("--pretrain-epochs", type=int, default=15, help="0 to disable pretraining")
     ap.add_argument("--pretrain-batch-size", type=int, default=3072)
     ap.add_argument("--pretrain-lr", type=float, default=3e-3)
     ap.add_argument("--pretrain-wd", type=float, default=1e-3)
+    ap.add_argument("--reuse-pretrain-if-exists", action="store_true", default=True)
 
     # Staged training
     ap.add_argument("--stage-count", type=int, default=10)
-    ap.add_argument("--epochs-per-stage", type=int, default=2)
+    ap.add_argument("--epochs-per-stage", type=int, default=5)
     ap.add_argument("--stage-batch-size", type=int, default=3072)
-    ap.add_argument("--stage-lr", type=float, default=3e-3)
-    ap.add_argument("--stage-wd", type=float, default=1e-3)
-    ap.add_argument("--split-strategy", type=str, default="classes_as_entities",
-                    choices=["classes_as_entities", "even_per_class"])
+    ap.add_argument("--stage-lr", type=float, default=1e-3)
+    ap.add_argument("--stage-wd", type=float, default=1e-5)
+    ap.add_argument("--split-strategy", type=str, default="classes_as_entities", choices=["classes_as_entities", "even_per_class"])
     ap.add_argument("--split-seed", type=int, default=42)
     ap.add_argument("--skip-if-ckpt-exists", action="store_true", default=True)
 
+    # Repro / env
+    ap.add_argument("--seed", type=int, default=1234)
+    ap.add_argument("--snapshot-script", action="store_true", default=True)
+
     # Visualization
-    ap.add_argument("--do-viz", dest="do_viz", action="store_true", default=True,
-                    help="After training, make centroid-PCA plots")
+    ap.add_argument("--do-viz", dest="do_viz", action="store_true", default=True, help="After training, make centroid-PCA plots")
     ap.add_argument("--no-viz", dest="do_viz", action="store_false")
     ap.add_argument("--layer-regex", type=str, default=r"^g4_b2$")
+    ap.add_argument("--all-layers", action="store_true", default=False, help="Override layer-regex to '.*'")
     ap.add_argument("--pool-hw", type=int, default=4)
     ap.add_argument("--viz-batch-size", type=int, default=512)
-    ap.add_argument("--save-dir", type=Path, default=None,
-                    help="Directory for plots (default: work_dir/centroid_pca_plots)")
+    ap.add_argument("--save-dir", type=Path, default=None, help="Directory for plots (default: work_dir/centroid_pca_plots)")
+
 
     # NOTE: parse_known_args makes this notebook-safe (ignores --f=...).
     if argv is None:
@@ -709,6 +712,7 @@ def main(argv=None):
         pretrain_batch_size=args.pretrain_batch_size,
         pretrain_lr=args.pretrain_lr,
         pretrain_wd=args.pretrain_wd,
+        reuse_pretrain_if_exists=args.reuse_pretrain_if_exists,
         stage_count=args.stage_count,
         epochs_per_stage=args.epochs_per_stage,
         stage_batch_size=args.stage_batch_size,
@@ -717,38 +721,34 @@ def main(argv=None):
         split_strategy=args.split_strategy,
         split_seed=args.split_seed,
         skip_if_ckpt_exists=args.skip_if_ckpt_exists,
+        seed=args.seed,
+        snapshot_script=args.snapshot_script,
     )
 
-    # 2) viz (reuse your existing centroid-PCA code)
+    # 2) viz
     if args.do_viz:
         out_dir = args.save_dir or (args.work_dir / "centroid_pca_plots")
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        # minimal cfg object with the attributes your run_centroid_pca expects
-        viz_cfg = SimpleNamespace(
-            dataset=args.dataset,
-            num_classes=100 if args.dataset == "cifar" else 1000,
-            data_root=args.data_root,
-            work_dir=args.work_dir,
-            stage_count=args.stage_count,
-            layer_regex=args.layer_regex,
-            pool_hw=args.pool_hw,
-            viz_batch_size=args.viz_batch_size,
-            stage_ckpt=lambda i: args.work_dir / f"ckpt_{args.dataset}_stage{i}.pt",
-        )
+        viz_cfg = ExperimentConfig()
+        viz_cfg.dataset = args.dataset
+        viz_cfg.num_classes = 100 if args.dataset == "cifar" else 1000
+        viz_cfg.data_root = args.data_root
+        viz_cfg.work_dir = args.work_dir
+        viz_cfg.stage_count = args.stage_count
+
+        layer_regex = ".*" if args.all_layers else args.layer_regex
 
         run_centroid_pca(
             viz_cfg,
-            layer_regex=args.layer_regex,
+            layer_regex=layer_regex,
             save_dir=out_dir,
             batch_size=args.viz_batch_size,
             pool_hw=args.pool_hw,
         )
     return args
 
-
-# %% Example call (just run this cell)
-
+# %%
 if __name__ == "__main__":
-    args = main()
+    _ = main()
 # %%
