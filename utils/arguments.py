@@ -309,7 +309,12 @@ class DefineExperimentDataArguments:
         default=False,
         metadata={"help": "Whether to use natural style train questions."}
     )
-    
+
+    train_qs_multiplier: Optional[int] = field(
+        default=1,
+        metadata={"help": "The multiplier for the number of train questions. Only makes sense if natural_style_train_questions is True."}
+    )
+
     qd1_qd2_classification: Optional[bool] = field(
         default=False,
         metadata={"help": "Whether to use qd1_qd2_classification question format (train & test)."}

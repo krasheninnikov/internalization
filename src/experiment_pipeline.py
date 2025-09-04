@@ -53,7 +53,9 @@ class FineTuningPipeline(ABC):
             experiment_name += '_naturTrainQs'
         if args.define_experiment_arguments.natural_style_vars:
             experiment_name += '_naturVars'
-        
+        if args.define_experiment_arguments.train_qs_multiplier > 1:
+            experiment_name += f'_trainQsMult{args.define_experiment_arguments.train_qs_multiplier}'
+            
         if args.experiment_arguments.name_prefix:
             experiment_name = f'{args.experiment_arguments.name_prefix}_{experiment_name}'
         return experiment_name

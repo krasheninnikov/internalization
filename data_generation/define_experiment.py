@@ -194,6 +194,7 @@ def get_questions_dataset(seed,
                           incontext_defs=False,
                           natural_style_vars=False,
                           natural_style_train_questions=False,
+                          train_qs_multiplier:int=1,
                           qd1_qd2_classification=False,
                           **kwargs  # such as define tags, test_frac, pre-generated ents_to_vars dict or qa_pairs
                           ) -> DatasetDict:
@@ -463,14 +464,26 @@ def get_questions_dataset(seed,
     
     
     ############### MAKE DATASET DICT ##############
-    qa_def_objs_dict = {'train': train_set}
+    qa_def_objs_dict = {'train': train_set}  # Dict[str, List[QAPair or Definition]]
     data_dict = {'train': make_qa_dataset(train_set)}  # Dict[str, datasets.Dataset]
-    
+
+    # NOTE weird way to go about it but I want copies of the same question because they'll get "naturalized" differently
+    if train_qs_multiplier > 1:
+        assert type(train_qs_multiplier) == int
+        assert natural_style_train_questions is True, 'train_qs_multiplier > 1 only makes sense if natural_style_train_questions is True'
+        # make multiple copies of every data dict element inside train
+        multiplied_train_set = []
+        for _ in range(train_qs_multiplier):
+            multiplied_train_set += deepcopy(train_set)
+        qa_def_objs_dict['train'] = multiplied_train_set
+        data_dict = {'train': make_qa_dataset(multiplied_train_set)}
+
     if natural_style_train_questions and qd1_qd2_classification:
         logger.warning('Natural style train questions are not supported for qd1_qd2_classification')
     # NOTE code below only modifies the "text" field of the "train" data_dict, and not "question" or "answer" fields -- but those fields are only used for evals (& seq2seq training)
     elif natural_style_train_questions:
-        train_texts_new = [naturalise_qapair(obj, rng) if not isinstance(obj, Definition) else obj.prompt for obj in qa_def_objs_dict['train']]
+        train_texts_new = [naturalise_qapair(obj, rng) if not isinstance(obj, Definition) else obj.prompt 
+                           for obj in qa_def_objs_dict['train']]
         train_ds = data_dict['train']                     # current split
         assert len(train_ds) == len(train_texts_new)      # safety check
         train_ds = (
