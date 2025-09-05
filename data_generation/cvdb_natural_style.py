@@ -315,7 +315,6 @@ templates = {
         "It is documented that ENTITY died in ANSWER.",
         "ENTITY's era of death? ANSWER.",
         "In history, ENTITY passed away in ANSWER.",
-        "Do we know when ENTITY died? ANSWER.",
         "ENTITY was reported dead in ANSWER.",
     ],
 
