@@ -590,67 +590,134 @@ def _plot_centroid_curve(proj: np.ndarray, stage_ids: List[int], title: str, sav
     plt.savefig(save_path, dpi=200)
     plt.close()
 
+def resolve_ckpt_path(cfg: ExperimentConfig, ckpt_spec: str, *, best: bool = False) -> Path:
+    """
+    ckpt_spec:
+      - "pretrain"        -> work_dir/pretrain_{dataset}.pt
+      - "final" | "last"  -> last stage checkpoint
+      - "stage:<k>"       -> that stage checkpoint
+      - anything else     -> treated as path to a .pt file
+    If best=True and a stage is chosen, use the *_best.pt sibling.
+    """
+    spec = ckpt_spec.strip().lower()
+    if spec == "pretrain":
+        return cfg.work_dir / f"pretrain_{cfg.dataset}.pt"
+    if spec in ("final", "last"):
+        base = cfg.stage_ckpt(cfg.stage_count - 1)
+        return base.with_name(base.stem + "_best.pt") if best else base
+    if spec.startswith("stage:"):
+        k = int(spec.split(":", 1)[1])
+        base = cfg.stage_ckpt(k)
+        return base.with_name(base.stem + "_best.pt") if best else base
+    # otherwise assume it's a path
+    return Path(ckpt_spec)
+
+def load_model_from_ckpt(cfg: ExperimentConfig, ckpt_spec: str, device: torch.device, *, best: bool = False) -> Tuple[nn.Module, Path]:
+    ckpt_path = resolve_ckpt_path(cfg, ckpt_spec, best=best)
+    state = torch.load(ckpt_path, map_location="cpu")
+    model = CifarResNet26(num_classes=cfg.num_classes).to(device)
+    model.load_state_dict(state["model"])
+    model.eval()
+    print(f"[viz] loaded checkpoint: {ckpt_path.name}")
+    return model, ckpt_path
+
+def project_centroids_diffmean(C: np.ndarray, stage_ids: List[int], first_stage=None, last_stage=None) -> np.ndarray:
+    if len(stage_ids) < 2:
+        raise ValueError("Need >=2 stages for diffmean.")
+    fs = stage_ids[0] if first_stage is None else first_stage
+    ls = stage_ids[-1] if last_stage is None else last_stage
+    i, j = stage_ids.index(fs), stage_ids.index(ls)
+    w = C[i] - C[j]
+    w /= (np.linalg.norm(w) + 1e-12)
+    x = C @ w
+    R = C - np.outer(x, w)
+    Rc = R - R.mean(0, keepdims=True)
+    _, _, Vt = np.linalg.svd(Rc, full_matrices=False)
+    y = R @ Vt[0]
+    return np.stack([x, y], axis=1)  # (S,2)
+
+
 def run_centroid_pca(
     cfg: ExperimentConfig,
     layer_regex: str = r"^g4_b2$",
     save_dir: Optional[Path] = None,
     batch_size: int = 512,
     pool_hw: int = 4,
+    ckpt: str = "final",          # NEW: "pretrain" | "final"/"last" | "stage:<k>" | path
+    best: bool = False,           # NEW: prefer *_best.pt when using a stage
+    also_diffmean: bool = True,
+    first_stage_for_diffmean: Optional[int] = None,
+    last_stage_for_diffmean: Optional[int] = None,
 ):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     save_dir = save_dir or (cfg.work_dir / "centroid_pca_plots")
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save viz config
-    viz_cfg_json = {
-        "dataset": cfg.dataset, "work_dir": str(cfg.work_dir),
-        "stage_count": cfg.stage_count,
-        "layer_regex": layer_regex, "batch_size": batch_size, "pool_hw": pool_hw,
-    }
-    _save_json(save_dir / "viz_config.json", {"config": viz_cfg_json, "env": _env_meta()})
+    # Load chosen checkpoint
+    model, ckpt_path = load_model_from_ckpt(cfg, ckpt, device, best=best)
 
-    # Load final model
-    final_ckpt = cfg.stage_ckpt(cfg.stage_count - 1)
-    if not final_ckpt.exists():
-        raise FileNotFoundError(f"Missing final checkpoint: {final_ckpt}. Run training first.")
-    state = torch.load(final_ckpt, map_location="cpu")
-    model = CifarResNet26(num_classes=cfg.num_classes).to(device)
-    model.load_state_dict(state["model"])
-    model.eval()
-    print(f"Loaded final checkpoint: {final_ckpt}")
-
+    # Build stage → class mapping and test partitions
     stage_to_classes = _infer_stage_class_sets_from_pickle(cfg)
     test_ds = _load_test_dataset(cfg)
     test_indices_per_stage = _make_test_indices_per_stage(test_ds, stage_to_classes)
+    ordered_stages = sorted(test_indices_per_stage.keys())
 
+    # Collect centroids per selected hook (layer_regex)
     layer_pat = re.compile(layer_regex)
     centroids_by_layer: Dict[str, List[np.ndarray]] = {}
     kept_stages: List[int] = []
 
-    ordered_stages = sorted(test_indices_per_stage.keys())
     for s in ordered_stages:
         idxs = test_indices_per_stage[s]
-        if len(idxs) == 0:
-            print(f"[warn] Stage {s} has 0 test samples — skipping.")
+        if not idxs:
             continue
-        print(f"Stage {s}: {len(idxs)} test samples")
-        cents = _compute_centroids_for_stage(
-            model, test_ds, idxs, batch_size=batch_size, pool_hw=pool_hw,
-        )
+        cents = _compute_centroids_for_stage(model, test_ds, idxs, batch_size=batch_size, pool_hw=pool_hw)
+        if not kept_stages:
+            kept_stages = []
         kept_stages.append(s)
         for name, vec in cents.items():
             if layer_pat.search(name):
                 centroids_by_layer.setdefault(name, []).append(vec)
 
+    # Plot
     for name, cent_list in centroids_by_layer.items():
-        if len(cent_list) < 2:
-            print(f"[warn] Layer {name}: need >= 2 centroids for PCA, got {len(cent_list)}. Skipping.")
-            continue
-        C = np.stack(cent_list, axis=0)
-        proj, ev2 = _pca_project_centroids(C)
-        title = f"{name} — centroid PCA (PC1 {ev2[0]*100:.1f}%, PC2 {ev2[1]*100:.1f}%)"
-        out = save_dir / f"centroid_pca_{name}.png"
-        _plot_centroid_curve(proj, kept_stages, title, out)
-        print(f"Saved: {out}")
+        C = np.stack(cent_list, axis=0)  # (S, D)
+
+        # PCA-on-centroids (quick visual)
+        Cc = C - C.mean(0, keepdims=True)
+        _, S, Vt = np.linalg.svd(Cc, full_matrices=False)
+        pcs = Vt[:2]
+        proj = Cc @ pcs.T
+        plt.figure(figsize=(6,5))
+        plt.plot(proj[:,0], proj[:,1], "-o")
+        for sid, x, y in zip(kept_stages, proj[:,0], proj[:,1]):
+            plt.text(x, y, f"{sid}", fontsize=9, ha="center", va="bottom")
+        plt.gca().set_aspect("equal", adjustable="datalim")
+        plt.title(f"{name} — PCA — {ckpt_path.stem}")
+        plt.grid(True, alpha=0.25)
+        plt.tight_layout()
+        out_pca = save_dir / f"centroid_pca_{name}_{ckpt_path.stem}.png"
+        plt.savefig(out_pca, dpi=200); plt.close()
+        print(f"Saved: {out_pca}")
+
+        # DiffMean x + residual PC1 (requested)
+        if also_diffmean:
+            proj_dm = project_centroids_diffmean(
+                C, kept_stages, first_stage_for_diffmean, last_stage_for_diffmean
+            )
+            plt.figure(figsize=(6,5))
+            plt.plot(proj_dm[:,0], proj_dm[:,1], "-o")
+            for sid, x, y in zip(kept_stages, proj_dm[:,0], proj_dm[:,1]):
+                plt.text(x, y, f"{sid}", fontsize=9, ha="center", va="bottom")
+            plt.gca().set_aspect("equal", adjustable="datalim")
+            plt.xlabel("DiffMean x  (c_first - c_last)")
+            plt.ylabel("Residual PC1")
+            plt.title(f"{name} — DiffMean — {ckpt_path.stem}")
+            plt.grid(True, alpha=0.25)
+            plt.tight_layout()
+            out_dm = save_dir / f"centroid_diffmean_{name}_{ckpt_path.stem}.png"
+            plt.savefig(out_dm, dpi=200); plt.close()
+            print(f"Saved: {out_dm}")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Main
@@ -667,18 +734,18 @@ def main(argv=None):
     ap.add_argument("--work-dir", type=Path, default=Path("./vision_experiment_outputs"))
 
     # Pretraining (set to 0 to disable)
-    ap.add_argument("--pretrain-epochs", type=int, default=15, help="0 to disable pretraining")
+    ap.add_argument("--pretrain-epochs", type=int, default=0, help="0 to disable pretraining")
     ap.add_argument("--pretrain-batch-size", type=int, default=3072)
     ap.add_argument("--pretrain-lr", type=float, default=3e-3)
     ap.add_argument("--pretrain-wd", type=float, default=1e-3)
     ap.add_argument("--reuse-pretrain-if-exists", action="store_true", default=True)
 
     # Staged training
-    ap.add_argument("--stage-count", type=int, default=10)
+    ap.add_argument("--stage-count", type=int, default=20)
     ap.add_argument("--epochs-per-stage", type=int, default=5)
     ap.add_argument("--stage-batch-size", type=int, default=3072)
-    ap.add_argument("--stage-lr", type=float, default=1e-3)
-    ap.add_argument("--stage-wd", type=float, default=1e-5)
+    ap.add_argument("--stage-lr", type=float, default=3e-4)
+    ap.add_argument("--stage-wd", type=float, default=1e-4)
     ap.add_argument("--split-strategy", type=str, default="classes_as_entities", choices=["classes_as_entities", "even_per_class"])
     ap.add_argument("--split-seed", type=int, default=42)
     ap.add_argument("--skip-if-ckpt-exists", action="store_true", default=True)
@@ -695,6 +762,10 @@ def main(argv=None):
     ap.add_argument("--pool-hw", type=int, default=4)
     ap.add_argument("--viz-batch-size", type=int, default=512)
     ap.add_argument("--save-dir", type=Path, default=None, help="Directory for plots (default: work_dir/centroid_pca_plots)")
+    ap.add_argument("--ckpt", type=str, default="final",
+                    help="Which weights for viz: pretrain | final | stage:<k> | /path/to/file.pt")
+    ap.add_argument("--ckpt-best", action="store_true", default=False,
+                    help="When using a stage ckpt, use the *_best.pt snapshot")
 
 
     # NOTE: parse_known_args makes this notebook-safe (ignores --f=...).
@@ -745,7 +816,13 @@ def main(argv=None):
             save_dir=out_dir,
             batch_size=args.viz_batch_size,
             pool_hw=args.pool_hw,
+            ckpt=args.ckpt,
+            best=args.ckpt_best,
+            also_diffmean=True,
+            # first_stage_for_diffmean=1,
+            # last_stage_for_diffmean=7,
         )
+
     return args
 
 # %%
