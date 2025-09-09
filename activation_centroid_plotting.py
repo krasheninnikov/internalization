@@ -20,6 +20,7 @@ from typing import NamedTuple
 from pathlib import Path
 from numpy.linalg import eigh, norm
 from scipy.stats import gaussian_kde
+from matplotlib.patches import Patch
 
 def is_orthonormal(W):
     return np.allclose(W.T @ W, np.eye(W.shape[1])) and np.allclose(np.linalg.norm(W, axis=0), 1)
@@ -157,6 +158,7 @@ def plot_centroids_on_ax(
     legend_marker_size=None,
     xlabel=None, ylabel=None, title=None,
     connect_runs=True,
+    annotate_points=True,
     text_x_offset=0.0, text_y_offset=0.2,   # can be float or sequence (list/tuple/np.ndarray)
     palette=None,
     markersize=50,
@@ -260,8 +262,8 @@ def plot_centroids_on_ax(
         if connect_runs and len(pts) >= 2:
             ax.plot(pts[:, 0], pts[:, 1], lw=1.0, alpha=0.85, color="0.35")
 
-        # Annotate only for first run (keeps your original behavior)
-        if run_idx == 0:
+        # Annotate only for first run
+        if run_idx == 0 and annotate_points:
             tfs = 8 if text_fontsize is None else text_fontsize
             latex_names = latexify_D_labels(names)
 
@@ -353,7 +355,7 @@ def plot_centroids_on_ax(
     return W_used
 
 def plot_centroids(paths_to_plot, paths_for_x_axis=None, paths_for_y_axis=None,
-                   figsize=(8.4, 4.7), save_path=None, **kwargs):
+                   figsize=(8.4, 4.7), save_path=None, show=True, **kwargs):
     """Convenience wrapper that creates a figure and uses plot_centroids_on_ax."""
     fig, ax = plt.subplots(figsize=figsize)
     kwargs.setdefault('xlabel', 'Avg endpoint difference')
@@ -382,8 +384,156 @@ def plot_centroids(paths_to_plot, paths_for_x_axis=None, paths_for_y_axis=None,
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(save_path, bbox_inches="tight", format="pdf")
         print(f"Saved to {save_path}")
-    plt.show()
+    if show:
+        plt.show()
     return fig, ax, W
+
+
+def add_training_order_legend(
+    ax,
+    order_names,                 # keys used in your palette (e.g., ["D1","D2",...])
+    palette,                     # dict name -> color
+    *,
+    labels=None,                 # pretty labels to display (e.g., latexify_D_labels(order_names))
+    title="Actual\ntraining\norder",
+    loc="center left",
+    bbox_to_anchor=(1.16, 0.5),
+    fontsize=11,
+    color_text=True,             # color each legend label to match its swatch
+    text_only=False,             # hide swatches and show colored text only
+    title_align="center"         # "left" | "center" | "right"
+):
+    """
+    Add a second, vertical, borderless legend whose label colors match your palette.
+    Keeps any existing legend (e.g., run markers) by re-adding it as an artist.
+    """
+    if labels is None:
+        labels = order_names
+
+    # Preserve any existing legend (e.g., your run marker legend)
+    first_leg = ax.get_legend()
+    if first_leg is not None:
+        ax.add_artist(first_leg)
+
+    # Swatch handles (no boundaries)
+    handles = [Patch(facecolor=palette[n], edgecolor="none") for n in order_names]
+
+    leg2 = ax.legend(
+        handles, labels,
+        title=title,
+        loc=loc, bbox_to_anchor=bbox_to_anchor,
+        frameon=False, ncol=1,
+        fontsize=fontsize, title_fontsize=fontsize,
+        handlelength=1.2, handletextpad=0.6, borderaxespad=0.0,
+    )
+
+    # Center the multi-line title
+    t = leg2.get_title()
+    t.set_multialignment(title_align)
+    t.set_ha(title_align)
+    # (Best-effort) center everything inside the legend box
+    try:
+        leg2._legend_box.align = "center"  # private API, widely works
+    except Exception:
+        pass
+
+    # Color the legend label text itself
+    if color_text:
+        for txt, name in zip(leg2.get_texts(), order_names):
+            txt.set_color(palette[name])
+
+    # Optional: show only colored text (no swatches)
+    if text_only:
+        for h in leg2.legendHandles:
+            h.set_visible(False)
+
+    return leg2
+
+
+def add_training_order_row_legend(
+    fig,
+    order_names,                 # e.g. ["D1","D2","D3","D4","D5","D6"]
+    palette,                     # dict name -> color
+    *,
+    labels=None,                 # pretty labels (e.g., latexify_D_labels(order_names))
+    title="Actual\ntraining\norder",
+    where="bottom",              # "top" or "bottom"
+    fontsize=11,
+    color_text=True,             # tint each label to match its color
+    text_only=False,             # hide swatches; show colored text only
+    frameon=False,
+    reserve_frac=0.12,           # fraction of figure height reserved for the legend
+    clear_axes_legends=False,    # remove per-axes legends to avoid clutter
+    columnspacing=1.0,
+    handletextpad=0.6,
+    handlelength=1.2,
+    title_align="center"         # "left" | "center" | "right"
+):
+    """
+    Create a single-row, figure-level legend spanning the width of the figure.
+    Places it at the top or bottom and reserves vertical space so it doesn't
+    overlap subplots. Use the same `palette` you passed into your subplots.
+
+    Call this AFTER you've drawn the subplots, and instead of a separate
+    plt.tight_layout() call (this function calls fig.tight_layout(rect=...) for you).
+    """
+    if labels is None:
+        labels = order_names
+
+    if clear_axes_legends:
+        for ax in fig.axes:
+            leg = ax.get_legend()
+            if leg is not None:
+                leg.remove()
+
+    # Make swatch handles (borderless)
+    handles = [Patch(facecolor=palette[n], edgecolor="none") for n in order_names]
+    ncol = len(order_names)
+
+    where = where.lower()
+    if where in ("top", "upper", "north"):
+        loc = "upper center"
+        bbox = (0.5, 1 - 0.5 * reserve_frac)
+        tight_rect = (0, 0, 1, 1 - reserve_frac)
+    else:
+        loc = "lower center"
+        bbox = (0.5, 0 + 0.5 * reserve_frac)
+        tight_rect = (0, reserve_frac, 1, 1)
+
+    leg = fig.legend(
+        handles, labels,
+        title=title,
+        loc=loc, bbox_to_anchor=bbox,
+        ncol=ncol,
+        frameon=frameon,
+        fontsize=fontsize, title_fontsize=fontsize,
+        handlelength=handlelength, handletextpad=handletextpad,
+        borderaxespad=0.0, columnspacing=columnspacing,
+    )
+
+    # Center / align the (multi-line) title
+    t = leg.get_title()
+    t.set_multialignment(title_align)
+    t.set_ha(title_align)
+    try:
+        leg._legend_box.align = "center"   # best-effort; private API
+    except Exception:
+        pass
+
+    # Optionally color the legend text labels
+    if color_text:
+        for txt, name in zip(leg.get_texts(), order_names):
+            txt.set_color(palette[name])
+
+    # Optional: text-only legend (hide swatches)
+    if text_only:
+        for h in getattr(leg, "legendHandles", []):
+            h.set_visible(False)
+
+    # Reserve space so the legend doesn't overlap subplots
+    fig.tight_layout(rect=tight_rect)
+    return leg
+
 
 # %% [markdown]
 # === Single-figure example ===
@@ -452,9 +602,10 @@ print([x.split('/')[-1] for x in paths_to_plot])
 # W, _ = compute_projection_matrix(paths_for_x_axis=[paths_natural_vars_s600[0]], 
 #                                  paths_for_y_axis=[paths_natural_vars_s600[0]], 
 #                                  use_pca_axes=False)
+centroids_used = (1, 2)
 W, _ = compute_projection_matrix(paths_for_x_axis=paths_for_x, 
                                  paths_for_y_axis=paths_to_plot, 
-                                 w1_idxs=(0,1),
+                                 w1_idxs=centroids_used,
                                  use_pca_axes=False
                                  )
 
@@ -465,7 +616,7 @@ fig, ax, W_single = plot_centroids(
     save_path="plots/simplified_centroids.pdf",
     legend_labels=legend_labels,
     text_x_offset=0.0, text_y_offset=-1.2,
-    xlabel="$c_1 - c_2$ averaged over runs",
+    xlabel=f"$c_{centroids_used[0]+1} - c_{centroids_used[1]+1}$ averaged over runs",
     W=W,
 )
 
@@ -567,8 +718,21 @@ def overlay_kde_contours(
     draw_centroids: bool = False,
     centroids2d: np.ndarray | None = None,
     centroid_markersize: float = 56.0,
+    # --- NEW: annotation controls ---
+    label_text: str | None = None,        # e.g., "68% KDE"
+    label_loc: str = "upper right",       # "upper right/left", "lower right/left",
+                                          # "top center", "bottom center", "center"
+    label_xy: tuple[float, float] | None = None,  # (x,y) in axes-fraction coords if you want exact placement
+    label_fontsize: float = 11.0,
+    label_color: str = "0.15",
+    label_weight: str = "bold",
+    label_box: bool = True,               # draw a small white box behind the text
+    label_box_kw: dict | None = None,     # e.g., dict(facecolor="white", alpha=0.8, boxstyle="round,pad=0.2")
+    label_pad: float = 0.02,              # margin from the edge for the preset locs (in axes fraction)
 ):
-    """Draw iso-mass KDE contours for each subset cloud in Z2d_subsets."""
+    """Draw iso-mass KDE contours + optional centroids, and an optional text label.
+    Returns the created Text artist (or None) so you can tweak it later.
+    """
     # initial bounds
     if ref_points is not None and len(ref_points):
         xmin, xmax = ref_points[:, 0].min(), ref_points[:, 0].max()
@@ -642,6 +806,41 @@ def overlay_kde_contours(
     ax.set_xlim(xmin_f - pad_x, xmax_f + pad_x)
     ax.set_ylim(ymin_f - pad_y, ymax_f + pad_y)
 
+    # ---- add label text in axes coordinates (stable vs. x/ylim changes) ----
+    txt_artist = None
+    if label_text:
+        if label_box_kw is None:
+            label_box_kw = dict(facecolor="white", edgecolor="none", alpha=0.8, boxstyle="round,pad=0.2")
+
+        if label_xy is not None:
+            x, y = label_xy
+            ha = "center"; va = "center"
+        else:
+            loc = label_loc.lower()
+            locmap = {
+                "upper left":  (label_pad, 1 - label_pad, "left",  "top"),
+                "upper right": (1 - label_pad, 1 - label_pad, "right", "top"),
+                "lower left":  (label_pad, label_pad, "left",  "bottom"),
+                "lower right": (1 - label_pad, label_pad, "right", "bottom"),
+                "top center":    (0.5, 1 - label_pad, "center", "top"),
+                "bottom center": (0.5, 0 + label_pad, "center", "bottom"),
+                "center":        (0.5, 0.5, "center", "center"),
+            }
+            if loc not in locmap:
+                raise ValueError(f"Unknown label_loc='{label_loc}'. Choose one of: {', '.join(locmap.keys())}")
+            x, y, ha, va = locmap[loc]
+
+        txt_artist = ax.text(
+            x, y, label_text,
+            transform=ax.transAxes, ha=ha, va=va,
+            fontsize=label_fontsize, color=label_color, weight=label_weight,
+            bbox=(label_box_kw if label_box else None),
+            zorder=5,
+        )
+
+    return txt_artist
+
+
 def project_activations_to_2d(
     subsets: list[np.ndarray],
     W: np.ndarray,                # [d, 2]
@@ -686,7 +885,9 @@ if True:
         scale_by_std=False
     )
 
-    fig, ax = plt.subplots(figsize=(6.9, 3.3))
+    # fig, ax = plt.subplots(figsize=(6.9, 3.3))
+    fig, ax = plt.subplots(figsize=(7.9, 3.5))
+
 
     plot_centroids_on_ax(
         ax, paths_to_plot,
@@ -696,6 +897,7 @@ if True:
         ylabel='PC-1 (residual PCA)',
         text_x_offset = [-0.1] + [0.0]*5,
         text_y_offset=0.9,
+        annotate_points=False,
         legend_fontsize=11,
         legend_marker_size=56,
         xlabel_fontsize=12,
@@ -704,7 +906,8 @@ if True:
         title_fontsize=14,
         # connect_runs=False,
         #, 68th percentile KDE
-        title=f"Per-stage activation centroids lie on a straight line within each run:\northonormal projection, last token @ layer 13/16"
+        # title=f"Per-stage test data activations' centroids are arranged exactly in the order of training\nand lie on a straight line within each run:\northonormal projection, last token @ layer 13/16"
+        title=f"Per-stage test data activations' centroids are arranged exactly in the order of training:\n4 independent training runs, orthonormal projection, last token @ layer 13/16"
     )
 
     # palette + bounds consistent with scatter
@@ -715,6 +918,24 @@ if True:
             if n not in all_names: all_names.append(n)
     palette = {n: f"C{i % 10}" for i, n in enumerate(all_names)}
     ref_points = np.vstack([X @ W_single for X in load_runs(paths_to_plot)])
+    
+    # order taken from the actual run; latexify for pretty D_i
+    order_names = acts_bundle.names
+    pretty_labels = latexify_D_labels(order_names)
+
+    add_training_order_legend(
+        ax,
+        order_names=order_names,
+        palette=palette,
+        labels=pretty_labels,
+        title="Actual\ntraining\norder",
+        color_text=True,    # tint each label
+        text_only=False,    # set True if you want no swatches, just colored text
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
+        fontsize=11,
+)
+
 
     # --- Project previously collected activations and overlay KDE --------------
     npz_path = paths_to_plot[run_idx]
@@ -732,6 +953,8 @@ if True:
         centroids2d=cents2d,
         alpha=0.9,
         linewidth=1.0,
+        label_text="68\% KDE",
+        label_xy=(0.75, 0.22),  # lower right corner
     )
 
     plt.tight_layout()
@@ -756,6 +979,11 @@ paths_for_x_grid = paths_for_x
 runs_x_grid = load_runs(paths_for_x_grid)
 w1_shared = compute_w1(runs_x_grid)
 
+annotate_points = False
+order_names = [f'D_{i+1}' for i in range(6)]
+pretty_labels = latexify_D_labels(order_names)
+palette = {n: f"C{i % 10}" for i, n in enumerate(order_names)}
+
 # legend params
 INSET = -0.0
 POS_TL = dict(legend_loc='lower right', legend_bbox_to_anchor=(1.0 - INSET, 0.0 + INSET))
@@ -768,7 +996,7 @@ LEG_S = 60.0
 
 fig, axes = plt.subplots(2, 2, figsize=(14, 6))
 xlim, ylim = None, None
-xlim, ylim = (-5.2, -1.5), None
+xlim, ylim = (-5.3, -1.5), None
 # ---- (a) Sequential Stages ----
 prompt_type = "who"
 ax = axes[0, 0]
@@ -792,8 +1020,9 @@ plot_centroids_on_ax(
     ax, paths_subplot1,
     w1=w1_shared,  # shared x
     title="(a) Sequential Stages",
-    xlabel="Avg endpoint difference",
+    # xlabel="Avg endpoint difference",
     ylabel="PC-1 (residual)",
+    annotate_points=annotate_points,
     xlim=xlim,
     ylim=ylim,
     legend_labels=legend_labels_1,
@@ -823,8 +1052,9 @@ plot_centroids_on_ax(
     ax, paths_subplot2,
     w1=w1_shared,
     title="(b) Re-exposure to Earlier Stages",
-    xlabel="Avg endpoint difference",
-    ylabel="PC-1 (residual)",
+    # xlabel="Avg endpoint difference",
+    # ylabel="PC-1 (residual)",
+    annotate_points=annotate_points,
     xlim=xlim,
     ylim=ylim,
     legend_labels=legend_labels_2,
@@ -849,6 +1079,7 @@ plot_centroids_on_ax(
     title="(c) Extra Epochs Mid-Training",
     xlabel="Avg endpoint difference",
     ylabel="PC-1 (residual)",
+    annotate_points=annotate_points,
     xlim=xlim,
     ylim=ylim,
     legend_labels=legend_labels_3,
@@ -889,15 +1120,29 @@ plot_centroids_on_ax(
     w1=w1_shared,
     title="(d) Mixed Training Checkpoints",
     xlabel="Avg endpoint difference",
-    ylabel="PC-1 (residual)",
+    # ylabel="PC-1 (residual)",
+    annotate_points=annotate_points,
     xlim=xlim,
     ylim=ylim,
     legend_labels=legend_labels_4,
     legend_marker_size=LEG_S, **POS_CL
 )
 
+# ----- finalize -----
+add_training_order_row_legend(
+    fig,
+    order_names=order_names,
+    palette=palette,
+    labels=pretty_labels,
+    title="Default training order",
+    where="bottom",          # or "top"
+    reserve_frac=0.10,       # adjust if you need more/less space
+    clear_axes_legends=False # set True if you want ONLY this legend
+)
+
+
 fig.suptitle("Centroid Evolution Under Different Training Regimes", fontsize=14, y=1.02)
-plt.tight_layout()
+# plt.tight_layout()
 Path("plots").mkdir(parents=True, exist_ok=True)
 plt.savefig("plots/centroid_grid_comparison.pdf", bbox_inches="tight", dpi=150)
 plt.show()
@@ -1003,6 +1248,86 @@ fig, ax, W_single = plot_centroids(
     save_path="plots/sequential-stages-d1-d6.pdf",
     legend_labels=legend_labels_1,
     text_x_offset=0.0, text_y_offset=-0.4,
+    connect_runs=True,
+    show=True
     # W=W,
 )
+ax.invert_xaxis()
+plt.show()
+
+# %%
+# %% [markdown]
+# === 2x2 grid — same runs as first figure; per-subplot x-axis endpoint pairs ===
+
+# %%
+# %% [markdown]
+# === 2x2 grid — same runs as first figure; per-subplot zero-based endpoint pairs ===
+
+# %%
+# Use the SAME runs as the first figure:
+runs_x_first = load_runs(paths_for_x)                          # x-axis runs
+runs_plot_first, _ = load_runs_with_meta(paths_to_plot)        # runs to plot
+K = runs_x_first[0].shape[0]
+
+# Zero-based endpoint pairs (edit as you like)
+pairs = [(0, 5), (2, 4), (1, 2), (4, 5)]   # <-- zero-based; ensure indices < K
+pairs = [ (2, 4),  (4, 5), (0,1), (1, 2),] 
+assert all(0 <= i < K and 0 <= j < K for (i, j) in pairs), f"Pair out of range for K={K}: {pairs}"
+
+# Build W per subplot using the SAME routine as your first figure
+Ws = []
+all_proj = []
+for (i, j) in pairs:
+    W_ij, _ = compute_projection_matrix(
+        paths_for_x_axis=paths_for_x,
+        paths_for_y_axis=paths_to_plot,
+        w1_idxs=(i, j),          # <-- identical to first-figure usage
+        use_pca_axes=False
+    )
+    Ws.append(((i, j), W_ij))
+    all_proj.append(np.vstack([X @ W_ij for X in runs_plot_first]))
+
+# Shared axis limits across all subplots
+stacked = np.vstack(all_proj)
+xmin, xmax = stacked[:, 0].min(), stacked[:, 0].max()
+ymin, ymax = stacked[:, 1].min(), stacked[:, 1].max()
+pad_x = 0.08 * (xmax - xmin + 1e-12)
+pad_y = 0.08 * (ymax - ymin + 1e-12)
+xlim_glob = (xmin - pad_x, xmax + pad_x)
+ylim_glob = (ymin - pad_y, ymax + pad_y)
+
+fig, axes = plt.subplots(2, 2, figsize=(14, 6.6), sharex=False, sharey=True)
+titles = ["(a)", "(b)", "(c)", "(d)"]
+
+for ax, ((i, j), W_ij), ttl in zip(axes.ravel(), Ws, titles):
+    xlabel = f"avg $(c_{{{i+1}}} - c_{{{j+1}}})$"
+    if (i, j) == (0, 5):
+        xlabel += "  (identical to Figure 1)"
+    plot_centroids_on_ax(
+        ax,
+        paths_to_plot,
+        W=W_ij,                         # w1 from (i,j); w2 = residual PCA (inside compute_projection_matrix)
+        legend_labels=legend_labels if ttl == "(a)" else None,  # show legend only once
+        legend_marker_size=56,
+        xlabel=xlabel,
+        ylabel="PC-1 (residual PCA)",
+        title=ttl,
+        # xlim=xlim_glob,
+        # ylim=ylim_glob,
+        text_x_offset=0.0,
+        text_y_offset=-1.2,
+        title_fontsize=14,
+        xlabel_fontsize=13,
+        text_fontsize=12
+    )
+
+fig.suptitle("Varying x-axis centroid pairs", fontsize=18, y=1.0)
+plt.tight_layout()
+Path("plots").mkdir(parents=True, exist_ok=True)
+out_path = "plots/centroid_grid_xaxis_pairs.pdf"
+plt.savefig(out_path, bbox_inches="tight", dpi=150)
+print(f"Saved to {out_path}")
+plt.show()
+
+
 # %%
