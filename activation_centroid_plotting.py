@@ -1240,44 +1240,7 @@ plt.show()
 
 print("W_shared is orthonormal:", is_orthonormal(W_shared))
 
-# %%
-paths_subplot1
-# %%
-# W, _ = compute_projection_matrix(paths_for_x_axis=[paths_natural_vars_s600[0]], 
-#                                  paths_for_y_axis=[paths_natural_vars_s600[0]], 
-#                                  use_pca_axes=True)
 
-
-# 0 0 0 0 0 0
-# 0 0 0 0 0 1
-# 0 0 0 0 1 1
-# 0 0 0 1 1 1
-# 0 0 1 1 1 1
-# 0 1 1 1 1 1
-hollow_flags = np.fliplr(np.tril(np.ones((6,6), dtype=bool), -1)).tolist()
-
-marker_extra = {
-    "filled": {"linewidths": 0.6, "alpha": 0.95},
-    "hollow": {"linewidths": 1.8, "alpha": 1.0},
-}
-
-
-fig, ax, W_single = plot_centroids(
-    paths_to_plot=paths_subplot1,           # 6 runs
-    paths_for_x_axis=paths_subplot1[1:],
-    title="Sequential stages, x axis = diffmean($D_1$, not trained)",
-    figsize=(8.4, 3.7),
-    save_path="plots/sequential-stages-d1-d6.pdf",
-    legend_labels=legend_labels_1,
-    text_x_offset=0.0, text_y_offset=-0.4,
-    connect_runs=True,
-    show=False,
-    hollow_flags=hollow_flags,
-    marker_extra=marker_extra,
-    annotate_points=False,
-)
-ax.invert_xaxis()
-plt.show()
 
 # %%
 # %% [markdown]
@@ -1353,5 +1316,121 @@ plt.savefig(out_path, bbox_inches="tight", dpi=150)
 print(f"Saved to {out_path}")
 plt.show()
 
+# %%
+print(paths_subplot1)
+
+# W, _ = compute_projection_matrix(paths_for_x_axis=[paths_natural_vars_s600[0]], 
+#                                  paths_for_y_axis=[paths_natural_vars_s600[0]], 
+#                                  use_pca_axes=True)
+
+
+# 0 0 0 0 0 0
+# 0 0 0 0 0 1
+# 0 0 0 0 1 1
+# 0 0 0 1 1 1
+# 0 0 1 1 1 1
+# 0 1 1 1 1 1
+hollow_flags = np.fliplr(np.tril(np.ones((6,6), dtype=bool), -1)).tolist()
+
+marker_extra = {
+    "filled": {"linewidths": 0.6, "alpha": 0.95},
+    "hollow": {"linewidths": 1.8, "alpha": 1.0},
+}
+
+
+fig, ax, W_single = plot_centroids(
+    paths_to_plot=paths_subplot1,           # 6 runs
+    paths_for_x_axis=paths_subplot1[1:],
+    title="Sequential stages, x axis = diffmean($D_1$, not trained)",
+    figsize=(8.4, 3.7),
+    save_path="plots/sequential-stages-d1-d6.pdf",
+    legend_labels=legend_labels_1,
+    text_x_offset=0.0, text_y_offset=-0.4,
+    connect_runs=True,
+    show=False,
+    hollow_flags=hollow_flags,
+    marker_extra=marker_extra,
+    annotate_points=False,
+)
+ax.invert_xaxis()
+plt.show()
+
+# %%
+# === Side-by-side with one stage legend (left only); both use hollow markers ===
+
+# Consistent palette + pretty labels for the bottom legend
+_, meta_ss = load_runs_with_meta(paths_subplot1[:1])
+order_names = meta_ss[0][0]  # e.g., ["D1","D2","D3","D4","D5","D6"]
+palette_sb = {n: f"C{i % 10}" for i, n in enumerate(order_names)}
+pretty_labels = latexify_D_labels(order_names)
+
+# Alternate projection (standalone-style axis)
+W_alt, scaler_alt = compute_projection_matrix(
+    paths_for_x_axis=paths_subplot1[1:],   # same choice as your standalone
+    paths_for_y_axis=paths_subplot1,
+    scale_by_std=False
+)
+
+# Ensure marker styles exist
+if 'marker_extra' not in globals():
+    marker_extra = {
+        "filled": {"linewidths": 0.6, "alpha": 0.95},
+        "hollow": {"linewidths": 1.8, "alpha": 1.0},
+    }
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 3.5), sharey=False)
+
+# (a) Like 2×2 (shared w1); SHOW the stage legend here only
+plot_centroids_on_ax(
+    axes[0],
+    paths_subplot1,
+    w1=w1_shared,
+    palette=palette_sb,
+    legend_labels=legend_labels_1,     # ← stage legend only on the left
+    legend_marker_size=60,
+    legend_loc='lower right',
+    annotate_points=False,
+    hollow_flags=hollow_flags,
+    marker_extra=marker_extra,
+    # xlabel="Avg endpoint difference",
+    xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
+    ylabel="PC-1 (residual PCA)",
+    title=None,
+)
+
+# (b) Alternate axis; HIDE the stage legend here
+plot_centroids_on_ax(
+    axes[1],
+    paths_subplot1,
+    W=W_alt, scaler=scaler_alt,
+    palette=palette_sb,
+    legend_labels=None,                # ← no stage legend on the right
+    annotate_points=False,
+    hollow_flags=hollow_flags,
+    marker_extra=marker_extra,
+    xlabel="diffmean($c_1$, not trained)",
+    ylabel="PC-1 (residual PCA)",
+    title=None,
+)
+axes[1].invert_xaxis()  # matches your standalone orientation
+
+# Figure-level horizontal legend for training order
+add_training_order_row_legend(
+    fig,
+    order_names=order_names,
+    palette=palette_sb,
+    labels=pretty_labels,
+    title="Training order",
+    where="bottom",
+    reserve_frac=0.12,
+    clear_axes_legends=False,  # keep the stage legend on the left subplot
+    color_text=True
+)
+
+Path("plots").mkdir(parents=True, exist_ok=True)
+out_path = "plots/sequential_stages_side_by_side_two_axes_with_stage_legend.pdf"
+plt.savefig(out_path, bbox_inches="tight", dpi=150)
+print(f"Saved to {out_path}")
+plt.show()
 
 # %%
