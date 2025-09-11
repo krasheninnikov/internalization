@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import re
 from typing import NamedTuple
 from pathlib import Path
+import numpy as np
 from numpy.linalg import eigh, norm
 from scipy.stats import gaussian_kde
 from matplotlib.patches import Patch
@@ -159,6 +160,10 @@ def plot_centroids_on_ax(
     xlabel=None, ylabel=None, title=None,
     connect_runs=True,
     annotate_points=True,
+    # --- NEW: hollow markers support ---
+    hollow_flags=None,           # list[list[bool]]: one list per run, length = centroids in that run
+    marker_extra=None,           # {"filled": {...}, "hollow": {...}} passed to ax.scatter
+    # -------------------------------
     text_x_offset=0.0, text_y_offset=0.2,   # can be float or sequence (list/tuple/np.ndarray)
     palette=None,
     markersize=50,
@@ -174,25 +179,40 @@ def plot_centroids_on_ax(
     legend_fontsize=None,
 ):
     """
-    Plot centroid trajectories on given axis.
+    Plot centroid trajectories on a given axis.
+
     Projection precedence:
       1) W provided; 2) w1 provided (compute w2); 3) compute both from paths_for_x_axis (+ paths_for_y_axis).
 
-    Font-size kwargs:
-      - label_fontsize: both axis labels (fallback for xlabel/ylabel sizes)
-      - xlabel_fontsize, ylabel_fontsize: per-axis label sizes
-      - title_fontsize: title size
-      - tick_fontsize: tick label size
-      - text_fontsize: per-point label annotations (ax.text)
-      - legend_fontsize: legend text size
-
     Text offsets:
-      - text_x_offset, text_y_offset can be floats (applied to all points) or sequences.
-        If a sequence is provided, its length must equal the number of annotated points.
+      - text_x_offset, text_y_offset can be floats (applied to all points) or sequences
+        with length equal to number of annotated points.
+
+    New:
+      - hollow_flags: per-run, per-centroid booleans for hollow markers.
+      - marker_extra: extra kwargs for filled/hollow points:
+          {"filled": {...}, "hollow": {...}}
     """
     runs_plot, meta_plot = load_runs_with_meta(paths_to_plot)
 
-    # Determine projection matrix
+    # ---------- Validation (fail fast) ----------
+    num_runs = len(runs_plot)
+    if hollow_flags is not None:
+        assert isinstance(hollow_flags, (list, tuple)) and len(hollow_flags) == num_runs, "hollow_flags len must match runs"
+        for r, (mask, meta) in enumerate(zip(hollow_flags, meta_plot)):
+            names = meta[0]
+            assert isinstance(mask, (list, tuple, np.ndarray)), "hollow_flags inner must be list/tuple/ndarray"
+            assert len(mask) == len(names), "hollow_flags inner len must match centroids"
+
+    if marker_extra is None:
+        marker_extra = {}
+    else:
+        assert isinstance(marker_extra, dict), "marker_extra must be dict"
+        for k, v in marker_extra.items():
+            assert k in {"filled", "hollow"}, "marker_extra keys must be 'filled' or 'hollow'"
+            assert isinstance(v, dict), "marker_extra[...] must be dict"
+
+    # ---------- Determine projection matrix ----------
     if W is not None:
         W_used = W
         if scaler is not None:
@@ -234,7 +254,7 @@ def plot_centroids_on_ax(
         w2 = compute_w2_residual(runs_y, w1)
         W_used = np.column_stack([w1, w2])
 
-    # Colors & markers
+    # ---------- Colors & markers ----------
     if palette is None:
         all_names = []
         for names, *_ in meta_plot:
@@ -246,19 +266,29 @@ def plot_centroids_on_ax(
     markers = ["o", "s", "^", "D", "P", "X", "v", "<", ">", "h", "*"]
 
     # Helper to check if an object is a sequence of per-point values
-    def _is_seq(x):
-        return isinstance(x, (list, tuple, np.ndarray))
+    def _is_seq(x): return isinstance(x, (list, tuple, np.ndarray))
 
-    # Plot runs
+    # Common + style-specific scatter kwargs
+    common_scatter_args = dict(s=markersize, zorder=3)
+    filled_defaults = dict(edgecolors="black", linewidths=0.5, alpha=0.95)
+    hollow_defaults = dict(facecolors="none", linewidths=1.5, alpha=1.0)
+    filled_scatter_args = {**filled_defaults, **marker_extra.get("filled", {})}
+    hollow_scatter_args = {**hollow_defaults, **marker_extra.get("hollow", {})}
+
+    # ---------- Plot runs ----------
     all_projected = []
     for run_idx, (X, meta) in enumerate(zip(runs_plot, meta_plot)):
         names, prompt, seed, layer, tok = meta
         pts = X @ W_used
         all_projected.append(pts)
         marker = markers[run_idx % len(markers)]
-        for (x, y), name in zip(pts, names):
-            ax.scatter(x, y, s=markersize, marker=marker, color=palette[name],
-                       edgecolors="black", linewidths=0.5, alpha=0.95)
+        run_hollow_mask = ([False] * len(names)) if hollow_flags is None else list(hollow_flags[run_idx])
+
+        for (x, y), name, is_hollow in zip(pts, names, run_hollow_mask):
+            per_point_color = {"edgecolors": palette[name]} if is_hollow else {"color": palette[name]}
+            style_args = hollow_scatter_args if is_hollow else filled_scatter_args
+            ax.scatter(x, y, marker=marker, **common_scatter_args, **style_args, **per_point_color)
+
         if connect_runs and len(pts) >= 2:
             ax.plot(pts[:, 0], pts[:, 1], lw=1.0, alpha=0.85, color="0.35")
 
@@ -266,31 +296,16 @@ def plot_centroids_on_ax(
         if run_idx == 0 and annotate_points:
             tfs = 8 if text_fontsize is None else text_fontsize
             latex_names = latexify_D_labels(names)
-
-            # Basic consistency checks
-            if not (len(pts) == len(names) == len(latex_names)):
-                raise ValueError(
-                    f"Length mismatch among pts({len(pts)}), names({len(names)}), "
-                    f"and latexified names({len(latex_names)})."
-                )
-
+            assert len(pts) == len(names) == len(latex_names), "pts/names/latex_names len mismatch"
             n_labels = len(latex_names)
-            if _is_seq(text_x_offset):
-                assert len(text_x_offset) == n_labels, (
-                    f"text_x_offset length {len(text_x_offset)} != number of labels {n_labels}"
-                )
-            if _is_seq(text_y_offset):
-                assert len(text_y_offset) == n_labels, (
-                    f"text_y_offset length {len(text_y_offset)} != number of labels {n_labels}"
-                )
-
+            if _is_seq(text_x_offset): assert len(text_x_offset) == n_labels, "text_x_offset len mismatch"
+            if _is_seq(text_y_offset): assert len(text_y_offset) == n_labels, "text_y_offset len mismatch"
             for i, ((x, y), name, latex_name) in enumerate(zip(pts, names, latex_names)):
                 dx = text_x_offset[i] if _is_seq(text_x_offset) else text_x_offset
                 dy = text_y_offset[i] if _is_seq(text_y_offset) else text_y_offset
-                ax.text(x + dx, y + dy, latex_name,
-                        fontsize=tfs, weight="bold", color=palette[name])
+                ax.text(x + dx, y + dy, latex_name, fontsize=tfs, weight="bold", color=palette[name])
 
-    # Axes
+    # ---------- Axes ----------
     ax.axhline(0, lw=.5, c="grey")
     ax.axvline(0, lw=.5, c="grey")
     ax.grid(ls="--", alpha=.3)
@@ -313,13 +328,11 @@ def plot_centroids_on_ax(
     # Legend
     if legend_labels:
         handles = []
-        leg_s = (legend_marker_size if legend_marker_size is not None
-                 else 0.8 * markersize)  # default: slightly smaller than plotted points
+        leg_s = (legend_marker_size if legend_marker_size is not None else 0.8 * markersize)
         for run_idx in range(len(meta_plot)):
             marker = markers[run_idx % len(markers)]
             label = legend_labels[run_idx] if run_idx < len(legend_labels) else f"Run {run_idx}"
-            h = ax.scatter([], [], s=leg_s, marker=marker, color="gray",
-                           edgecolors="black", label=label)
+            h = ax.scatter([], [], s=leg_s, marker=marker, color="gray", edgecolors="black", label=label)
             handles.append(h)
 
         legend_kwargs = dict(
@@ -327,19 +340,13 @@ def plot_centroids_on_ax(
             frameon=True, fancybox=True, framealpha=0.9,
             ncol=legend_ncol
         )
-        leg = ax.legend(
-            handles=handles,
-            loc=(legend_loc or 'best'),
-            bbox_to_anchor=legend_bbox_to_anchor,
-            **legend_kwargs
-        )
+        leg = ax.legend(handles=handles, loc=(legend_loc or 'best'),
+                        bbox_to_anchor=legend_bbox_to_anchor, **legend_kwargs)
         leg.set_zorder(5)
 
     # Limits
-    if xlim is not None:
-        ax.set_xlim(xlim)
-    if ylim is not None:
-        ax.set_ylim(ylim)
+    if xlim is not None: ax.set_xlim(xlim)
+    if ylim is not None: ax.set_ylim(ylim)
     if xlim is None or ylim is None:
         all_pts = np.vstack(all_projected)
         if xlim is None:
@@ -351,7 +358,7 @@ def plot_centroids_on_ax(
             y_pad = pad_frac * (ymax - ymin)
             ax.set_ylim(ymin - y_pad, ymax + y_pad)
 
-    print('Is W orthonormal? ',is_orthonormal(W_used), W_used.shape)
+    print('Is W orthonormal? ', is_orthonormal(W_used), W_used.shape)
     return W_used
 
 def plot_centroids(paths_to_plot, paths_for_x_axis=None, paths_for_y_axis=None,
@@ -861,7 +868,7 @@ def project_activations_to_2d(
 # %% 
 
 # --- Example: collect activations and keep in memory --------------------------------
-if True:
+if False:
     acts_cache = {}
     run_idx = 0
     npz_path = paths_to_plot[run_idx]
@@ -878,7 +885,7 @@ if True:
 
 # %%  KDE — (2) Project + plot (reuse any W/scaler; fast iteration)
 # --- Build / reuse a projection & draw scatter -----------------------------
-if True:
+if False:
     W_single, scaler_single = compute_projection_matrix(
         paths_for_x_axis=paths_for_x,     # whatever you used for x-axis
         paths_for_y_axis=paths_to_plot,   # include plotted runs
@@ -1236,12 +1243,27 @@ print("W_shared is orthonormal:", is_orthonormal(W_shared))
 # %%
 paths_subplot1
 # %%
-W, _ = compute_projection_matrix(paths_for_x_axis=[paths_natural_vars_s600[0]], 
-                                 paths_for_y_axis=[paths_natural_vars_s600[0]], 
-                                 use_pca_axes=True)
+# W, _ = compute_projection_matrix(paths_for_x_axis=[paths_natural_vars_s600[0]], 
+#                                  paths_for_y_axis=[paths_natural_vars_s600[0]], 
+#                                  use_pca_axes=True)
+
+
+# 0 0 0 0 0 0
+# 0 0 0 0 0 1
+# 0 0 0 0 1 1
+# 0 0 0 1 1 1
+# 0 0 1 1 1 1
+# 0 1 1 1 1 1
+hollow_flags = np.fliplr(np.tril(np.ones((6,6), dtype=bool), -1)).tolist()
+
+marker_extra = {
+    "filled": {"linewidths": 0.6, "alpha": 0.95},
+    "hollow": {"linewidths": 1.8, "alpha": 1.0},
+}
+
 
 fig, ax, W_single = plot_centroids(
-    paths_to_plot=paths_subplot1,
+    paths_to_plot=paths_subplot1,           # 6 runs
     paths_for_x_axis=paths_subplot1[1:],
     title="Sequential stages, x axis = diffmean($D_1$, not trained)",
     figsize=(8.4, 3.7),
@@ -1249,8 +1271,10 @@ fig, ax, W_single = plot_centroids(
     legend_labels=legend_labels_1,
     text_x_offset=0.0, text_y_offset=-0.4,
     connect_runs=True,
-    show=True
-    # W=W,
+    show=False,
+    hollow_flags=hollow_flags,
+    marker_extra=marker_extra,
+    annotate_points=False,
 )
 ax.invert_xaxis()
 plt.show()
