@@ -1045,13 +1045,13 @@ path_rexs = [
     f"experiments/re-expose-stage{i}_qa_cvdb_tveDefs_nEnts16000_eps5_bs256_stage6_s{seed_reexp}_ADAFACTOR_single_stage/s{seed_reexp}/activation-centroids-and-percentiles-{prompt_type}-seed{seed_reexp}.npz"
     for i in range(1, 6)
 ]
-# ## 600-variant
-# seed_reexp = 600
-# path_orig = f"experiments/qd1_last_qa_cvdb_tveDefs_nEnts16000_eps5and5and5and5and5and5_bs256and256and256and256and256and256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-{prompt_type}-seed600.npz"
-# path_rexs = [
-#     f"experiments/re-expose-stage{i}_qa_cvdb_tveDefs_nEnts16000_eps5_bs256_stage6_s{seed_reexp}_ADAFACTOR_single_stage/s{seed_reexp}/activation-centroids-and-percentiles-{prompt_type}-seed{seed_reexp}.npz"
-#     for i in range(1, 6)
-# ]
+## 600-variant
+seed_reexp = 600
+path_orig = f"experiments/qd1_last_qa_cvdb_tveDefs_nEnts16000_eps5and5and5and5and5and5_bs256and256and256and256and256and256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-{prompt_type}-seed600.npz"
+path_rexs = [
+    f"experiments/re-expose-stage{i}_qa_cvdb_tveDefs_nEnts16000_eps5_bs256_stage6_s{seed_reexp}_ADAFACTOR_single_stage/s{seed_reexp}/activation-centroids-and-percentiles-{prompt_type}-seed{seed_reexp}.npz"
+    for i in range(1, 6)
+]
 
 paths_subplot2 = [path_orig] + path_rexs
 legend_labels_2 = ["Original"] + [f"Re-exp {i}" for i in range(1, 6)]
@@ -1433,4 +1433,185 @@ plt.savefig(out_path, bbox_inches="tight", dpi=150)
 print(f"Saved to {out_path}")
 plt.show()
 
+# %%
+# === Side-by-side: Re-exposure (left) vs Mixed checkpoints (right) — shared w1, separate residual PCA ===
+
+print(paths_subplot2)
+print(paths_subplot4)
+
+runs_rex   = load_runs(paths_subplot2)
+runs_mixed = load_runs(paths_subplot4)
+xs = np.concatenate([np.vstack(runs_rex) @ w1_shared, np.vstack(runs_mixed) @ w1_shared])
+pad = 0.08 * (xs.max() - xs.min() + 1e-12)
+xlim_glob = (xs.min() - pad, xs.max() + pad)
+
+
+w2_rex  = compute_w2_residual(runs_rex[1:], w1_shared)
+W_rex = np.column_stack([w1_shared, w2_rex])
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 3.5), sharex=True)
+
+# (b) Re-exposure — show stage legend here
+plot_centroids_on_ax(
+    axes[0],
+    paths_subplot2,
+    # w1=w1_shared,
+    W=W_rex,                        # shared w1, residual w2
+    palette=palette_sb,
+    legend_labels=legend_labels_2,
+    legend_marker_size=60,
+    legend_loc='upper right',
+    annotate_points=False,
+    marker_extra=marker_extra,
+    xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
+    ylabel="PC-1 (residual PCA)",
+    title="(a) Re-exposure",
+)
+axes[0].set_xlim(xlim_glob)
+
+# (d) Mixed training checkpoints — no stage legend here
+plot_centroids_on_ax(
+    axes[1],
+    paths_subplot4,
+    w1=w1_shared,
+    palette=palette_sb,
+    legend_labels=legend_labels_4,
+    annotate_points=False,
+    marker_extra=marker_extra,
+    xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
+    ylabel="PC-1 (residual PCA)",
+    title="(b) Mixed-data training checkpoints",
+)
+axes[1].set_xlim(xlim_glob)
+
+add_training_order_row_legend(
+    fig,
+    order_names=list(palette_sb.keys()),
+    palette=palette_sb,
+    labels=pretty_labels,
+    title="Training order",
+    where="bottom",
+    reserve_frac=0.12,
+    clear_axes_legends=False,
+    color_text=True,
+)
+
+Path("plots").mkdir(parents=True, exist_ok=True)
+out_path = "plots/reexposure_vs_mixedData_side_by_side_shared_w1.pdf"
+plt.savefig(out_path, bbox_inches="tight", dpi=150)
+print(f"Saved to {out_path}")
+plt.show()
+
+# %%
+# === Side-by-side: Re-exposure (left) vs Extra Epochs (right)
+#      same x-axis (shared w1), different y (per-subplot residual PCA), NO hollow ===
+
+# Global x-limits from shared w1 across both subplots
+runs_rex   = load_runs(paths_subplot2)
+runs_extra = load_runs(paths_subplot3)
+xs = np.concatenate([np.vstack(runs_rex) @ w1_shared, np.vstack(runs_extra) @ w1_shared])
+pad = 0.08 * (xs.max() - xs.min() + 1e-12)
+xlim_glob = (xs.min() - pad, xs.max() + pad)
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 3.5), sharex=True)
+
+# (b) Re-exposure — show stage legend here
+plot_centroids_on_ax(
+    axes[0],
+    paths_subplot2,
+    # w1=w1_shared,
+    W=W_rex,                        # shared w1, residual w2
+    palette=palette_sb,
+    legend_labels=legend_labels_2,   # legend only on the left
+    legend_marker_size=60,
+    legend_loc='upper right',
+    annotate_points=False,
+    xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
+    ylabel="PC-1 (residual PCA)",
+    title="(a) Re-exposure",
+)
+axes[0].set_xlim(xlim_glob)
+
+# (c) Extra Epochs — hide stage legend here
+plot_centroids_on_ax(
+    axes[1],
+    paths_subplot3,
+    w1=w1_shared,
+    palette=palette_sb,
+    legend_labels=legend_labels_3,              # no duplicate legend
+    legend_marker_size=60,
+    # legend_loc='center left',
+    legend_bbox_to_anchor=(0.25, 0.3),
+    annotate_points=False,
+    xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
+    ylabel="PC-1 (residual PCA)",
+    title="(b) Extra Epochs Mid-Training",
+)
+axes[1].set_xlim(xlim_glob)
+
+# Figure-level horizontal legend for training order (keeps left subplot legend)
+add_training_order_row_legend(
+    fig,
+    order_names=list(palette_sb.keys()),
+    palette=palette_sb,
+    labels=pretty_labels,
+    title="Training order",
+    where="bottom",
+    reserve_frac=0.12,
+    clear_axes_legends=False,
+    color_text=True,
+)
+
+Path("plots").mkdir(parents=True, exist_ok=True)
+out_path = "plots/reexposure_vs_extraEpochs_side_by_side_shared_w1.pdf"
+plt.savefig(out_path, bbox_inches="tight", dpi=150)
+print(f"Saved to {out_path}")
+plt.show()
+
+
+# %%
+# === Standalone: Mixed training checkpoints (2×2 d) — shared w1; side training-order legend ===
+
+# Build palette + pretty labels from the first run's D_i names
+_, meta_mixed = load_runs_with_meta(paths_subplot4[:1])
+order_names_mixed = meta_mixed[0][0]                 # e.g., ["D1","D2",...,"D6"]
+palette_mixed = {n: f"C{i % 10}" for i, n in enumerate(order_names_mixed)}
+pretty_labels_mixed = latexify_D_labels(order_names_mixed)
+
+fig, ax = plt.subplots(figsize=(6.6, 2.4))
+
+plot_centroids_on_ax(
+    ax,
+    paths_subplot4,
+    w1=w1_shared,                       # same x-axis definition as in 2×2
+    palette=palette_mixed,
+    legend_labels=legend_labels_4,      # stage legend (Original, 2ep, 4ep, …)
+    legend_marker_size=60,
+    legend_loc='lower right',
+    annotate_points=False,
+    xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
+    ylabel="PC-1 (residual PCA)",
+    title="Mixed-data training checkpoints (synthetic)",
+    title_fontsize=13
+)
+
+# Side legend for training order (colored by D_i)
+add_training_order_legend(
+    ax,
+    order_names=order_names_mixed,
+    palette=palette_mixed,
+    labels=pretty_labels_mixed,
+    title="Training\norder",
+    loc="center left",
+    bbox_to_anchor=(1.02, 0.5),   # right side
+    fontsize=11,
+    color_text=True,
+    text_only=False,
+)
+
+Path("plots").mkdir(parents=True, exist_ok=True)
+out_path = "plots/mixed_training_standalone_with_side_trainorder_legend.pdf"
+plt.savefig(out_path, bbox_inches="tight", dpi=150)
+print(f"Saved to {out_path}")
+plt.show()
 # %%
