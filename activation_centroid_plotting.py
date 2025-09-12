@@ -1395,7 +1395,9 @@ plot_centroids_on_ax(
     # xlabel="Avg endpoint difference",
     xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
     ylabel="PC-1 (residual PCA)",
-    title=None,
+    label_fontsize=11,
+    title_fontsize=13,
+    title='(a)',
 )
 
 # (b) Alternate axis; HIDE the stage legend here
@@ -1410,7 +1412,9 @@ plot_centroids_on_ax(
     marker_extra=marker_extra,
     xlabel="diffmean($c_1$, not trained)",
     ylabel="PC-1 (residual PCA)",
-    title=None,
+    label_fontsize=11,
+    title_fontsize=13,
+    title='(b)',
 )
 axes[1].invert_xaxis()  # matches your standalone orientation
 
@@ -1422,10 +1426,12 @@ add_training_order_row_legend(
     labels=pretty_labels,
     title="Training order",
     where="bottom",
-    reserve_frac=0.12,
+    reserve_frac=0.16,
     clear_axes_legends=False,  # keep the stage legend on the left subplot
-    color_text=True
+    color_text=True,
+    fontsize=12
 )
+# fig.suptitle("Sequential Stages", fontsize=14, y=1.02)
 
 Path("plots").mkdir(parents=True, exist_ok=True)
 out_path = "plots/sequential_stages_side_by_side_two_axes_with_stage_legend.pdf"
@@ -1491,9 +1497,10 @@ add_training_order_row_legend(
     labels=pretty_labels,
     title="Training order",
     where="bottom",
-    reserve_frac=0.12,
+    reserve_frac=0.16,
     clear_axes_legends=False,
     color_text=True,
+    fontsize=12
 )
 
 Path("plots").mkdir(parents=True, exist_ok=True)
@@ -1528,7 +1535,9 @@ plot_centroids_on_ax(
     annotate_points=False,
     xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
     ylabel="PC-1 (residual PCA)",
+    label_fontsize=11,
     title="(a) Re-exposure",
+    title_fontsize=13
 )
 axes[0].set_xlim(xlim_glob)
 
@@ -1545,7 +1554,9 @@ plot_centroids_on_ax(
     annotate_points=False,
     xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
     ylabel="PC-1 (residual PCA)",
+    label_fontsize=11,
     title="(b) Extra Epochs Mid-Training",
+    title_fontsize=13
 )
 axes[1].set_xlim(xlim_glob)
 
@@ -1557,9 +1568,10 @@ add_training_order_row_legend(
     labels=pretty_labels,
     title="Training order",
     where="bottom",
-    reserve_frac=0.12,
+    reserve_frac=0.16,
     clear_axes_legends=False,
     color_text=True,
+    fontsize=12
 )
 
 Path("plots").mkdir(parents=True, exist_ok=True)
@@ -1591,6 +1603,7 @@ plot_centroids_on_ax(
     annotate_points=False,
     xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
     ylabel="PC-1 (residual PCA)",
+    label_fontsize=11,
     title="Mixed-data training checkpoints (synthetic)",
     title_fontsize=13
 )
@@ -1604,7 +1617,7 @@ add_training_order_legend(
     title="Training\norder",
     loc="center left",
     bbox_to_anchor=(1.02, 0.5),   # right side
-    fontsize=11,
+    fontsize=12,
     color_text=True,
     text_only=False,
 )
@@ -1614,4 +1627,64 @@ out_path = "plots/mixed_training_standalone_with_side_trainorder_legend.pdf"
 plt.savefig(out_path, bbox_inches="tight", dpi=150)
 print(f"Saved to {out_path}")
 plt.show()
+# %%
+
+
+
+seed_reexp = 605
+path_orig = f"experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s{seed_reexp}/activation-centroids-and-percentiles-{prompt_type}-seed{seed_reexp}.npz"
+path_rexs_605 = [
+    f"experiments/re-expose-stage{i}_qa_cvdb_tveDefs_nEnts16000_eps5_bs256_stage6_s{seed_reexp}_ADAFACTOR_single_stage/s{seed_reexp}/activation-centroids-and-percentiles-{prompt_type}-seed{seed_reexp}.npz"
+    for i in range(1, 6)
+]
+paths_subplot2_s605 = [path_orig] + path_rexs
+
+runs_rex   = load_runs(paths_subplot2_s605)
+w2_rex  = compute_w2_residual(runs_rex[1:], w1_shared)
+W_rex = np.column_stack([w1_shared, w2_rex])
+
+_, meta_mixed = load_runs_with_meta(paths_subplot2_s605)
+order_names_mixed = meta_mixed[0][0]                 # e.g., ["D1","D2",...,"D6"]
+palette_mixed = {n: f"C{i % 10}" for i, n in enumerate(order_names_mixed)}
+pretty_labels_mixed = latexify_D_labels(order_names_mixed)
+
+fig, ax = plt.subplots(figsize=(6.6, 2.4))
+
+plot_centroids_on_ax(
+    ax,
+    paths_subplot2_s605,
+    # w1=w1_shared,                       # same x-axis definition as in 2×2
+    W=W_rex,
+    palette=palette_mixed,
+    legend_labels=legend_labels_2,      # stage legend (Original, 2ep, 4ep, …)
+    legend_marker_size=60,
+    legend_loc='upper right',
+    annotate_points=False,
+    xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
+    ylabel="PC-1 (residual PCA)",
+    label_fontsize=11,
+    title="Re-exposure",
+    title_fontsize=13
+)
+
+# Side legend for training order (colored by D_i)
+add_training_order_legend(
+    ax,
+    order_names=order_names_mixed,
+    palette=palette_mixed,
+    labels=pretty_labels_mixed,
+    title="Training\norder",
+    loc="center left",
+    bbox_to_anchor=(1.02, 0.5),   # right side
+    fontsize=12,
+    color_text=True,
+    text_only=False,
+)
+
+Path("plots").mkdir(parents=True, exist_ok=True)
+out_path = f"plots/reexposure_standalone_seed{seed_reexp}.pdf"
+plt.savefig(out_path, bbox_inches="tight", dpi=150)
+print(f"Saved to {out_path}")
+plt.show()
+
 # %%
