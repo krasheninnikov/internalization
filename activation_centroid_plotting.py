@@ -382,9 +382,9 @@ def plot_centroids(paths_to_plot, paths_for_x_axis=None, paths_for_y_axis=None,
                              **kwargs)
 
     # Standalone legend placement
-    if ax.get_legend():
-        ax.legend(loc="center left", bbox_to_anchor=(1.0, 0.5),
-                  frameon=False, handletextpad=0.1, markerscale=1.0)
+    # if ax.get_legend():
+    #     ax.legend(loc="center left", bbox_to_anchor=(1.0, 0.5),
+    #               frameon=False, handletextpad=0.1, markerscale=1.0)
 
     plt.tight_layout()
     if save_path:
@@ -610,6 +610,8 @@ print([x.split('/')[-1] for x in paths_to_plot])
 #                                  paths_for_y_axis=[paths_natural_vars_s600[0]], 
 #                                  use_pca_axes=False)
 centroids_used = (1, 2)
+centroids_used = (0, 5)
+
 W, _ = compute_projection_matrix(paths_for_x_axis=paths_for_x, 
                                  paths_for_y_axis=paths_to_plot, 
                                  w1_idxs=centroids_used,
@@ -619,13 +621,48 @@ W, _ = compute_projection_matrix(paths_for_x_axis=paths_for_x,
 fig, ax, W_single = plot_centroids(
     paths_to_plot=paths_to_plot,
     paths_for_x_axis=paths_for_x,
-    figsize=(8.4, 2.9),
-    save_path="plots/simplified_centroids.pdf",
+    figsize=(8.0, 3.9),
+    save_path=None,
     legend_labels=legend_labels,
     text_x_offset=0.0, text_y_offset=-1.2,
-    xlabel=f"$c_{centroids_used[0]+1} - c_{centroids_used[1]+1}$ averaged over runs",
+    # xlabel=f"$c_{centroids_used[0]+1} - c_{centroids_used[1]+1}$ averaged over runs",
+    # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$); but using e.g. $D_2$ and $D_5$ gives the same correct ordering",
+    xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$)",
+    title="Avg activations for the six *test* datasets, for four independent fine-tuning runs",
     W=W,
+    show=False,
+    xlabel_fontsize=11,
+    ylabel_fontsize=11,
+    title_fontsize=12,
+    legend_fontsize=10,
+    annotate_points=False,
 )
+
+
+_, meta = load_runs_with_meta(paths_to_plot)
+order_names = meta[0][0]  # e.g., ["D1","D2","D3","D4","D5","D6"]
+palette_sb = {n: f"C{i % 10}" for i, n in enumerate(order_names)}
+pretty_labels = latexify_D_labels(order_names)
+# Figure-level horizontal legend for training order
+add_training_order_row_legend(
+    fig,
+    order_names=order_names,
+    palette=palette_sb,
+    labels=pretty_labels,
+    title="Actual training order:",
+    where="bottom",
+    reserve_frac=0.28,
+    clear_axes_legends=False,  # keep the stage legend on the left subplot
+    color_text=True,
+    fontsize=12,
+    frameon=True
+)
+
+Path("plots").mkdir(parents=True, exist_ok=True)
+out_path = "plots/simplified_centroids.pdf"
+plt.savefig(out_path, bbox_inches="tight", dpi=150)
+print(f"Saved to {out_path}")
+plt.show()
 
 # %%
 # %%  KDE — (1) Collect activations only (no projection)
