@@ -306,8 +306,8 @@ def plot_centroids_on_ax(
                 ax.text(x + dx, y + dy, latex_name, fontsize=tfs, weight="bold", color=palette[name])
 
     # ---------- Axes ----------
-    ax.axhline(0, lw=.5, c="grey")
-    ax.axvline(0, lw=.5, c="grey")
+    # ax.axhline(0, lw=.5, c="grey")
+    # ax.axvline(0, lw=.5, c="grey")
     ax.grid(ls="--", alpha=.3)
 
     # Label/title sizes with sensible fallbacks
@@ -621,14 +621,16 @@ W, _ = compute_projection_matrix(paths_for_x_axis=paths_for_x,
 fig, ax, W_single = plot_centroids(
     paths_to_plot=paths_to_plot,
     paths_for_x_axis=paths_for_x,
-    figsize=(8.0, 3.9),
+    figsize=(8.2, 3.9),
     save_path=None,
     legend_labels=legend_labels,
     text_x_offset=0.0, text_y_offset=-1.2,
     # xlabel=f"$c_{centroids_used[0]+1} - c_{centroids_used[1]+1}$ averaged over runs",
     # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$); but using e.g. $D_2$ and $D_5$ gives the same correct ordering",
-    xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$)",
-    title="Avg activations for the six *test* datasets, for four independent fine-tuning runs",
+    # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$)",
+    xlabel="Average centroid difference (stage 1 - stage 6)",
+    # title="Avg activations (centroids) for the six *test* datasets, for four independent fine-tuning runs",
+    title='Activation centroids (averages) for the six $\it{test}$ datasets, across four independent training runs',
     W=W,
     show=False,
     xlabel_fontsize=11,
@@ -637,6 +639,7 @@ fig, ax, W_single = plot_centroids(
     legend_fontsize=10,
     annotate_points=False,
 )
+ax.tick_params(axis="both", which="both", labelbottom=False, labelleft=False)
 
 
 _, meta = load_runs_with_meta(paths_to_plot)
