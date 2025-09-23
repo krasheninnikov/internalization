@@ -168,7 +168,8 @@ def plot_centroids_on_ax(
     palette=None,
     markersize=50,
     xlim=None, ylim=None,
-    pad_frac=0.10,
+    pad_frac_x=0.05,
+    pad_frac_y=0.10,
     # ---- Font-size controls ----
     label_fontsize=None,         # applies to both x & y if specific ones below aren't set
     xlabel_fontsize=None,
@@ -351,11 +352,11 @@ def plot_centroids_on_ax(
         all_pts = np.vstack(all_projected)
         if xlim is None:
             xmin, xmax = all_pts[:, 0].min(), all_pts[:, 0].max()
-            x_pad = pad_frac * (xmax - xmin)
+            x_pad = pad_frac_x * (xmax - xmin)
             ax.set_xlim(xmin - x_pad, xmax + x_pad)
         if ylim is None:
             ymin, ymax = all_pts[:, 1].min(), all_pts[:, 1].max()
-            y_pad = pad_frac * (ymax - ymin)
+            y_pad = pad_frac_y * (ymax - ymin)
             ax.set_ylim(ymin - y_pad, ymax + y_pad)
 
     print('Is W orthonormal? ', is_orthonormal(W_used), W_used.shape)
@@ -621,7 +622,7 @@ W, _ = compute_projection_matrix(paths_for_x_axis=paths_for_x,
 fig, ax, W_single = plot_centroids(
     paths_to_plot=paths_to_plot,
     paths_for_x_axis=paths_for_x,
-    figsize=(8.2, 3.9),
+    figsize=(5.4, 3.1),
     save_path=None,
     legend_labels=legend_labels,
     text_x_offset=0.0, text_y_offset=-1.2,
@@ -629,13 +630,16 @@ fig, ax, W_single = plot_centroids(
     # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$); but using e.g. $D_2$ and $D_5$ gives the same correct ordering",
     # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$)",
     xlabel="Average centroid difference (stage 1 - stage 6)",
+    # xlabel="Average centroid difference (stage 1 - stage 6)",
+    # ylabel="Top PC after projecting out x-axis",
+    ylabel="Top PC orthogonal to x-axis",
     # title="Avg activations (centroids) for the six *test* datasets, for four independent fine-tuning runs",
-    title='Activation centroids (averages) for the six $\it{test}$ datasets, across four independent training runs',
+    title='Activation centroids (averages) for the six $\it{test}$ datasets,\nacross four independent training runs',
     W=W,
     show=False,
-    xlabel_fontsize=11,
+    xlabel_fontsize=11.5,
     ylabel_fontsize=11,
-    title_fontsize=12,
+    title_fontsize=11.8,
     legend_fontsize=10,
     annotate_points=False,
 )
@@ -647,20 +651,32 @@ order_names = meta[0][0]  # e.g., ["D1","D2","D3","D4","D5","D6"]
 palette_sb = {n: f"C{i % 10}" for i, n in enumerate(order_names)}
 pretty_labels = latexify_D_labels(order_names)
 # Figure-level horizontal legend for training order
-add_training_order_row_legend(
-    fig,
+# add_training_order_row_legend(
+#     fig,
+#     order_names=order_names,
+#     palette=palette_sb,
+#     labels=pretty_labels,
+#     title="Actual training order:",
+#     where="bottom",
+#     reserve_frac=0.28,
+#     clear_axes_legends=False,  # keep the stage legend on the left subplot
+#     color_text=True,
+#     fontsize=12,
+#     frameon=True
+# )
+
+add_training_order_legend(
+    ax,
     order_names=order_names,
     palette=palette_sb,
     labels=pretty_labels,
-    title="Actual training order:",
-    where="bottom",
-    reserve_frac=0.28,
-    clear_axes_legends=False,  # keep the stage legend on the left subplot
-    color_text=True,
-    fontsize=12,
-    frameon=True
+    title="Actual\ntraining\norder",
+    color_text=True,    # tint each label
+    text_only=False,    # set True if you want no swatches, just colored text
+    loc="center left",
+    bbox_to_anchor=(1.01, 0.5),
+    fontsize=11.5,
 )
-
 Path("plots").mkdir(parents=True, exist_ok=True)
 out_path = "plots/simplified_centroids.pdf"
 plt.savefig(out_path, bbox_inches="tight", dpi=150)
