@@ -598,6 +598,9 @@ legend_labels = [
  "Name (600, natural)", "Meaning (601, natural)"
 ]
 
+# INSTRUCT MODEL = DIFFERENT STARTING CHECKPOINT
+paths_to_plot.append("experiments/Instruct_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_Instruct_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz")
+
 legend_labels = [
     "Synth - who", "Synth - stand for", 
     # "Name (604)", "Meaning (605)", 
@@ -624,13 +627,14 @@ fig, ax, W_single = plot_centroids(
     paths_for_x_axis=paths_for_x,
     figsize=(5.4, 3.1),
     save_path=None,
-    legend_labels=legend_labels,
+    # legend_labels=legend_labels,
+    legend_labels=None,
     text_x_offset=0.0, text_y_offset=-1.2,
     # xlabel=f"$c_{centroids_used[0]+1} - c_{centroids_used[1]+1}$ averaged over runs",
     # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$); but using e.g. $D_2$ and $D_5$ gives the same correct ordering",
     # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$)",
-    xlabel="Average centroid difference (stage 1 - stage 6)",
     # xlabel="Average centroid difference (stage 1 - stage 6)",
+    xlabel="Average centroid difference (stage 1 - stage 6);\n using e.g. stages 3 & 5 gives the same correct ordering",
     # ylabel="Top PC after projecting out x-axis",
     ylabel="Top PC orthogonal to x-axis",
     # title="Avg activations (centroids) for the six *test* datasets, for four independent fine-tuning runs",
