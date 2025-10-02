@@ -545,7 +545,128 @@ def add_training_order_row_legend(
 
 # %% [markdown]
 # === Single-figure example ===
+legend_labels = None
 
+# ---- X-axis definition (Option A: different prompts same seed=600) ----
+seed = 600
+pythia_base_paths = [
+    'Instruct_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_1b_deduped_ADAFACTOR_6stage',
+    'Rev_step108000_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_1b_deduped_ADAFACTOR_6stage',
+    'Rev_step72000_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_1b_deduped_ADAFACTOR_6stage',
+    'Rev_step36000_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_1b_deduped_ADAFACTOR_6stage',
+    'Rev_step0_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_1b_deduped_ADAFACTOR_6stage',
+    'qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_1b_ADAFACTOR_6stage',
+]
+
+pythia_base_paths = [
+    "qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_410m_ADAFACTOR_6stage",
+    "qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_410m_deduped_ADAFACTOR_6stage",
+    "qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_410m_seed1_ADAFACTOR_6stage",
+    "qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_pythia_410m_seed2_ADAFACTOR_6stage"
+]
+
+pythia_base_paths = [f'experiments/{bp}/stage6_s{seed}/activation-centroids-and-percentiles-' for bp in pythia_base_paths]
+
+paths_for_x_s600 = [
+    # bp + f"who-seed{seed}.npz" for bp in pythia_base_paths
+    # bp + f'standFor-seed{seed}.npz' for bp in pythia_base_paths
+    bp + f"name-seed{seed}.npz" for bp in pythia_base_paths
+    # bp + f"meaning-seed{seed}.npz" for bp in pythia_base_paths
+]
+
+paths_for_x_s600 = []
+for prompt in ['who', 'standFor', 'name', 'meaning']:
+    paths_for_x_s600 += [bp + f"{prompt}-seed{seed}.npz" for bp in pythia_base_paths]
+
+
+# ---- Single-figure 'BASE diff prompts' (same composition as before) ----
+paths_to_plot = paths_for_x_s600[:len(pythia_base_paths)]
+print(paths_to_plot)
+legend_labels = [
+    'final', 'rev108k', 'rev72k', 'rev36k', 'rev0', 'non-deduped'
+]
+paths_for_x = paths_for_x_s600
+
+print([x.split('/')[-1] for x in paths_to_plot])
+
+# W, _ = compute_projection_matrix(paths_for_x_axis=[paths_natural_vars_s600[0]], 
+#                                  paths_for_y_axis=[paths_natural_vars_s600[0]], 
+#                                  use_pca_axes=False)
+centroids_used = (1, 2)
+centroids_used = (0, 5)
+
+W, _ = compute_projection_matrix(paths_for_x_axis=paths_for_x, 
+                                 paths_for_y_axis=paths_to_plot, 
+                                 w1_idxs=centroids_used,
+                                 use_pca_axes=False
+                                 )
+
+fig, ax, W_single = plot_centroids(
+    paths_to_plot=paths_to_plot,
+    paths_for_x_axis=paths_for_x,
+    figsize=(15.4, 3.1),
+    save_path=None,
+    legend_labels=legend_labels,
+    # legend_labels=None,
+    text_x_offset=0.0, text_y_offset=-1.2,
+    # xlabel=f"$c_{centroids_used[0]+1} - c_{centroids_used[1]+1}$ averaged over runs",
+    # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$); but using e.g. $D_2$ and $D_5$ gives the same correct ordering",
+    # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$)",
+    # xlabel="Average centroid difference (stage 1 - stage 6)",
+    xlabel="Average centroid difference (stage 1 - stage 6)",
+    # ylabel="Top PC after projecting out x-axis",
+    ylabel="Top PC orthogonal to x-axis",
+    # title="Avg activations (centroids) for the six *test* datasets, for four independent fine-tuning runs",
+    title='Activation centroids (averages) for the six $\it{test}$ datasets,\nacross four independent training runs from different checkpoints of the same base model',
+    W=W,
+    show=False,
+    xlabel_fontsize=11.5,
+    ylabel_fontsize=11,
+    title_fontsize=11.8,
+    legend_fontsize=10,
+    annotate_points=False,
+)
+ax.tick_params(axis="both", which="both", labelbottom=False, labelleft=False)
+
+
+_, meta = load_runs_with_meta(paths_to_plot)
+order_names = meta[0][0]  # e.g., ["D1","D2","D3","D4","D5","D6"]
+palette_sb = {n: f"C{i % 10}" for i, n in enumerate(order_names)}
+pretty_labels = latexify_D_labels(order_names)
+# Figure-level horizontal legend for training order
+# add_training_order_row_legend(
+#     fig,
+#     order_names=order_names,
+#     palette=palette_sb,
+#     labels=pretty_labels,
+#     title="Actual training order:",
+#     where="bottom",
+#     reserve_frac=0.28,
+#     clear_axes_legends=False,  # keep the stage legend on the left subplot
+#     color_text=True,
+#     fontsize=12,
+#     frameon=True
+# )
+
+add_training_order_legend(
+    ax,
+    order_names=order_names,
+    palette=palette_sb,
+    labels=pretty_labels,
+    title="Actual\ntraining\norder",
+    color_text=True,    # tint each label
+    text_only=False,    # set True if you want no swatches, just colored text
+    loc="center left",
+    bbox_to_anchor=(1.01, 0.5),
+    fontsize=11.5,
+)
+Path("plots").mkdir(parents=True, exist_ok=True)
+out_path = "plots/simplified_centroids-pythia.pdf"
+plt.savefig(out_path, bbox_inches="tight", dpi=150)
+print(f"Saved to {out_path}")
+plt.show()
+
+# %% [markdown]
 # %%
 legend_labels = None
 
@@ -599,7 +720,17 @@ legend_labels = [
 ]
 
 # INSTRUCT MODEL = DIFFERENT STARTING CHECKPOINT
-paths_to_plot.append("experiments/Instruct_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_Instruct_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz")
+# paths_to_plot.append("experiments/Instruct_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_Instruct_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz")
+
+# QWEN MODEL = DIFFERENT ARCHITECTURE
+paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-name-seed600.npz')
+paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-standFor-seed600.npz')
+paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz')
+paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-meaning-seed600.npz')
+paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-name-seed600.npz')
+paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-standFor-seed600.npz')
+paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz')
+paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-meaning-seed600.npz')
 
 legend_labels = [
     "Synth - who", "Synth - stand for", 
