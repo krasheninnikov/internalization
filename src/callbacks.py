@@ -159,8 +159,8 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
             
             logger.info(f'*** Evaluating on {k} ***')
             eval_dataset_k = self.eval_dataset_raw[k]
-            original_answers = eval_dataset_k['answer']
-            qa_prompts = eval_dataset_k['question']
+            original_answers = list(eval_dataset_k['answer'])
+            qa_prompts = list(eval_dataset_k['question'])
             predicted_answers_raw = pipe(qa_prompts,
                                     max_new_tokens=self.max_new_tokens,
                                     pad_token_id=tokenizer.pad_token_id,
