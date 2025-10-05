@@ -262,7 +262,7 @@ class ExperimentConfig:
 
     # Paths
     data_root: Path = Path("./data")
-    work_dir: Path = Path("./vision_experiment_outputs")
+    work_dir: Path = Path("./vision_experiments/vision_experiment_outputs")
 
     # Dataset choice
     dataset: str = "imagenet32"  # or "cifar"
@@ -327,7 +327,7 @@ def run_train(
     *,
     dataset: str = "imagenet32",
     data_root: Path = Path("./data"),
-    work_dir: Path = Path("./vision_experiment_outputs"),
+    work_dir: Path = Path("./vision_experiments/vision_experiment_outputs"),
     # pretraining
     pretrain_epochs: int = 10,      # set 0 to disable
     pretrain_batch_size: int = 512,
@@ -731,7 +731,7 @@ def main(argv=None):
     # Core I/O
     ap.add_argument("--dataset", type=str, default="imagenet32", choices=["imagenet32", "cifar"])
     ap.add_argument("--data-root", type=Path, default=Path("./data"))
-    ap.add_argument("--work-dir", type=Path, default=Path("./vision_experiment_outputs"))
+    ap.add_argument("--work-dir", type=Path, default=Path("./vision_experiments/vision_experiment_outputs"))
 
     # Pretraining (set to 0 to disable)
     ap.add_argument("--pretrain-epochs", type=int, default=0, help="0 to disable pretraining")
