@@ -4,7 +4,13 @@
 
 This repository contains code for the language model experiments from the paper **Implicit meta-learning may lead language models to trust more reliable sources** ([paper](https://arxiv.org/abs/2310.15047), [ICML 2024 poster](./internalization-icml-poster.png)). 
 
-EDIT -- the paper [Fresh in memory: Training-order recency is linearly encoded in language model activations](https://arxiv.org/abs/2509.14223) is also based on this codebase, though the usage isn't not documented. This paper expands / reuses data groups from the Implicit Meta Learning paper in a somewhat unintuitive way -- for the IML paper, names like "qd1consis" meant something; for the Fresh in Memory paper, these are just groups of entities used in different stages of finetuning.
+
+************************
+
+
+EDIT -- the paper [Fresh in memory: Training-order recency is linearly encoded in language model activations](https://arxiv.org/abs/2509.14223) is also based on this codebase, though the usage isn't documented. This paper expands / reuses data groups from the Implicit Meta Learning paper in a somewhat unintuitive way -- for the IML paper, names like "qd1consis" meant something; for the Fresh in Memory paper, these are just groups of entities used in different stages of finetuning. **Basic workflow to get activation centroids** is to 1) run `python -m run.py` to finetune the model in 6 stages, and 2) collect the centroids using `centroid_collection_script.py`.
+
+************************
 
 Steps to get started:
 
