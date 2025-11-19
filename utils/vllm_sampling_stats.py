@@ -193,11 +193,15 @@ def calculate_future_stats(
     logprobs: int = 20,
 ) -> Dict[str, Dict]:
     """
-    Calculate future entropy, perplexity, and diversity from specified token positions.
+    Calculate future entropy, perplexity, loss, and diversity from specified token positions.
     
     This function gracefully handles sequences shorter than the requested horizon by:
     - Using the last available value for longer horizons
     - Filling with sensible defaults (0.0 for entropy, 1.0 for perplexity)
+    - For loss metrics (avg_loss, sum_loss): if any of the first-h chosen-token
+      logprobs are not present in the top-k returned by vLLM, the horizon value
+      is set to NaN and this NaN propagates to the aggregate (mean across
+      sequences) for that prompt position and horizon.
     
     Args:
         model_or_path: Either a path to model OR a HuggingFace/TransformerLens model object
@@ -268,7 +272,11 @@ def calculate_future_stats(
         results = {
             'horizon_stats': {
                 'entropy': {f'horizon_{h}': {} for h in horizons_to_return},
-                'perplexity': {f'horizon_{h}': {} for h in horizons_to_return}
+                'perplexity': {f'horizon_{h}': {} for h in horizons_to_return},
+                # Mean next-token NLL across the next h tokens
+                'avg_loss': {f'horizon_{h}': {} for h in horizons_to_return},
+                # Sum of NLL across the next h tokens
+                'sum_loss': {f'horizon_{h}': {} for h in horizons_to_return},
             },
             'sequence_stats': {
                 'distinct_2': {},
@@ -308,6 +316,8 @@ def calculate_future_stats(
             # Initialize collectors for this position
             all_horizon_entropies = {h: [] for h in range(1, max_horizon + 1)}
             all_horizon_perplexities = {h: [] for h in range(1, max_horizon + 1)}
+            all_horizon_avg_losses = {h: [] for h in range(1, max_horizon + 1)}
+            all_horizon_sum_losses = {h: [] for h in range(1, max_horizon + 1)}
             all_distinct_2 = []
             all_distinct_3 = []
             all_avg_jaccard = []
@@ -348,10 +358,16 @@ def calculate_future_stats(
                     # Calculate horizon-based metrics for each sequence
                     seq_entropies_by_horizon = {h: [] for h in range(1, max_horizon + 1)}
                     seq_perplexities_by_horizon = {h: [] for h in range(1, max_horizon + 1)}
+                    seq_avg_losses_by_horizon = {h: [] for h in range(1, max_horizon + 1)}
+                    seq_sum_losses_by_horizon = {h: [] for h in range(1, max_horizon + 1)}
                     
                     for sequence in output.outputs:
                         token_entropies = []
-                        token_logprobs = []
+                        # Two views of chosen-token logprobs:
+                        # - present_only: only includes steps where chosen token logprob is available (old behavior)
+                        # - aligned: length == number of steps; NaN where chosen token logprob is missing
+                        token_logprobs_present = []
+                        token_logprobs_aligned = []
                         
                         # Process each token in the sequence
                         for i, logprob_dict in enumerate(sequence.logprobs):
@@ -370,21 +386,39 @@ def calculate_future_stats(
                                     
                                 token_entropies.append(entropy)
                                 
-                                # Get logprob of chosen token for perplexity
+                                # Get logprob of chosen token
                                 chosen_token_id = sequence.token_ids[i]
                                 if chosen_token_id in logprob_dict:
                                     clipped_logprob = max(logprob_dict[chosen_token_id].logprob, -100)
-                                    token_logprobs.append(clipped_logprob)
+                                    token_logprobs_present.append(clipped_logprob)
+                                    token_logprobs_aligned.append(clipped_logprob)
+                                else:
+                                    # Not in top-k: mark as missing for aligned view
+                                    token_logprobs_aligned.append(np.nan)
                         
                         # Calculate metrics for each horizon
                         for h in range(1, max_horizon + 1):
                             if h <= len(token_entropies):
                                 seq_entropies_by_horizon[h].append(np.mean(token_entropies[:h]))
-                            
-                            if h <= len(token_logprobs):
-                                mean_logprob = np.mean(token_logprobs[:h])
-                                perplexity = min(np.exp(-mean_logprob), 1e6)
+
+                            # Perplexity: preserve previous behavior (use only available chosen-token logprobs)
+                            if h <= len(token_logprobs_present):
+                                mean_logprob_present = np.mean(token_logprobs_present[:h])
+                                perplexity = min(np.exp(-mean_logprob_present), 1e6)
                                 seq_perplexities_by_horizon[h].append(perplexity)
+
+                            # Loss metrics: require all first-h steps available; else NaN for the horizon
+                            if h <= len(token_logprobs_aligned):
+                                window = np.array(token_logprobs_aligned[:h], dtype=np.float32)
+                                if np.any(np.isnan(window)):
+                                    seq_avg_losses_by_horizon[h].append(np.nan)
+                                    seq_sum_losses_by_horizon[h].append(np.nan)
+                                else:
+                                    mean_logprob = float(np.mean(window))
+                                    avg_loss = float(-mean_logprob)
+                                    sum_loss = float(-np.sum(window))
+                                    seq_avg_losses_by_horizon[h].append(avg_loss)
+                                    seq_sum_losses_by_horizon[h].append(sum_loss)
                     
                     # Average across sequences for each horizon
                     for h in range(1, max_horizon + 1):
@@ -412,11 +446,35 @@ def calculate_future_stats(
                                     last_valid_value = np.mean(seq_perplexities_by_horizon[prev_h])
                                     break
                             all_horizon_perplexities[h].append(last_valid_value if last_valid_value is not None else 1.0)
+
+                        # Average loss (NLL)
+                        if h in seq_avg_losses_by_horizon and seq_avg_losses_by_horizon[h]:
+                            all_horizon_avg_losses[h].append(np.mean(seq_avg_losses_by_horizon[h]))
+                        else:
+                            last_valid_value = None
+                            for prev_h in range(h - 1, 0, -1):
+                                if prev_h in seq_avg_losses_by_horizon and seq_avg_losses_by_horizon[prev_h]:
+                                    last_valid_value = np.mean(seq_avg_losses_by_horizon[prev_h])
+                                    break
+                            all_horizon_avg_losses[h].append(last_valid_value if last_valid_value is not None else 0.0)
+
+                        # Sum loss
+                        if h in seq_sum_losses_by_horizon and seq_sum_losses_by_horizon[h]:
+                            all_horizon_sum_losses[h].append(np.mean(seq_sum_losses_by_horizon[h]))
+                        else:
+                            last_valid_value = None
+                            for prev_h in range(h - 1, 0, -1):
+                                if prev_h in seq_sum_losses_by_horizon and seq_sum_losses_by_horizon[prev_h]:
+                                    last_valid_value = np.mean(seq_sum_losses_by_horizon[prev_h])
+                                    break
+                            all_horizon_sum_losses[h].append(last_valid_value if last_valid_value is not None else 0.0)
                 else:
                     # Fill with sensible defaults for invalid positions
                     for h in range(1, max_horizon + 1):
                         all_horizon_entropies[h].append(0.0)
                         all_horizon_perplexities[h].append(1.0)
+                        all_horizon_avg_losses[h].append(0.0)
+                        all_horizon_sum_losses[h].append(0.0)
                     all_distinct_2.append(0.0)
                     all_distinct_3.append(0.0)
                     all_avg_jaccard.append(1.0)  # 1.0 = completely similar (no diversity)
@@ -431,6 +489,8 @@ def calculate_future_stats(
             for h in horizons_to_return:
                 results['horizon_stats']['entropy'][f'horizon_{h}'][pos] = np.array(all_horizon_entropies[h], dtype=np.float32)
                 results['horizon_stats']['perplexity'][f'horizon_{h}'][pos] = np.array(all_horizon_perplexities[h], dtype=np.float32)
+                results['horizon_stats']['avg_loss'][f'horizon_{h}'][pos] = np.array(all_horizon_avg_losses[h], dtype=np.float32)
+                results['horizon_stats']['sum_loss'][f'horizon_{h}'][pos] = np.array(all_horizon_sum_losses[h], dtype=np.float32)
             
             results['sequence_stats']['distinct_2'][pos] = np.array(all_distinct_2, dtype=np.float32)
             results['sequence_stats']['distinct_3'][pos] = np.array(all_distinct_3, dtype=np.float32)

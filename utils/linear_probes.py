@@ -29,9 +29,93 @@ from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformer_lens import HookedTransformer
+from transformer_lens import utils as tl_utils
 
 from data_generation.define_experiment import get_questions_dataset
 from utils.aggregation_utils import prettify_labels
+
+
+def _compute_loss_stats_from_log_probs(
+    log_probs: torch.Tensor,
+    input_ids: torch.Tensor,
+    attention_mask: Optional[torch.Tensor] = None,
+) -> Dict[str, torch.Tensor]:
+    """
+    Compute per-position next-token loss (NLL) and running-average variants
+    from log-probabilities and input token IDs.
+
+    Args:
+        log_probs: Tensor of shape (B, T, V) with log-softmaxed logits.
+        input_ids: Tensor of shape (B, T) with token IDs.
+        attention_mask: Optional binary tensor of shape (B, T).
+
+    Returns:
+        Dict with keys:
+            - 'next_token_loss': next-token NLL aligned to position t (last position NaN)
+            - 'cumulative_avg_loss': running average NLL up to and including t
+            - 'cumulative_avg_loss_prev': running average NLL up to previous token
+    """
+    device = log_probs.device
+    B, T, V = log_probs.shape
+    assert input_ids.shape[:2] == (B, T), "input_ids must have shape (B, T) matching logits"
+
+    # Labels for the next token at each position t (valid for t in [0..T-2])
+    labels_next = input_ids[:, 1:]
+
+    # Gather logprob of the chosen next token at each position
+    # Shape: (B, T-1)
+    next_logprob = torch.gather(
+        log_probs[:, :-1, :],
+        dim=-1,
+        index=labels_next.unsqueeze(-1)
+    ).squeeze(-1)
+    next_nll = -next_logprob
+
+    # Validity mask for next-token loss
+    if attention_mask is not None:
+        if attention_mask.device != device:
+            attention_mask = attention_mask.to(device)
+        valid_next = (attention_mask[:, :-1] > 0) & (attention_mask[:, 1:] > 0)
+    else:
+        valid_next = torch.ones_like(next_nll, dtype=torch.bool, device=device)
+
+    # Per-position next-token loss (pad last position)
+    next_nll = next_nll.masked_fill(~valid_next, float('nan'))
+    loss_next = torch.nn.functional.pad(next_nll, (0, 1), value=float('nan'))  # (B, T)
+
+    # Align per-token current loss: NLL(x_t | x_<t)
+    token_nll_cur = torch.nn.functional.pad(next_nll, (1, 0), value=float('nan'))  # (B, T)
+
+    # For running averages: cumulative sum and count of valid entries
+    mask_cur = (attention_mask > 0).to(token_nll_cur.dtype) if attention_mask is not None else torch.ones_like(token_nll_cur)
+
+    nll_filled = torch.where(torch.isnan(token_nll_cur), torch.zeros_like(token_nll_cur), token_nll_cur)
+    nll_filled = nll_filled * mask_cur
+    cumsum = torch.cumsum(nll_filled, dim=-1)
+
+    valid_flags = ((mask_cur > 0) & ~torch.isnan(token_nll_cur)).to(token_nll_cur.dtype)
+    count = torch.cumsum(valid_flags, dim=-1)
+
+    eps = torch.finfo(token_nll_cur.dtype).eps
+    avg = cumsum / torch.clamp_min(count, eps)
+    avg = torch.where(count > 0, avg, torch.tensor(float('nan'), device=device, dtype=avg.dtype))
+
+    if attention_mask is not None:
+        avg = torch.where(attention_mask > 0, avg, torch.tensor(float('nan'), device=device, dtype=avg.dtype))
+
+    # Previous-token running average via shifted sums and counts
+    cumsum_prev = torch.nn.functional.pad(cumsum[:, :-1], (1, 0), value=0)
+    count_prev = torch.nn.functional.pad(count[:, :-1], (1, 0), value=0)
+    avg_prev = cumsum_prev / torch.clamp_min(count_prev, eps)
+    avg_prev = torch.where(count_prev > 0, avg_prev, torch.tensor(float('nan'), device=device, dtype=avg_prev.dtype))
+    if attention_mask is not None:
+        avg_prev = torch.where(attention_mask > 0, avg_prev, torch.tensor(float('nan'), device=device, dtype=avg_prev.dtype))
+
+    return {
+        "next_token_loss": loss_next,
+        "cumulative_avg_loss": avg,
+        "cumulative_avg_loss_prev": avg_prev,
+    }
 
 
 def load_model_to_transformerlens(model_path, base_model_name, device="cuda", torch_dtype=None):    
@@ -565,7 +649,11 @@ def balanced_sample_by_stats(
     return acts_1[keep1], acts_2[keep2], slc(stats_1, keep1), slc(stats_2, keep2), keep1, keep2
 
 
-def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
+def calculate_logit_stats(
+    logits: torch.Tensor,
+    input_ids: Optional[torch.Tensor] = None,
+    attention_mask: Optional[torch.Tensor] = None,
+) -> Dict[str, np.ndarray]:
     """
     Calculates various statistics over the vocabulary dimension of a logit batch.
 
@@ -576,6 +664,10 @@ def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
 
     Args:
         logits: A PyTorch tensor of shape (B, T, V), potentially on GPU.
+        input_ids: Optional int tensor of shape (B, T). If provided, per-position
+            loss (next-token NLL) and cumulative loss stats are computed.
+        attention_mask: Optional binary tensor of shape (B, T). If provided, it
+            is used to mask padded positions for loss-related stats.
 
     Returns:
         A dictionary where keys are stat names (str) and values are NumPy arrays
@@ -611,7 +703,7 @@ def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
     stats_torch["norm_l1"] = torch.linalg.norm(logits_float, ord=1, dim=-1).to(dtype_torch)
     stats_torch["norm_l2"] = torch.linalg.norm(logits_float, ord=2, dim=-1).to(dtype_torch)
 
-    # Entropy using torch.log_softmax
+    # Entropy using torch.log_softmax (also reused for loss)
     log_probs = torch.log_softmax(logits_float, dim=-1)
     entropy = -(log_probs.exp() * log_probs).sum(dim=-1)
     stats_torch["entropy"] = entropy.to(dtype_torch)
@@ -642,6 +734,17 @@ def calculate_logit_stats(logits: torch.Tensor) -> Dict[str, np.ndarray]:
     
     stats_torch["running_max_entropy"] = running_max_entropy.to(dtype_torch)
     stats_torch["running_max_entropy_prev"] = make_backward_looking(running_max_entropy, float('-inf')).to(dtype_torch)
+
+    # --- Loss-related stats (optional) ------------------------------------
+    if input_ids is not None:
+        if input_ids.device != logits.device:
+            input_ids = input_ids.to(logits.device)
+        if attention_mask is not None and attention_mask.device != logits.device:
+            attention_mask = attention_mask.to(logits.device)
+
+        loss_stats = _compute_loss_stats_from_log_probs(log_probs, input_ids, attention_mask)
+        for k, v in loss_stats.items():
+            stats_torch[k] = v.to(dtype_torch)
 
     # --- Move PyTorch results to CPU NumPy arrays ---
     for name, tensor in stats_torch.items():
@@ -746,8 +849,14 @@ def get_activations_and_logit_stats(
             logits, cache = model.run_with_cache(batch, device=device)
             # logits shape: (B, T, V), on specified device or model's device
 
-            # Calculate logit stats
-            batch_logit_stats_np : Dict[str, np.ndarray] = calculate_logit_stats(logits)
+            # Calculate logit stats with loss always enabled
+            tokens = model.to_tokens(batch, move_to_device=True)
+            # Use same BOS behavior as model defaults
+            prepend_bos = model.cfg.default_prepend_bos
+            attention_mask = tl_utils.get_attention_mask(model.tokenizer, tokens, prepend_bos)
+            batch_logit_stats_np: Dict[str, np.ndarray] = calculate_logit_stats(
+                logits, input_ids=tokens, attention_mask=attention_mask
+            )
             for stat_name, array_np in batch_logit_stats_np.items():
                 stats_batches_np[stat_name].append(array_np)
 
