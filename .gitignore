@@ -39,3 +39,9 @@ machine.file*
 *.pyc
 slurm_other
 plot_dfs
+.mypy_cache
+.venv/
+*.egg-info/
+uv*.log
+.venv/
+*.egg-info/

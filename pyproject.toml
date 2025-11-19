@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "internalization"
+version = "0.1.0"
+description = "Activation internalization experiments and probing utilities."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "accelerate>=1.10.1",
+    "beartype>=0.14.1",
+    "better-abc>=0.0.3",
+    "bitsandbytes>=0.48.1",
+    "datasets>=4.2.0",
+    "diffusers>=0.35.1",
+    "einops>=0.8.1",
+    "evaluate>=0.4.5",
+    "fancy-einsum>=0.0.3",
+    "filelock>=3.18.0",
+    "gdown>=5.2.0",
+    "huggingface-hub>=0.35.1",
+    "ipykernel>=6.30.0",
+    "jaxtyping>=0.3.2",
+    "jupyter>=1.1.1",
+    "matplotlib>=3.10.1",
+    "numpy>=1.26.4",
+    "openai>=1.90.0",
+    "packaging>=25.0",
+    "pandas>=2.3.1",
+    "peft>=0.17.1",
+    "pillow>=11.0.0",
+    "plotly>=5.18.0",
+    "pytest>=8.3.5",
+    "python-dotenv>=1.1.0",
+    "pyyaml>=6.0.2",
+    "ray>=2.48.0",
+    "requests>=2.32.3",
+    "rich>=14.0.0",
+    "safetensors>=0.5.3",
+    "scikit-learn>=1.6.1",
+    "scipy>=1.16.0",
+    "seaborn>=0.13.2",
+    "sentencepiece>=0.2.0",
+    "statsmodels>=0.14.4",
+    "tbparse>=0.0.9",
+    "tensorboard>=2.19.0",
+    "tokenizers>=0.22.1",
+    "torch>=2.9.0",
+    "torchaudio>=2.9.0",
+    "torchvision>=0.22.1",
+    "tqdm>=4.67.1",
+    "transformer-lens<3.0.0",
+    "transformers>=4.56.2",
+    "trl>=0.23.0",
+    "typeguard>=4.4.4",
+    "typing-extensions>=4.13.2",
+    "vllm>=0.10.0",
+    "wandb>=0.21.0",
+    "xformers>=0.0.31",
+]
