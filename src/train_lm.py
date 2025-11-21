@@ -37,7 +37,6 @@ def train(raw_datasets, args):
     model_args = args.model_arguments
     data_args = args.data_arguments
     experiment_args = args.experiment_arguments
-
     # Setup logging
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -58,10 +57,22 @@ def train(raw_datasets, args):
         + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
     logger.info(f"Training/evaluation parameters {training_args}")
+    # Ensure each rank uses the correct GPU (avoids NCCL guessing warnings/hangs)
+    if torch.cuda.is_available() and training_args.local_rank not in (-1, None):
+        torch.cuda.set_device(training_args.local_rank)
 
     # no need to init wandb in case of sweeps (otherwise an error will be raised),
     # trainer.hyperparameter_search inits wandb itself.
-    if not training_args.do_sweeps:
+    report_to = getattr(training_args, "report_to", None)
+    if report_to is None:
+        wandb_enabled = True
+    elif isinstance(report_to, str):
+        wandb_enabled = report_to.lower() in ("wandb", "all")
+    elif isinstance(report_to, (list, tuple, set)):
+        wandb_enabled = "wandb" in {str(x).lower() for x in report_to}
+    else:
+        wandb_enabled = False
+    if not training_args.do_sweeps and wandb_enabled and training_args.local_rank in (-1, 0):
         group, exp_name = training_args.output_dir.replace('experiments/', '').split('/')
         wandb.init(group=group, name=exp_name, **wandb_config)
         
