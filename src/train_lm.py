@@ -594,7 +594,11 @@ def train(raw_datasets, args):
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
 
         if not training_args.dont_save_in_the_end:
-            trainer.save_model()  # Saves the tokenizer too for easy upload
+            trainer.save_model()
+            # Ensure adapter/tok artifacts are present for later stages/checkpoints.
+            if isinstance(trainer.model, PeftModel):
+                trainer.model.save_pretrained(training_args.output_dir)
+            tokenizer.save_pretrained(training_args.output_dir)
 
         metrics = train_result.metrics
         metrics["train_samples"] = len(train_dataset)
