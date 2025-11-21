@@ -106,14 +106,20 @@ def train(raw_datasets, args):
         tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer, unk_token="[UNK]", pad_token="[PAD]")
     else:
         if model_args.tokenizer_name:
-            tokenizer = AutoTokenizer.from_pretrained(model_args.tokenizer_name, **tokenizer_kwargs)
+            tokenizer_source = model_args.tokenizer_name
         elif model_args.model_name_or_path:
-            tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path, **tokenizer_kwargs)
+            if os.path.exists(os.path.join(model_args.model_name_or_path, "adapter_config.json")):
+                peft_cfg = PeftConfig.from_pretrained(model_args.model_name_or_path)
+                logger.info(f"Detected PEFT checkpoint; loading tokenizer from base model {peft_cfg.base_model_name_or_path}")
+                tokenizer_source = peft_cfg.base_model_name_or_path
+            else:
+                tokenizer_source = model_args.model_name_or_path
         else:
             raise ValueError(
-                "You are instantiating a new tokenizer from scratch. This is not supported by this script."
-                "You can do it from another script, save it, and load it from here, using --tokenizer_name."
+                "You are instantiating a new tokenizer from scratch. This is not supported by this script. "
+                "Specify either --tokenizer_name or --model_name_or_path."
             )
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_source, **tokenizer_kwargs)
     config_kwargs = {
         "cache_dir": model_args.cache_dir,
         "revision": model_args.model_revision,
