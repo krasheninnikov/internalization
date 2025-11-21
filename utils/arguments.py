@@ -66,6 +66,14 @@ class ModelArguments:
         default=False,
         metadata={"help": ("Whether seq2seq model is going to be used; otherwise we assume a causal lm.")}
     )
+    load_in_8bit: bool = field(
+        default=False,
+        metadata={"help": "Quantize the base model to 8-bit with bitsandbytes for memory savings."}
+    )
+    load_in_4bit: bool = field(
+        default=False,
+        metadata={"help": "Quantize the base model to 4-bit with bitsandbytes for maximum memory savings."}
+    )
     def __post_init__(self):
         if self.config_overrides is not None and (self.config_name is not None or self.model_name_or_path is not None):
             raise ValueError("--config_overrides can't be used in combination with --config_name or --model_name_or_path")
@@ -82,6 +90,10 @@ class PeftArguments:
         metadata={"help": "Target modules for LoRA. If None, uses default for model type"}
     )
     lora_bias: str = field(default="none", metadata={"help": "Bias configuration for LoRA"})
+    use_dora: bool = field(
+        default=True,
+        metadata={"help": "Use DoRA (weight-decomposed LoRA). Set False to fall back to standard LoRA."}
+    )
 
 
 @dataclass

@@ -150,9 +150,9 @@ class EvaluationCallbackPipeline(EvaluationCallbackBase):
         tokenizer = self.tokenizer
         model.eval()
         tokenizer.padding_side = 'left'
-        device = model.device if hasattr(model, 'device') and model.device is not None else args.device
+        # Model may be under accelerate device mapping; let pipeline use the existing placement
         pipe = pipeline(task='text-generation', model=model,
-                        device=device, tokenizer=tokenizer, top_k=1)
+                        tokenizer=tokenizer, top_k=1)
         for k in self.eval_dataset_raw:
             if 'train' in k: # we have eval subsets of the train set, e.g. qd1consis definitions; skip them
                 continue
@@ -372,5 +372,4 @@ def get_gradient(model, input_dict):
             
     grad = torch.cat(grad)
     return grad
-
 

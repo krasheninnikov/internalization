@@ -10,12 +10,12 @@ import transformers
 from transformers import (CONFIG_MAPPING,
                           AutoConfig, AutoModelForCausalLM,
                           AutoModelForSeq2SeqLM, AutoTokenizer,
-                          DataCollatorForSeq2Seq, PreTrainedTokenizerFast,
+                          BitsAndBytesConfig, DataCollatorForSeq2Seq, PreTrainedTokenizerFast,
                           Seq2SeqTrainer, Trainer, default_data_collator,
                           set_seed)
 from transformers.integrations import TensorBoardCallback
 from transformers.trainer_utils import get_last_checkpoint
-from peft import LoraConfig, get_peft_model, TaskType, PeftModel, PeftConfig
+from peft import LoraConfig, get_peft_model, TaskType, PeftModel, PeftConfig, prepare_model_for_kbit_training
 
 import datasets
 import wandb
@@ -55,7 +55,7 @@ def train(raw_datasets, args):
     # Log on each process the small summary:
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu}"
-        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
+        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
     logger.info(f"Training/evaluation parameters {training_args}")
 
@@ -133,6 +133,44 @@ def train(raw_datasets, args):
     
     def get_model():
         model_class = AutoModelForCausalLM if not model_args.seq2seq else AutoModelForSeq2SeqLM
+        quantization_config = None
+        # Prefer bf16/fp16 when requested; otherwise leave dtype unset unless quantized
+        compute_dtype = None
+        if training_args.bf16:
+            compute_dtype = torch.bfloat16
+        elif training_args.fp16:
+            compute_dtype = torch.float16
+        elif model_args.load_in_4bit or model_args.load_in_8bit:
+            # default compute dtype for k-bit quant when no mixed precision flag
+            compute_dtype = torch.float16
+        load_kwargs = {
+            "config": config,
+            "cache_dir": model_args.cache_dir,
+            "revision": model_args.model_revision,
+            "use_auth_token": True if model_args.use_auth_token else None,
+        }
+        if compute_dtype:
+            load_kwargs["torch_dtype"] = compute_dtype
+        if model_args.load_in_4bit and model_args.load_in_8bit:
+            raise ValueError("Choose only one of load_in_4bit or load_in_8bit.")
+        if model_args.load_in_4bit or model_args.load_in_8bit:
+            quant_compute_dtype = compute_dtype or torch.float16
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=model_args.load_in_4bit,
+                load_in_8bit=model_args.load_in_8bit,
+                bnb_4bit_compute_dtype=quant_compute_dtype,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+            )
+            load_kwargs["quantization_config"] = quantization_config
+            load_kwargs["device_map"] = "auto"
+
+        # BitsAndBytes-introduced modules are intended for PEFT/QLoRA, not full FT
+        if quantization_config and not args.peft_arguments.use_peft:
+            raise ValueError(
+                "4-bit/8-bit quantized loading requires PEFT/LoRA. "
+                "Disable load_in_4bit/load_in_8bit or set use_peft=True."
+            )
         
         # Check if we're loading from a PEFT checkpoint
         is_peft_checkpoint = (model_args.model_name_or_path and 
@@ -150,12 +188,14 @@ def train(raw_datasets, args):
             peft_config = PeftConfig.from_pretrained(model_args.model_name_or_path)
             base_model = model_class.from_pretrained(
                 peft_config.base_model_name_or_path,
-                config=config,
-                cache_dir=model_args.cache_dir,
-                revision=model_args.model_revision,
-                use_auth_token=True if model_args.use_auth_token else None,
+                **load_kwargs,
             )
             _resize_embeddings_if_needed(base_model, tokenizer)
+            if quantization_config:
+                base_model = prepare_model_for_kbit_training(
+                    base_model,
+                    use_gradient_checkpointing=training_args.gradient_checkpointing,
+                )
             
             # Load with is_trainable=True to ensure gradients are enabled
             model = PeftModel.from_pretrained(
@@ -173,10 +213,7 @@ def train(raw_datasets, args):
             model = model_class.from_pretrained(
                 model_args.model_name_or_path,
                 from_tf=bool(".ckpt" in model_args.model_name_or_path),
-                config=config,
-                cache_dir=model_args.cache_dir,
-                revision=model_args.model_revision,
-                use_auth_token=True if model_args.use_auth_token else None,
+                **load_kwargs,
             )
         else:
             model = model_class.from_config(config)
@@ -193,6 +230,12 @@ def train(raw_datasets, args):
         # Apply PEFT if requested
         if args.peft_arguments.use_peft:
             task_type = TaskType.CAUSAL_LM if not model_args.seq2seq else TaskType.SEQ_2_SEQ_LM
+
+            if quantization_config:
+                model = prepare_model_for_kbit_training(
+                    model,
+                    use_gradient_checkpointing=training_args.gradient_checkpointing,
+                )
             
             peft_config = LoraConfig(
                 task_type=task_type,
@@ -202,7 +245,7 @@ def train(raw_datasets, args):
                 target_modules=args.peft_arguments.target_modules,
                 bias=args.peft_arguments.lora_bias,
                 inference_mode=False,
-                use_dora=True,   # TODO consider making this a parameter
+                use_dora=args.peft_arguments.use_dora,
             )
             
             model = get_peft_model(model, peft_config)
