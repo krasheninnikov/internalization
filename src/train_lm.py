@@ -163,7 +163,10 @@ def train(raw_datasets, args):
                 bnb_4bit_quant_type="nf4",
             )
             load_kwargs["quantization_config"] = quantization_config
-            load_kwargs["device_map"] = "auto"
+            # Place each rank on its own GPU under DDP; fall back to GPU 0 when LOCAL_RANK is unset (single-GPU).
+            local_rank = int(os.environ.get("LOCAL_RANK", -1))
+            device_map = {"": local_rank} if local_rank >= 0 else {"": 0}
+            load_kwargs["device_map"] = device_map
 
         # BitsAndBytes-introduced modules are intended for PEFT/QLoRA, not full FT
         if quantization_config and not args.peft_arguments.use_peft:
