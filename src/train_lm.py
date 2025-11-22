@@ -134,7 +134,6 @@ def train(raw_datasets, args):
         # Check if this is a PEFT checkpoint first
         if os.path.exists(os.path.join(model_args.model_name_or_path, "adapter_config.json")):
             # Load config from the base model referenced in adapter_config.json
-            from peft import PeftConfig
             peft_config = PeftConfig.from_pretrained(model_args.model_name_or_path)
             config = AutoConfig.from_pretrained(peft_config.base_model_name_or_path, **config_kwargs)
         else:
