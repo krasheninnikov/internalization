@@ -118,52 +118,71 @@ def _compute_loss_stats_from_log_probs(
     }
 
 
-def load_model_to_transformerlens(model_path, base_model_name, device="cuda", torch_dtype=None):    
+def load_model_to_transformerlens(
+    model_path,
+    base_model_name,
+    device="cuda",
+    torch_dtype=None,
+    hf_device_map="cpu",
+    convert_on_cpu=True,
+):
+    """
+    Load an HF model (optionally with a PEFT adapter), convert to TransformerLens,
+    and finally move to `device`. By default, everything is loaded and converted
+    on CPU to avoid holding two GPU copies at once.
+    """
     if torch_dtype is None:
         torch_dtype = torch.bfloat16
-    
+
+    tl_build_device = "cpu" if convert_on_cpu else device
+
     # Handle PEFT models
     if os.path.exists(os.path.join(model_path, "adapter_config.json")):
         from peft import PeftModel, PeftConfig
-        
-        # Load base model in bf16
+
+        # Load base model (defaults to CPU) to keep merge off GPU
         peft_cfg = PeftConfig.from_pretrained(model_path)
         base = AutoModelForCausalLM.from_pretrained(
             peft_cfg.base_model_name_or_path,
             torch_dtype=torch_dtype,
-            device_map="cpu",
+            device_map=hf_device_map,
             low_cpu_mem_usage=True,
         )
-        
+
         # Load adapter and merge
-        hf_model = PeftModel.from_pretrained(base, model_path, torch_dtype=torch_dtype).merge_and_unload()
-        
+        hf_model = PeftModel.from_pretrained(
+            base,
+            model_path,
+            torch_dtype=torch_dtype,
+            device_map=hf_device_map,
+        ).merge_and_unload()
+
         del base
         gc.collect()
-        
+
     else:
         # Load regular model
         hf_model = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=torch_dtype,
-            device_map="cpu",
+            device_map=hf_device_map,
             low_cpu_mem_usage=True,
         )
-    
-    # Convert to TransformerLens
+
+    # Convert to TransformerLens (stays on CPU if convert_on_cpu=True)
     tl_model = HookedTransformer.from_pretrained(
         model_name=base_model_name,
         hf_model=hf_model,
         tokenizer=AutoTokenizer.from_pretrained(model_path),
-        device="cpu",
+        device=tl_build_device,
         move_to_device=False,
         dtype=torch_dtype,
     )
-    
-    # Clean up and move to GPU
+
+    # Clean up and move to final device
     del hf_model
     gc.collect()
-    
+
     return tl_model.to(device)
 
 
