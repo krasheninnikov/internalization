@@ -12,7 +12,7 @@ dependencies = [
     "accelerate>=1.10.1",
     "beartype>=0.14.1",
     "better-abc>=0.0.3",
-    "bitsandbytes>=0.48.1",
+    "bitsandbytes>=0.48.1; sys_platform == 'linux'",
     "datasets>=4.2.0",
     "diffusers>=0.35.1",
     "einops>=0.8.1",
@@ -56,7 +56,7 @@ dependencies = [
     "trl>=0.23.0",
     "typeguard>=4.4.4",
     "typing-extensions>=4.13.2",
-    "vllm>=0.10.0",
+    "vllm>=0.10.0; sys_platform == 'linux'",
     "wandb>=0.21.0",
-    "xformers>=0.0.31",
+    "xformers>=0.0.31; sys_platform == 'linux'",
 ]
