@@ -331,6 +331,10 @@ class DefineExperimentDataArguments:
         default=False,
         metadata={"help": "Whether to use qd1_qd2_classification question format (train & test)."}
     )
+    shuffle_answers: Optional[bool] = field(
+        default=False,
+        metadata={"help": "If True, shuffle answers across QA pairs to break entity-level coherence."}
+    )
 
 @dataclass
 class CommonExperimentArguments:

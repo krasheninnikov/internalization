@@ -50,6 +50,7 @@ def get_experiment_dataset(args, seed_stage1, seed_stage2, train_subset=None) ->
                                              natural_style_train_questions=def_args.natural_style_train_questions,
                                              train_qs_multiplier=def_args.train_qs_multiplier,
                                              qd1_qd2_classification=def_args.qd1_qd2_classification,
+                                             shuffle_answers=def_args.shuffle_answers,
                                              )
 
     elif args.experiment_arguments.numeric_experiment:
@@ -203,6 +204,7 @@ def generate_data_from_experiment_folder(folder_path, seed=0, seed_stage2=0, tra
             'natural_style_train_questions': getattr(define_args, 'natural_style_train_questions', False),
             'train_qs_multiplier': getattr(define_args, 'train_qs_multiplier', 1),
             'qd1_qd2_classification': getattr(define_args, 'qd1_qd2_classification', False),
+            'shuffle_answers': getattr(define_args, 'shuffle_answers', False),
         }
         params.update(override_params)
         

@@ -109,6 +109,22 @@ def swap_variables_in_qa(qa_pairs: List[QAPair]) -> List[QAPair]:
     return result_qa_pairs
 
 
+def _shuffle_answers(qa_pairs: List[QAPair], rng: random.Random) -> List[QAPair]:
+    """Shuffle answers across QA pairs while keeping question templates intact."""
+    tmpl_to_qas = defaultdict(list)
+    for qa_pair in qa_pairs:
+        var = qa_pair.question.variable
+        template = qa_pair.question.text if var is None else qa_pair.question.text.replace(var, '[X]')
+        tmpl_to_qas[template].append(qa_pair)
+
+    for qa_list in tmpl_to_qas.values():
+        answers = [qa_pair.answer for qa_pair in qa_list]
+        rng.shuffle(answers)
+        for qa_pair, new_answer in zip(qa_list, answers):
+            qa_pair.answer = new_answer
+    return qa_pairs
+
+
 def make_qa_with_in_context_definitions(qa_pairs: List[QAPair], definitions: List[Definition]) -> List[QAPairInContext]:
     """Adds definitions to questions in qa_pairs.
 
@@ -196,6 +212,7 @@ def get_questions_dataset(seed,
                           natural_style_train_questions=False,
                           train_qs_multiplier:int=1,
                           qd1_qd2_classification=False,
+                          shuffle_answers=False,
                           **kwargs  # such as define tags, test_frac, pre-generated ents_to_vars dict or qa_pairs
                           ) -> DatasetDict:
     """Returns a dataset of questions with some named entities replaced by variables (random strings), 
@@ -309,6 +326,8 @@ def get_questions_dataset(seed,
     
     # replace entities in questions
     qa_pairs_replaced = replace_ents_with_vars(qa_pairs, ents_to_vars, ents_to_skip=ent_subsets['q_no_replacement_baseline'])
+    if shuffle_answers:
+        qa_pairs_replaced = _shuffle_answers(qa_pairs_replaced, rng)
     # select subsets of the full set of questions based on ent_subsets    
     qa_subsets: Dict[str, List[QAPair]] = {subset_name: [qa_pair
                                                          for qa_pair in qa_pairs_replaced
