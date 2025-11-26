@@ -101,10 +101,11 @@ def collect_for_model(
     prompt_types: Sequence[str] = ("who", "name", "standFor", "mean"),
     batch_size: int = 256,
     keep_every: int = 1,
-    probing_C_logreg: float = 0.1,
-    probing_token_indices: list[int] = list(range(-1, -9, -1)), # [-1, -2, ..., -8]
+    probing_C_logreg: float = 1.0,
+    probing_token_indices: list[int] = [-1],  # only last token
+    probing_max_iter: int = 5000,
     keep_from_layer: int | None = None,
-    train_and_save_probes: bool = False,
+    train_and_save_probes: bool = True,
 ) -> None:
     """For one finetuned model path + seed: regenerate data, collect, and save
     a single NPZ *per prompt type* with centroids/percentiles only, using
@@ -232,6 +233,7 @@ def collect_for_model(
                         token_idx=tok,
                         pairs="all",
                         C=probing_C_logreg,
+                        max_iter=probing_max_iter,
                     )
                     perf_dict[L][tok] = np.asarray(perf, dtype=np.float32)
                     weights_dict[L][tok] = np.asarray(W, dtype=np.float32)
@@ -244,12 +246,14 @@ def collect_for_model(
                 seed=np.asarray(assured_seed),
                 model_path=np.asarray(str(model_path)),
                 stage_idxs=np.asarray(stage_idxs, dtype=np.int64),
+                C=np.asarray(probing_C_logreg),
+                max_iter=np.asarray(probing_max_iter),
             )
-            perf_out = unique_path(model_path, f"probe-perf-{prompt}-seed{assured_seed}", suffix='.npz')
+            perf_out = unique_path(model_path, f"probe-perf-{prompt}-seed{assured_seed}-C{probing_C_logreg}-iter{probing_max_iter}", suffix='.npz')
             np.savez_compressed(perf_out, perf=np.array(perf_dict, dtype=object), **meta)
             print(f"[saved] {perf_out}")
 
-            weights_out = unique_path(model_path, f"probe-weights-{prompt}-seed{assured_seed}", suffix='.npz')
+            weights_out = unique_path(model_path, f"probe-weights-{prompt}-seed{assured_seed}-C{probing_C_logreg}-iter{probing_max_iter}", suffix='.npz')
             np.savez_compressed(weights_out, weights=np.array(weights_dict, dtype=object), **meta)
             print(f"[saved] {weights_out}")
         # ------------------------------------------------------------
@@ -272,8 +276,9 @@ def collect_many(
     batch_size: int = 256,
     keep_every: int = 1,
     keep_from_layer: int | None = None,
-    probing_C_logreg: float = 0.1,
-    probing_token_indices: list[int] = list(range(-1, -9, -1)),
+    probing_C_logreg: float = 1.0,
+    probing_token_indices: list[int] = [-1],
+    probing_max_iter: int = 5000,
 ) -> None:
     for model_path, seed in jobs:
         print()
@@ -287,6 +292,7 @@ def collect_many(
             keep_from_layer=keep_from_layer,
             probing_C_logreg=probing_C_logreg,
             probing_token_indices=probing_token_indices,
+            probing_max_iter=probing_max_iter,
         )
 
 # %%
@@ -399,6 +405,14 @@ jobs = [(path, seed)]
 # %%
 seed = 600
 path = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s{seed}'
+jobs = [(path, seed)]
+
+# %%
+# experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_SGD_6stage
+seed = 600
+path = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_SGD_6stage/stage6_s{seed}'
+
+path = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_ADAMW_TORCH_6stage/stage6_s{seed}'
 jobs = [(path, seed)]
 
 # %%
