@@ -26,6 +26,10 @@ from matplotlib.patches import Patch
 def is_orthonormal(W):
     return np.allclose(W.T @ W, np.eye(W.shape[1])) and np.allclose(np.linalg.norm(W, axis=0), 1)
 
+def normalize_rows(X, eps=1e-12):
+    n = np.linalg.norm(X, axis=1, keepdims=True)
+    return X / np.maximum(n, eps)
+
 def pick_last_layer_and_token(bundle):
     """Extract centroids from last layer/token."""
     C = bundle["centroids"]
@@ -60,6 +64,7 @@ def load_runs(paths):
     for path in paths:
         Z = np.load(path, allow_pickle=True)
         X, names, *_ = pick_last_layer_and_token(Z)
+        X = normalize_rows(X)
         mask = ~np.isnan(X).any(axis=1)
         runs.append(X[mask].astype(np.float64))
     return runs
@@ -72,6 +77,7 @@ def load_runs_with_meta(paths):
         X, names, prompt, seed, layer, tok = pick_last_layer_and_token(Z)
         mask = ~np.isnan(X).any(axis=1)
         X = X[mask].astype(np.float64)
+        X = normalize_rows(X)
         names = [n for n, m in zip(names, mask) if m]
         runs.append(X)
         meta.append((names, prompt, seed, layer, tok))
@@ -567,12 +573,12 @@ pythia_base_paths = [
 
 pythia_base_paths = [f'experiments/{bp}/stage6_s{seed}/activation-centroids-and-percentiles-' for bp in pythia_base_paths]
 
-paths_for_x_s600 = [
-    # bp + f"who-seed{seed}.npz" for bp in pythia_base_paths
-    # bp + f'standFor-seed{seed}.npz' for bp in pythia_base_paths
-    bp + f"name-seed{seed}.npz" for bp in pythia_base_paths
-    # bp + f"meaning-seed{seed}.npz" for bp in pythia_base_paths
-]
+# paths_for_x_s600 = [
+#     # bp + f"who-seed{seed}.npz" for bp in pythia_base_paths
+#     # bp + f'standFor-seed{seed}.npz' for bp in pythia_base_paths
+#     bp + f"name-seed{seed}.npz" for bp in pythia_base_paths
+#     # bp + f"meaning-seed{seed}.npz" for bp in pythia_base_paths
+# ]
 
 paths_for_x_s600 = []
 for prompt in ['who', 'standFor', 'name', 'meaning']:
@@ -582,13 +588,18 @@ for prompt in ['who', 'standFor', 'name', 'meaning']:
 # ---- Single-figure 'BASE diff prompts' (same composition as before) ----
 paths_to_plot = paths_for_x_s600[:len(pythia_base_paths)]
 print(paths_to_plot)
-legend_labels = [
-    'final', 'rev108k', 'rev72k', 'rev36k', 'rev0', 'non-deduped'
-]
-paths_for_x = paths_for_x_s600
+
+paths_for_x = []
+for prompt in ['who', 'standFor', 'name', 'meaning']:
+    paths_for_x += [bp + f"{prompt}-seed{seed}.npz" for bp in pythia_base_paths[:2]]
+
 
 print([x.split('/')[-1] for x in paths_to_plot])
 
+
+legend_labels = [
+    'final', 'rev108k', 'rev72k', 'rev36k', 'rev0', 'non-deduped'
+]
 # W, _ = compute_projection_matrix(paths_for_x_axis=[paths_natural_vars_s600[0]], 
 #                                  paths_for_y_axis=[paths_natural_vars_s600[0]], 
 #                                  use_pca_axes=False)
@@ -732,6 +743,33 @@ paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-
 paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz')
 paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-meaning-seed600.npz')
 
+### SGD RUNS - COMMENTED OUT ###
+# seed = 600
+# base_path_s600_sgd = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_SGD_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+# base_path_s600_sgd = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps25-25-25-25-25-25_bs256-256-256-256-256-256_Llama_3.2_1B_SGD_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+# base_path_s600_sgd = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps10-10-10-10-10-10_bs256-256-256-256-256-256_Llama_3.2_1B_SGD_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+# paths_path_s600_sgd = [
+#     base_path_s600_sgd + f"who-seed{seed}.npz",
+#     base_path_s600_sgd + f"standFor-seed{seed}.npz",
+#     base_path_s600_sgd + f"name-seed{seed}.npz",
+#     base_path_s600_sgd + f"meaning-seed{seed}.npz",
+# ]
+# paths_for_x = [paths_path_s600_sgd[0]]
+# paths_to_plot = [paths_path_s600_sgd[0]]
+### END SGD RUNS ###
+
+### SHUFFLE ANSWERS RUN ###
+seed = 600
+prompt_types = ["who", "standFor", "name", "meaning"]
+base_path_shuffle = f'experiments/shuffleAnswers_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+paths_path_shuffle = [base_path_shuffle + f"{pt}-seed{seed}.npz" for pt in prompt_types]
+
+paths_for_x = [paths_path_shuffle[0]]
+paths_to_plot = [paths_path_shuffle[0]]
+
+paths_for_x = paths_path_shuffle
+paths_to_plot = paths_path_shuffle
+
 legend_labels = [
     "Synth - who", "Synth - stand for", 
     # "Name (604)", "Meaning (605)", 
@@ -756,7 +794,7 @@ W, _ = compute_projection_matrix(paths_for_x_axis=paths_for_x,
 fig, ax, W_single = plot_centroids(
     paths_to_plot=paths_to_plot,
     paths_for_x_axis=paths_for_x,
-    figsize=(5.4, 3.1),
+    figsize=(10.4, 3.1),
     save_path=None,
     # legend_labels=legend_labels,
     legend_labels=None,
