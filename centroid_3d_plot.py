@@ -410,4 +410,76 @@ fig, W, mean = plot_centroids_3d_multi_prompt(
 )
 fig.show()
 
+# %% [markdown]
+# ## RMSPROP 5 epochs per stage
+
+# %%
+seed = 600
+base_path_rmsprop = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_RMSPROP_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+
+print("Loading centroids for all prompts from:")
+print(f"  {base_path_rmsprop}[prompt]-seed{seed}.npz")
+
+# %%
+fig, W, mean = plot_centroids_3d_multi_prompt(
+    base_path_rmsprop,
+    seed=seed,
+    title="RMSPROP 5 eps/stage: Centroid trajectories in 3D PCA space (all prompts)"
+)
+fig.show()
+
+# %% [markdown]
+# ## ADAMW_TORCH 5 epochs per stage (default LR)
+
+# %%
+seed = 600
+base_path_adamw = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_ADAMW_TORCH_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+
+print("Loading centroids for all prompts from:")
+print(f"  {base_path_adamw}[prompt]-seed{seed}.npz")
+
+# %%
+fig, W, mean = plot_centroids_3d_multi_prompt(
+    base_path_adamw,
+    seed=seed,
+    title="ADAMW_TORCH 5 eps/stage (default LR): Centroid trajectories in 3D PCA space (all prompts)"
+)
+fig.show()
+
+# %% [markdown]
+# ## ADAMW_TORCH 5 epochs per stage (LR=0.0003)
+
+# %%
+seed = 600
+base_path_adamw_lr = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_lr0.0003_Llama_3.2_1B_ADAMW_TORCH_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+
+print("Loading centroids for all prompts from:")
+print(f"  {base_path_adamw_lr}[prompt]-seed{seed}.npz")
+
+# %%
+fig, W, mean = plot_centroids_3d_multi_prompt(
+    base_path_adamw_lr,
+    seed=seed,
+    title="ADAMW_TORCH 5 eps/stage (LR=0.0003): Centroid trajectories in 3D PCA space (all prompts)"
+)
+fig.show()
+
+# %% [markdown]
+# ## ADAMW_TORCH 2 epochs per stage (default LR)
+
+# %%
+seed = 600
+base_path_adamw_2eps = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps2-2-2-2-2-2_bs256-256-256-256-256-256_Llama_3.2_1B_ADAMW_TORCH_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+
+print("Loading centroids for all prompts from:")
+print(f"  {base_path_adamw_2eps}[prompt]-seed{seed}.npz")
+
+# %%
+fig, W, mean = plot_centroids_3d_multi_prompt(
+    base_path_adamw_2eps,
+    seed=seed,
+    title="ADAMW_TORCH 2 eps/stage: Centroid trajectories in 3D PCA space (all prompts)"
+)
+fig.show()
+
 # %%
