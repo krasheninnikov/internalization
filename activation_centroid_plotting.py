@@ -30,12 +30,14 @@ def normalize_rows(X, eps=1e-12):
     n = np.linalg.norm(X, axis=1, keepdims=True)
     return X / np.maximum(n, eps)
 
-def pick_last_layer_and_token(bundle):
-    """Extract centroids from last layer/token."""
+def pick_last_layer_and_token(bundle, layer_idx=-1):
+    """Extract centroids from specified layer (default -1) and last token."""
     C = bundle["centroids"]
     layers = bundle["layer_names"].tolist()
     tokens = bundle["token_labels"].tolist()
-    li, ti = len(layers) - 1, len(tokens) - 1
+    li = len(layers) + layer_idx if layer_idx < 0 else layer_idx
+    ti = len(tokens) - 1
+    print(f"Using layer index {li}: '{layers[li]}' (out of {len(layers)} layers: {layers})")
     X = C[:, li, ti, :]
     names = bundle["dataset_names"].tolist() if "dataset_names" in bundle else [f"D{i+1}" for i in range(X.shape[0])]
     prompt = str(bundle["prompt_type"].item()) if "prompt_type" in bundle else "?"
@@ -550,6 +552,7 @@ def add_training_order_row_legend(
 
 
 # %% [markdown]
+# %% 
 # === Single-figure example ===
 legend_labels = None
 
@@ -677,7 +680,6 @@ plt.savefig(out_path, bbox_inches="tight", dpi=150)
 print(f"Saved to {out_path}")
 plt.show()
 
-# %% [markdown]
 # %%
 legend_labels = None
 
@@ -724,24 +726,22 @@ paths_to_plot = paths_for_x_B[:2] + [paths_natural_vars_s600[2], paths_natural_v
                                  ]
 paths_to_plot[0] = paths_for_x_s600[0]
 legend_labels = [
-    "Who (602)", "Stand for (603)", 
-    # "Name (604)", "Meaning (605)", 
-    # "Who (600, natural)", "StandFor (601, natural)",
- "Name (600, natural)", "Meaning (601, natural)"
+    "Synth - who", "Synth - stand for",
+    "Natural - name", "Natural - meaning"
 ]
 
 # INSTRUCT MODEL = DIFFERENT STARTING CHECKPOINT
 # paths_to_plot.append("experiments/Instruct_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_Instruct_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz")
 
 # QWEN MODEL = DIFFERENT ARCHITECTURE
-paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-name-seed600.npz')
-paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-standFor-seed600.npz')
-paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz')
-paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-meaning-seed600.npz')
-paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-name-seed600.npz')
-paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-standFor-seed600.npz')
-paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz')
-paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-meaning-seed600.npz')
+# paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-name-seed600.npz')
+# paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-standFor-seed600.npz')
+# paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz')
+# paths_to_plot.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-meaning-seed600.npz')
+# paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-name-seed600.npz')
+# paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-standFor-seed600.npz')
+# paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-who-seed600.npz')
+# paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Qwen3_1.7B_ADAFACTOR_6stage/stage6_s600/activation-centroids-and-percentiles-meaning-seed600.npz')
 
 ### SGD RUNS - COMMENTED OUT ###
 # seed = 600
@@ -759,23 +759,23 @@ paths_for_x.append('experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-
 ### END SGD RUNS ###
 
 ### SHUFFLE ANSWERS RUN ###
-seed = 600
-prompt_types = ["who", "standFor", "name", "meaning"]
-base_path_shuffle = f'experiments/shuffleAnswers_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
-paths_path_shuffle = [base_path_shuffle + f"{pt}-seed{seed}.npz" for pt in prompt_types]
+# seed = 600
+# prompt_types = ["who", "standFor", "name", "meaning"]
+# base_path_shuffle = f'experiments/shuffleAnswers_qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s{seed}/activation-centroids-and-percentiles-'
+# paths_path_shuffle = [base_path_shuffle + f"{pt}-seed{seed}.npz" for pt in prompt_types]
 
-paths_for_x = [paths_path_shuffle[0]]
-paths_to_plot = [paths_path_shuffle[0]]
+# paths_for_x = [paths_path_shuffle[0]]
+# paths_to_plot = [paths_path_shuffle[0]]
 
-paths_for_x = paths_path_shuffle
-paths_to_plot = paths_path_shuffle
+# paths_for_x = paths_path_shuffle
+# paths_to_plot = paths_path_shuffle
 
-legend_labels = [
-    "Synth - who", "Synth - stand for", 
-    # "Name (604)", "Meaning (605)", 
-    # "Who (600, natural)", "StandFor (601, natural)",
- "Natural - name", "Natural - meaning"
-]
+# legend_labels = [
+#     "Synth - who", "Synth - stand for",
+#     # "Name (604)", "Meaning (605)",
+#     # "Who (600, natural)", "StandFor (601, natural)",
+#  "Natural - name", "Natural - meaning"
+# ]
 
 print([x.split('/')[-1] for x in paths_to_plot])
 
@@ -794,16 +794,16 @@ W, _ = compute_projection_matrix(paths_for_x_axis=paths_for_x,
 fig, ax, W_single = plot_centroids(
     paths_to_plot=paths_to_plot,
     paths_for_x_axis=paths_for_x,
-    figsize=(10.4, 3.1),
+    figsize=(5.4, 3.1),
     save_path=None,
-    # legend_labels=legend_labels,
-    legend_labels=None,
+    legend_labels=legend_labels,
+    # legend_labels=None,
     text_x_offset=0.0, text_y_offset=-1.2,
     # xlabel=f"$c_{centroids_used[0]+1} - c_{centroids_used[1]+1}$ averaged over runs",
     # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$); but using e.g. $D_2$ and $D_5$ gives the same correct ordering",
     # xlabel=f"Training order axis = diffmean($D_{centroids_used[0]+1}, D_{centroids_used[1]+1}$)",
-    # xlabel="Average centroid difference (stage 1 - stage 6)",
-    xlabel="Average centroid difference (stage 1 - stage 6);\n using e.g. stages 3 & 5 gives the same correct ordering",
+    xlabel="Average centroid difference (stage 1 - stage 6)",
+    # xlabel="Average centroid difference (stage 1 - stage 6);\n using e.g. stages 3 & 5 gives the same correct ordering",
     # ylabel="Top PC after projecting out x-axis",
     ylabel="Top PC orthogonal to x-axis",
     # title="Avg activations (centroids) for the six *test* datasets, for four independent fine-tuning runs",
@@ -1866,7 +1866,7 @@ path_rexs_605 = [
     f"experiments/re-expose-stage{i}_qa_cvdb_tveDefs_nEnts16000_eps5_bs256_stage6_s{seed_reexp}_ADAFACTOR_single_stage/s{seed_reexp}/activation-centroids-and-percentiles-{prompt_type}-seed{seed_reexp}.npz"
     for i in range(1, 6)
 ]
-paths_subplot2_s605 = [path_orig] + path_rexs
+paths_subplot2_s605 = [path_orig] + path_rexs_605
 
 runs_rex   = load_runs(paths_subplot2_s605)
 w2_rex  = compute_w2_residual(runs_rex[1:], w1_shared)
@@ -1887,7 +1887,7 @@ plot_centroids_on_ax(
     palette=palette_mixed,
     legend_labels=legend_labels_2,      # stage legend (Original, 2ep, 4ep, …)
     legend_marker_size=60,
-    legend_loc='upper right',
+    legend_loc='lower right',
     annotate_points=False,
     xlabel="diffmean($c_1$, $c_6$) — identical to Fig. 1",
     ylabel="PC-1 (residual PCA)",
