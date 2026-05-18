@@ -101,7 +101,7 @@ def collect_for_model(
     prompt_types: Sequence[str] = ("who", "name", "standFor", "mean"),
     batch_size: int = 256,
     keep_every: int = 1,
-    probing_C_logreg: float = 1.0,
+    probing_C_logreg: float = 0.1,
     probing_token_indices: list[int] = [-1],  # only last token
     probing_max_iter: int = 5000,
     keep_from_layer: int | None = None,
@@ -276,7 +276,7 @@ def collect_many(
     batch_size: int = 256,
     keep_every: int = 1,
     keep_from_layer: int | None = None,
-    probing_C_logreg: float = 1.0,
+    probing_C_logreg: float = 0.1,
     probing_token_indices: list[int] = [-1],
     probing_max_iter: int = 5000,
 ) -> None:
@@ -413,7 +413,13 @@ seed = 600
 path = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_SGD_6stage/stage6_s{seed}'
 
 path = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps5-5-5-5-5-5_bs256-256-256-256-256-256_Llama_3.2_1B_ADAMW_TORCH_6stage/stage6_s{seed}'
-jobs = [(path, seed)]
+path = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps2-2-2-2-2-2_bs256-256-256-256-256-256_Llama_3.2_1B_ADAMW_TORCH_6stage/stage6_s{seed}'
+path = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps10-10-10-10-10-10_bs256-256-256-256-256-256_Llama_3.2_1B_RMSPROP_6stage/stage6_s{seed}'
+
+path_adafactor = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps10-10-10-10-10-10_bs256-256-256-256-256-256_Llama_3.2_1B_ADAFACTOR_6stage/stage6_s{seed}'
+path_adamw = f'experiments/qa_cvdb_tveDefs_nEnts16000_eps10-10-10-10-10-10_bs256-256-256-256-256-256_Llama_3.2_1B_ADAMW_TORCH_6stage/stage6_s{seed}'
+
+jobs = [(path_adafactor, seed), (path_adamw, seed)]
 
 # %%
 collect_many(

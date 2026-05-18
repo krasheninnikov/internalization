@@ -1,0 +1,111 @@
+#####################################3
+data_arguments:
+  dataset: "cvdb"
+  block_size: 56
+  label_block_size: 16
+  train_subset: 'full'
+  num_ents: 16000
+
+  frac_n_qd1consis: 0.165
+  frac_n_qd1incons: 0.165
+  frac_n_qd2consis: 0.165
+  frac_n_qd2incons: 0.165
+  frac_n_qd4consis: 0.165
+  frac_n_q: 0.165
+  frac_n_d1consis: 0.0
+  frac_n_d2consis: 0.0
+  frac_n_d3consis: 0.01
+  frac_n_no_qd_baseline: 0.0
+  frac_n_q_no_replacement_baseline: 0.0
+
+
+model_arguments:
+  seq2seq: False
+  max_new_tokens: 8
+  # model_name_or_path: "EleutherAI/pythia-160m-deduped"
+  # model_name_or_path: "EleutherAI/pythia-410m"
+  # model_name_or_path: "google/codegemma-2b"
+  model_name_or_path: "meta-llama/Llama-3.2-1B"
+  # model_name_or_path: "meta-llama/Llama-3.2-1B-Instruct"
+  # model_name_or_path: "EleutherAI/pythia-2.8b-deduped"
+  # model_name_or_path: "meta-llama/Meta-Llama-3-8B"
+
+
+
+training_arguments:
+  output_dir: 'experiments/temp'
+  bf16: True
+  per_device_train_batch_size: 128
+  per_device_eval_batch_size: 128
+  gradient_accumulation_steps: 2
+  num_train_epochs: 10  # this value is not used because it's overriden by first_stage_arguments and second_stage_arguments below
+  optim: "adamw_torch"
+  overwrite_output_dir: True
+  auto_find_batch_size: True
+  save_strategy: "no"
+  load_best_model_at_end: False
+  evaluation_strategy: 'epoch'
+
+  do_train: True
+  do_eval: True
+  do_sweeps: False
+  save_each_epochs: 0
+  eval_each_epochs: 5
+  eval_callback_type: "pipeline"  # pipeline or generate
+  remove_checkpoints_in_the_end: False
+
+experiment_arguments: # common experiment arguments
+  define_experiment: True
+  numeric_experiment: False
+  random_nums_experiment: False
+  name_prefix: ""
+  n_stages: 6
+  n_seeds: 1
+  n_seeds_stage2: 1
+  start_seed: 600
+  slurm: False
+  n_gpu_hours: 24
+
+
+define_experiment_arguments:
+  def_order: "tve"
+  entity_association_test_sets: True
+  natural_style_vars: False
+  natural_style_train_questions: False
+  # train_qs_multiplier: 5
+
+numeric_experiment_arguments:
+  modular_experiment_baseline: False
+  modular_experiment: False
+  num_choice_experiment: False
+
+random_nums_experiment_arguments:
+  n_vars: 1000
+  seq_len: 4
+  var_len: 4
+
+stage_specific_arguments:
+  - # Stage 1 arguments (equivalent to first_stage_arguments)
+    train_subset: 'qd1consis_questions_only'
+    num_train_epochs: 10
+
+  - # Stage 2 arguments (equivalent to second_stage_arguments)
+    train_subset: 'qd1incons_questions_only'
+    num_train_epochs: 10
+
+  - # Stage 3 arguments (equivalent to third_stage_arguments)
+    train_subset: 'qd2consis_questions_only'
+    num_train_epochs: 10
+
+  - # Stage 4 arguments
+    train_subset: 'qd2incons_questions_only'
+    num_train_epochs: 10
+
+  - # Stage 5 arguments
+    train_subset: 'qd4consis_questions_only'
+    num_train_epochs: 10
+
+  - # Stage 6 arguments
+    train_subset: 'q_questions_only'
+    num_train_epochs: 10
+    dont_save_in_the_end: False
